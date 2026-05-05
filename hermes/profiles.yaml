@@ -1,0 +1,262 @@
+version: 1
+defaults:
+  steering_source: /Users/sva/Documents/Repos/Github/home-ops/hermes/steering
+  profile_strategy: clone-then-prune
+  secret_policy: Use HashiCorp Vault for shared/durable secrets; profile .env only for local runtime env indirection, never
+    committed.
+  local_model_guardrail: Use restricted toolsets/MCPs with qwen3-coder:30b; avoid full Hermes tool catalog.
+repos:
+  automations:
+    path: /Users/sva/Documents/Repos/Gitea/automations
+    mcp: cocoindex-automations
+  home-ops:
+    path: /Users/sva/Documents/Repos/Github/home-ops
+    mcp: cocoindex-home-ops
+  anit-guru:
+    path: /Users/sva/Documents/Repos/Github/anit.guru
+    mcp: cocoindex-anit-guru
+  vanhero:
+    path: /Users/sva/Documents/Repos/Github/vanhero.com
+    mcp: cocoindex-vanhero
+  observo:
+    path: /Users/sva/Documents/Repos/Gitea/observo
+    mcp: cocoindex-observo
+  game-servers:
+    upstream: https://github.com/anitguru/game-servers
+    status: not-local-yet
+  wayfinder:
+    upstream: https://github.com/anitguru/wayfinder.page
+    status: not-local-yet
+profiles:
+  automations:
+    purpose: Automations that support SVA hobby/brands/personas; migrate low-hanging Gitea Actions to Hermes cronjobs where
+      practical.
+    primary_repo: automations
+    repos:
+    - automations
+    - home-ops
+    - anit-guru
+    needs:
+    - vault
+    - cronjob
+    - terminal
+    - file
+    - firecrawl
+    - whisper
+    - tts
+    default_model:
+      provider: rgb-ollama
+      model: qwen3-coder:30b
+    mcp_servers:
+    - vault
+    - firecrawl
+    - cocoindex-automations
+    - cocoindex-home-ops
+    - cocoindex-anit-guru
+    default_cwd: /Users/sva/Documents/Repos/Gitea/automations
+    notes:
+    - Prefer HashiCorp Vault for shared/durable credentials; .env is acceptable only for local per-profile runtime secrets.
+    - Use local Qwen for read-only, summaries, deterministic cron maintenance, and simple refactors; escalate content/code
+      generation uncertainty to frontier models.
+  anit-guru:
+    purpose: Main SVA/AnITGuru persona site, X social, YouTube, Guru's Tech Bytes, audience-building and monetization goals.
+    primary_repo: anit-guru
+    repos:
+    - anit-guru
+    - home-ops
+    needs:
+    - vault
+    - web
+    - terminal
+    - file
+    - ahrefs
+    default_model:
+      provider: openai-codex
+      model: gpt-5.5
+    auxiliary_model:
+      provider: openai-codex
+      model: gpt-5.4-mini
+    mcp_servers:
+    - vault
+    - ahrefs
+    - cocoindex-anit-guru
+    - cocoindex-home-ops
+    default_cwd: /Users/sva/Documents/Repos/Github/anit.guru
+  vanhero:
+    purpose: VanHero legacy hobby gaming team/site; recreation only, no monetization goals.
+    primary_repo: vanhero
+    repos:
+    - vanhero
+    - home-ops
+    needs:
+    - vault
+    - web
+    - terminal
+    - file
+    - ahrefs
+    default_model:
+      provider: openai-codex
+      model: gpt-5.5
+    auxiliary_model:
+      provider: openai-codex
+      model: gpt-5.4-mini
+    mcp_servers:
+    - vault
+    - ahrefs
+    - cocoindex-vanhero
+    - cocoindex-home-ops
+    default_cwd: /Users/sva/Documents/Repos/Github/vanhero.com
+  game-server-ops:
+    purpose: Infra ops for Enemy Territory/ETLegacy public servers, ET Trick Jump private, Unreal Tournament 99, downloads.vanhero.com
+      Caddy/files, and VanHero stats pipeline.
+    primary_repo: https://github.com/anitguru/game-servers
+    repos:
+    - game-servers
+    - home-ops
+    - vanhero
+    needs:
+    - vault
+    - cronjob
+    - terminal
+    - file
+    default_model:
+      provider: rgb-ollama
+      model: qwen3-coder:30b
+    mcp_servers:
+    - vault
+    - cocoindex-home-ops
+    - cocoindex-vanhero
+    default_cwd: /Users/sva/Documents/Repos/Github/home-ops
+    pending_repos:
+    - Clone or reconstruct https://github.com/anitguru/game-servers into /Users/sva/Documents/Repos/Github/game-servers, then
+      add cocoindex-game-servers MCP.
+    notes:
+    - Do not clean up remote /root copies until local repo provenance is confirmed, pushed, and docs/wiki are updated.
+  observo:
+    purpose: Event data logging pipeline for work-learning in homelab; sources from home infra; sinks include SigNoz primary,
+      Splunk, and later SentinelOne Singularity Data Lake limited tests.
+    primary_repo: observo
+    repos:
+    - observo
+    - home-ops
+    needs:
+    - vault
+    - terminal
+    - file
+    default_model:
+      provider: openai-codex
+      model: gpt-5.5
+    auxiliary_model:
+      provider: openai-codex
+      model: gpt-5.4-mini
+    mcp_servers:
+    - vault
+    - cocoindex-observo
+    - cocoindex-home-ops
+    default_cwd: /Users/sva/Documents/Repos/Gitea/observo
+    notes:
+    - Do not access 1Password. If Observo credentials are needed by agents, move only necessary ones to HashiCorp Vault intentionally.
+  app-dev:
+    purpose: General app development learning, POCs/MVPs for individual projects, hobbies, and possible monetization paths.
+    primary_repo: prompt-diet
+    repos:
+    - prompt-diet
+    - fun-learning-kids
+    - shrink
+    - logflow-lab
+    - snowball
+    - forest-adventure
+    - mr-fusion
+    - log-volume-calculator
+    - npm-structured-logger
+    needs:
+    - vault
+    - terminal
+    - file
+    default_model:
+      provider: openai-codex
+      model: gpt-5.5
+    auxiliary_model:
+      provider: openai-codex
+      model: gpt-5.4-mini
+    mcp_servers:
+    - vault
+    - cocoindex-home-ops
+    default_cwd: /Users/sva/Documents/Repos/Github/home-ops
+    pending_repos:
+    - Locate/clone listed app repos, initialize CocoIndex per repo, then add scoped MCPs.
+  wayfinder:
+    purpose: Wayfinder/Athena creator community brand; high-traffic site, blog/content operations, newsletter/audience growth,
+      humble monetization, and eventual Astro rebuild/import cleanup.
+    primary_repo: https://github.com/anitguru/wayfinder.page
+    repos:
+    - wayfinder
+    needs:
+    - vault
+    - terminal
+    - file
+    - ahrefs
+    - firecrawl
+    - image_gen
+    default_model:
+      provider: openai-codex
+      model: gpt-5.5
+    auxiliary_model:
+      provider: openai-codex
+      model: gpt-5.4-mini
+    mcp_servers:
+    - vault
+    - ahrefs
+    - firecrawl
+    default_cwd: /Users/sva/Documents/Repos/Github/home-ops
+    pending_repos:
+    - Clone https://github.com/anitguru/wayfinder.page locally, initialize CocoIndex, add cocoindex-wayfinder MCP.
+  tvauto:
+    purpose: Automate TV show downloads and management; version control homelab app/config data and related public link site/deployable
+      files.
+    primary_repo: https://github.com/anitguru/tvauto-linktree-template
+    repos:
+    - tvauto
+    - tvauto.io
+    needs:
+    - vault
+    - terminal
+    - file
+    default_model:
+      provider: rgb-ollama
+      model: qwen3-coder:30b
+    mcp_servers:
+    - vault
+    - cocoindex-home-ops
+    default_cwd: /Users/sva/Documents/Repos/Github/home-ops
+    pending_repos:
+    - Split/rename old tvauto-linktree-template into private tvauto config repo plus clean tvauto.io public site repo after
+      reviewing existing data.
+  home-ops:
+    purpose: Local laptop/Hermes/home-ops automation, safe file organization, profile standards, and version-controlled ops
+      scripts.
+    primary_repo: home-ops
+    repos:
+    - home-ops
+    needs:
+    - vault
+    - cronjob
+    - terminal
+    - file
+    default_model:
+      provider: openai-codex
+      model: gpt-5.5
+    auxiliary_model:
+      provider: openai-codex
+      model: gpt-5.4-mini
+    mcp_servers:
+    - vault
+    - cocoindex-home-ops
+    default_cwd: /Users/sva/Documents/Repos/Github/home-ops
+    aliases:
+    - home-ops
+    - ops
+    notes:
+    - Renamed from the older ops profile; the ops wrapper alias is kept for muscle memory.
+    - Daily user-file organization cronjob now runs the version-controlled script from home-ops/hermes/scripts/.
+    - Cron execution itself uses an explicit local qwen3-coder:30b override where safe to avoid paid-model spend.
