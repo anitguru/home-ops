@@ -1,0 +1,143 @@
+# Kryten Readable — update-safe Hermes dashboard theme
+# Stored in home-ops and symlinked into ~/.hermes/dashboard-themes/ so Hermes updates do not overwrite it.
+name: kryten-readable
+label: Kryten Readable
+description: Readable system fonts, normal casing, reduced tracking, and higher contrast for the native Hermes dashboard.
+
+palette:
+  background:
+    hex: "#070b12"
+    alpha: 1.0
+  midground:
+    hex: "#e7edf5"
+    alpha: 1.0
+  foreground:
+    hex: "#ffffff"
+    alpha: 0.0
+  warmGlow: "rgba(86, 156, 214, 0.18)"
+  noiseOpacity: 0.25
+
+typography:
+  # No external font URL: use native OS fonts so it is fast, readable, and not dependent on Google Fonts availability.
+  fontSans: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+  fontMono: '"JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace'
+  fontDisplay: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+  baseSize: "19px"
+  lineHeight: "1.58"
+  letterSpacing: "0"
+
+layout:
+  radius: "0.65rem"
+  density: comfortable
+
+layoutVariant: standard
+
+colorOverrides:
+  card: "#0d1420"
+  cardForeground: "#e7edf5"
+  popover: "#0d1420"
+  popoverForeground: "#e7edf5"
+  primary: "#8ab4f8"
+  primaryForeground: "#070b12"
+  accent: "#1f2a3a"
+  accentForeground: "#e7edf5"
+  muted: "#141c29"
+  mutedForeground: "#a8b3c2"
+  border: "rgba(231, 237, 245, 0.18)"
+  input: "rgba(231, 237, 245, 0.22)"
+  ring: "#8ab4f8"
+  destructive: "#ff6b6b"
+  success: "#5bd88f"
+  warning: "#f5c86b"
+
+customCSS: |
+  /* Kill the inherited all-caps / Mondwest look without patching Hermes source. */
+  #root > div {
+    font-family: var(--theme-font-sans) !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+  }
+
+  /* Override dashboard chrome while leaving the embedded xterm chat cells alone. */
+  #root :where(:not(.xterm):not(.xterm *)) {
+    font-family: var(--theme-font-sans) !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+  }
+
+  #root :where(code, kbd, pre, samp, .font-mono, .font-mono-ui, .xterm, .xterm *) {
+    font-family: var(--theme-font-mono) !important;
+  }
+
+  #root :where(h1, h2, h3, h4, .font-bold, [class*="font-bold"]) {
+    font-weight: 650;
+  }
+
+  #root :where(.text-muted-foreground, [class*="text-muted-foreground"], [class*="text-midground/55"], [class*="text-midforeground/55"]) {
+    opacity: 1 !important;
+  }
+
+  /* Readability scale: override Tailwind's tiny utility sizes across sidebars, filters, tabs, buttons, and main panes. */
+  #root {
+    font-size: var(--theme-base-size) !important;
+  }
+
+  #root :where([class~="text-[10px]"], [class~="text-[11px]"], [class~="text-[12px]"], [class~="text-xs"]) {
+    font-size: 0.86rem !important;
+    line-height: 1.45 !important;
+  }
+
+  #root :where([class~="text-sm"]) {
+    font-size: 0.94rem !important;
+    line-height: 1.5 !important;
+  }
+
+  #root :where([class~="text-base"]) {
+    font-size: 1.02rem !important;
+    line-height: 1.55 !important;
+  }
+
+  #root :where([class~="text-lg"]) {
+    font-size: 1.14rem !important;
+    line-height: 1.45 !important;
+  }
+
+  #root :where([class~="text-xl"]) {
+    font-size: 1.28rem !important;
+    line-height: 1.35 !important;
+  }
+
+  #root :where([class~="text-2xl"]) {
+    font-size: 1.5rem !important;
+    line-height: 1.25 !important;
+  }
+
+  #root :where([class~="text-3xl"], [class~="text-4xl"], [class~="text-5xl"]) {
+    font-size: 1.78rem !important;
+    line-height: 1.18 !important;
+  }
+
+  #root :where(button, input, select, textarea, label, [role="button"], [role="tab"], [role="menuitem"]) {
+    font-size: max(0.92rem, 17px) !important;
+    line-height: 1.45 !important;
+  }
+
+  #root :where(h1) {
+    font-size: 1.82rem !important;
+    line-height: 1.15 !important;
+  }
+
+  #root :where(h2) {
+    font-size: 1.5rem !important;
+    line-height: 1.2 !important;
+  }
+
+  #root :where(h3) {
+    font-size: 1.25rem !important;
+    line-height: 1.25 !important;
+  }
+
+  #root :where(p, li, td, th) {
+    font-size: max(0.96rem, 18px) !important;
+    line-height: 1.55 !important;
+  }
