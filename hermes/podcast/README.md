@@ -34,6 +34,28 @@ The watcher helper `hermes/scripts/share-latest-podcast-audio.sh` is intentional
   - `scripts/publish-episode.mjs` — Cloudinary upload, episode markdown generation, site commit/push.
   - `content/podcast/YYYY-MM-DD.md` — generated episode pages.
 
+## Pipeline flow
+
+```mermaid
+flowchart TD
+    Cron["Hermes cron<br/>0 6 * * * America/New_York"] --> Producer["LLM-driven producer/publisher<br/>workdir: automations"]
+    Producer --> Env["Source ~/.hermes/secrets/podcast.env<br/>map SUPABASE_PG_DSN to COCOINDEX_DATABASE_URL if needed"]
+    Env --> Fetch["morning-briefing.sh<br/>fetch current HN stories"]
+    Fetch --> Rank["cocoindex_rank.py<br/>rank topics + mark recent duplicates"]
+    Rank --> Proof{"Ranking proof present?"}
+    Proof -->|"no: topic index fallback detected"| Stop["STOP<br/>do not publish fallback content"]
+    Proof -->|"yes"| Select["Select top non-recent duplicates<br/>allow repeats only if fewer than 4 fresh stories"]
+    Select --> Script["Generate script.txt<br/>6 paragraphs, 330-400 words"]
+    Script --> TTS["chatterbox_tts_segments.sh<br/>Peter Griffin voice + ffmpeg loudnorm"]
+    TTS --> AudioCheck{"MP3 valid and >60s?"}
+    AudioCheck -->|"no"| Stop
+    AudioCheck -->|"yes"| Captions["Whisper verbose_json<br/>build authored-text SRT"]
+    Captions --> Publish["anit.guru/scripts/publish-episode.mjs<br/>Cloudinary upload + episode markdown"]
+    Publish --> DB["Upsert podcast_episodes if publisher did not prove DB update"]
+    DB --> Verify["Verify ffprobe, SRT, Cloudinary HTTP 200,<br/>episode markdown, public route/feed, git status"]
+    Verify --> Report["Telegram completion report<br/>MEDIA: MP3 + SRT"]
+```
+
 ## Required secrets and environment
 
 Do not commit or paste secret values. The production cron should source `~/.hermes/secrets/podcast.env` if present.
