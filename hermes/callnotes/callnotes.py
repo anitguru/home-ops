@@ -138,11 +138,17 @@ def run_rclone(args: list[str], *, env: dict[str, str]) -> subprocess.CompletedP
     return subprocess.run(cmd, capture_output=True, text=True, check=True, env=env)
 
 
+def is_call_docx(name: str) -> bool:
+    """Return true for Recorder docs named call.docx or call-prefixed .docx files."""
+    normalized = name.strip().lower()
+    return normalized == "call.docx" or (normalized.startswith("call") and normalized.endswith(".docx"))
+
+
 def find_call_docs(*, env: dict[str, str]) -> list[str]:
     result = run_rclone(["lsjson", f"{REMOTE}:"], env=env)
     files = json.loads(result.stdout or "[]")
-    docs = [f["Path"] for f in files if f.get("Name", "").lower() == "call.docx" and not f.get("IsDir")]
-    print(f"Drive root scan: {len(files)} item(s), {len(docs)} call.docx candidate(s).")
+    docs = [f["Path"] for f in files if is_call_docx(f.get("Name", "")) and not f.get("IsDir")]
+    print(f"Drive root scan: {len(files)} item(s), {len(docs)} call-prefixed .docx candidate(s).")
     return docs
 
 

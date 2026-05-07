@@ -11,7 +11,7 @@ Repo-backed Hermes/default-profile cron migration of the old Gitea `callnotes` w
 
 ## Preserved behavior
 
-- Scan Google Drive remote `svagml-remote-gdrive` for root-level `call.docx`.
+- Scan Google Drive remote `svagml-remote-gdrive` for root-level `call.docx` or `call*.docx` files (for example, Google Recorder exports renamed to `call - ... .docx`).
 - Convert DOCX transcript text with `python-docx`.
 - Structure into Mortenson-style SentinelOne meeting notes.
 - Write to Obsidian MCP vault `work` (`sva-s1`) folder `01_Interactions` as `<YYYY-MM-DD>-Call.md`.
