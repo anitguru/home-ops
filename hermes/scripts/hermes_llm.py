@@ -36,12 +36,14 @@ def run_hermes_prompt(
 ) -> str:
     """Run a non-interactive Hermes one-shot and return stdout text.
 
-    Default profile is selected by HERMES_AUTOMATION_PROFILE, falling back to
-    ``automations`` because that profile is intended to carry focused automation
-    context while the default gateway remains the only persistent gateway.
+    Default profile is selected by HERMES_AUTOMATION_PROFILE. The caller should
+    set that to a specialty one-shot profile such as ``xposting`` or
+    ``xengaging`` while the default profile remains the persistent cron owner.
+    If unset, Hermes' default profile is used; never fall back to the retired
+    Gitea/automations profile.
     """
     hermes_bin = os.getenv("HERMES_BIN", "hermes")
-    profile = profile if profile is not None else os.getenv("HERMES_AUTOMATION_PROFILE", "automations")
+    profile = profile if profile is not None else os.getenv("HERMES_AUTOMATION_PROFILE", "")
 
     cmd = [hermes_bin]
     if profile:
@@ -58,6 +60,9 @@ def run_hermes_prompt(
         "ANTHROPIC_TOKEN",
         "CLAUDE_API_KEY",
         "HERMES_TUI",
+        "HERMES_TUI_ACTIVE_SESSION_FILE",
+        "HERMES_GATEWAY_SESSION",
+        "HERMES_INTERACTIVE",
         "HERMES_SESSION_KEY",
     ):
         env.pop(key, None)

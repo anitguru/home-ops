@@ -25,8 +25,8 @@ repos:
     upstream: https://github.com/anitguru/game-servers
     status: not-local-yet
   wayfinder:
-    upstream: https://github.com/anitguru/wayfinder.page
-    status: not-local-yet
+    path: /Users/sva/Documents/Repos/Github/wayfinder.page
+    mcp: cocoindex-wayfinder
 profiles:
   automations:
     purpose: Automations that support SVA hobby/brands/personas; migrate low-hanging Gitea Actions to Hermes cronjobs where
@@ -58,6 +58,59 @@ profiles:
     - Prefer HashiCorp Vault for shared/durable credentials; .env is acceptable only for local per-profile runtime secrets.
     - Use local Qwen for read-only, summaries, deterministic cron maintenance, and simple refactors; escalate content/code
       generation uncertainty to frontier models.
+  xposting:
+    purpose: One-shot @anitdotguru X post drafting profile invoked by default-profile Hermes cron wrappers.
+    primary_repo: home-ops
+    repos:
+    - home-ops
+    - anit-guru
+    needs:
+    - terminal
+    - file
+    default_model:
+      provider: openai-codex
+      model: gpt-5.5
+    default_cwd: /Users/sva/Documents/Repos/Github/home-ops/hermes/x-social
+    scheduling_owner: default
+    notes:
+    - Public-facing post copy should be concise, pragmatic, and only based on caller-provided source context.
+    - Cron/runtime state lives in home-ops; do not rely on Gitea Actions, runners, or pushes for scheduled posting.
+    - Do not keep a persistent gateway or scheduler for this profile; default profile owns active cron visibility.
+  xengaging:
+    purpose: One-shot @anitdotguru X mention reply drafting profile invoked by default-profile Hermes cron wrappers.
+    primary_repo: home-ops
+    repos:
+    - home-ops
+    - anit-guru
+    needs:
+    - terminal
+    - file
+    default_model:
+      provider: openai-codex
+      model: gpt-5.5
+    default_cwd: /Users/sva/Documents/Repos/Github/home-ops/hermes/x-social
+    scheduling_owner: default
+    notes:
+    - Only draft replies for mentions that deterministic engagement scoring already selected.
+    - Cron/runtime state lives in home-ops; do not rely on Gitea Actions, runners, or pushes for scheduled engagement.
+    - Do not keep a persistent gateway or scheduler for this profile; default profile owns active cron visibility.
+  callnotes:
+    purpose: One-shot transcript-to-meeting-note structuring profile invoked by default-profile Hermes cron wrappers.
+    primary_repo: home-ops
+    repos:
+    - home-ops
+    needs:
+    - terminal
+    - file
+    default_model:
+      provider: openai-codex
+      model: gpt-5.5
+    default_cwd: /Users/sva/Documents/Repos/Github/home-ops/hermes/callnotes
+    scheduling_owner: default
+    notes:
+    - Default-profile cron owns the old callnotes schedule; this profile only structures transcript text on demand.
+    - Cron/runtime state lives in home-ops; do not rely on Gitea Actions, runners, or pushes for scheduled callnotes.
+    - Do not keep a persistent gateway or scheduler for this profile.
   anit-guru:
     purpose: Main SVA/AnITGuru persona site, X social, YouTube, Guru's Tech Bytes, audience-building and monetization goals.
     primary_repo: anit-guru
@@ -188,9 +241,10 @@ profiles:
   wayfinder:
     purpose: Wayfinder/Athena creator community brand; high-traffic site, blog/content operations, newsletter/audience growth,
       humble monetization, and eventual Astro rebuild/import cleanup.
-    primary_repo: https://github.com/anitguru/wayfinder.page
+    primary_repo: wayfinder
     repos:
     - wayfinder
+    - home-ops
     needs:
     - vault
     - terminal
@@ -208,9 +262,9 @@ profiles:
     - vault
     - ahrefs
     - firecrawl
-    default_cwd: /Users/sva/Documents/Repos/Github/home-ops
-    pending_repos:
-    - Clone https://github.com/anitguru/wayfinder.page locally, initialize CocoIndex, add cocoindex-wayfinder MCP.
+    - cocoindex-wayfinder
+    - cocoindex-home-ops
+    default_cwd: /Users/sva/Documents/Repos/Github/wayfinder.page
   tvauto:
     purpose: Automate TV show downloads and management; version control homelab app/config data and related public link site/deployable
       files.
@@ -252,6 +306,7 @@ profiles:
     mcp_servers:
     - vault
     - cocoindex-home-ops
+    - unifi-network
     default_cwd: /Users/sva/Documents/Repos/Github/home-ops
     aliases:
     - home-ops

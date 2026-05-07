@@ -33,6 +33,7 @@ PROJECTS=(
   "/Users/sva/Documents/Repos/Github/anit.guru"
   "/Users/sva/Documents/Repos/Github/home-ops"
   "/Users/sva/Documents/Repos/Github/vanhero.com"
+  "/Users/sva/Documents/Repos/Github/wayfinder.page"
 )
 
 log "Starting CocoIndex refresh for ${#PROJECTS[@]} projects"
