@@ -4,7 +4,7 @@ defaults:
   profile_strategy: clone-then-prune
   secret_policy: Use HashiCorp Vault for shared/durable secrets; profile .env only for local runtime env indirection, never
     committed.
-  local_model_guardrail: Use restricted toolsets/MCPs with qwen3-coder:30b; avoid full Hermes tool catalog.
+  model_policy: Use openai-codex/gpt-5.5 for profile default models; use openai-codex/gpt-5.4-mini for auxiliary/delegation where configured.
 repos:
   automations:
     path: /Users/sva/Documents/Repos/Gitea/automations
@@ -45,8 +45,8 @@ profiles:
     - whisper
     - tts
     default_model:
-      provider: rgb-ollama
-      model: qwen3-coder:30b
+      provider: openai-codex
+      model: gpt-5.5
     mcp_servers:
     - vault
     - firecrawl
@@ -56,8 +56,7 @@ profiles:
     default_cwd: /Users/sva/Documents/Repos/Gitea/automations
     notes:
     - Prefer HashiCorp Vault for shared/durable credentials; .env is acceptable only for local per-profile runtime secrets.
-    - Use local Qwen for read-only, summaries, deterministic cron maintenance, and simple refactors; escalate content/code
-      generation uncertainty to frontier models.
+    - Use openai-codex/gpt-5.5 for agentic work; keep deterministic cron maintenance in no-agent scripts where practical.
   xposting:
     purpose: One-shot @anitdotguru X post drafting profile invoked by default-profile Hermes cron wrappers.
     primary_repo: home-ops
@@ -173,8 +172,8 @@ profiles:
     - terminal
     - file
     default_model:
-      provider: rgb-ollama
-      model: qwen3-coder:30b
+      provider: openai-codex
+      model: gpt-5.5
     mcp_servers:
     - vault
     - cocoindex-home-ops
@@ -277,8 +276,8 @@ profiles:
     - terminal
     - file
     default_model:
-      provider: rgb-ollama
-      model: qwen3-coder:30b
+      provider: openai-codex
+      model: gpt-5.5
     mcp_servers:
     - vault
     - cocoindex-home-ops
@@ -314,4 +313,4 @@ profiles:
     notes:
     - Renamed from the older ops profile; the ops wrapper alias is kept for muscle memory.
     - Daily user-file organization cronjob now runs the version-controlled script from home-ops/hermes/scripts/.
-    - Cron execution itself uses an explicit local qwen3-coder:30b override where safe to avoid paid-model spend.
+    - Daily user-file organization cron now uses openai-codex/gpt-5.5; keep future cost-sensitive automations deterministic/no-agent when practical.

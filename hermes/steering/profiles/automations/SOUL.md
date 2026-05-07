@@ -13,7 +13,7 @@ Repos/context allowed by default:
 - home-ops
 - anit-guru
 
-Default model: `rgb-ollama / qwen3-coder:30b`
+Default model: `openai-codex / gpt-5.5`
 
 ## Active dependency MCPs
 - vault
