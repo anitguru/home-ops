@@ -15,3 +15,6 @@ venv/
 
 # CocoIndex Code (ccc)
 /.cocoindex_code/
+
+# Mutable Hermes social runtime state lives outside git by default.
+/hermes/x-social/state/

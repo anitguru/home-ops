@@ -18,9 +18,10 @@ import requests
 import tweepy
 
 try:
-    from scripts import social_db
+    from scripts import social_db, state_paths
 except Exception:  # pragma: no cover - script execution fallback
     import social_db
+    import state_paths
 
 HOME_OPS_HERMES_SCRIPTS = Path(os.environ.get(
     "HOME_OPS_HERMES_SCRIPTS",
@@ -31,7 +32,7 @@ if str(HOME_OPS_HERMES_SCRIPTS) not in sys.path:
 from hermes_llm import run_hermes_prompt
 
 ROOT = Path(__file__).resolve().parent.parent
-HISTORY = ROOT / "state" / "posts.jsonl"
+HISTORY = state_paths.POSTS_HISTORY
 
 RECENT_DOMAIN_WINDOW = 5  # block same domain if it appeared in last N posts
 

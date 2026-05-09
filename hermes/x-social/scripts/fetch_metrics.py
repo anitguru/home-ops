@@ -12,12 +12,13 @@ from pathlib import Path
 import tweepy
 
 try:
-    from scripts import social_db
+    from scripts import social_db, state_paths
 except Exception:  # pragma: no cover - script execution fallback
     import social_db
+    import state_paths
 
 ROOT = Path(__file__).resolve().parent.parent
-HISTORY = ROOT / "state" / "posts.jsonl"
+HISTORY = state_paths.POSTS_HISTORY
 
 MIN_AGE_SECS = 3600         # skip posts younger than 1h
 MAX_AGE_SECS = 7 * 86400    # stop tracking after 7 days

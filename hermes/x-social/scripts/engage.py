@@ -20,9 +20,10 @@ from typing import Any
 import tweepy
 
 try:
-    from scripts import social_db
+    from scripts import social_db, state_paths
 except Exception:  # pragma: no cover - script execution fallback
     import social_db
+    import state_paths
 
 HOME_OPS_HERMES_SCRIPTS = Path(os.environ.get(
     "HOME_OPS_HERMES_SCRIPTS",
@@ -33,7 +34,7 @@ if str(HOME_OPS_HERMES_SCRIPTS) not in sys.path:
 from hermes_llm import run_hermes_prompt
 
 ROOT = Path(__file__).resolve().parent.parent
-STATE_FILE = ROOT / "state" / "engage_cursor.json"
+STATE_FILE = state_paths.ENGAGE_CURSOR
 
 MAX_REPLIES_PER_RUN = int(os.environ.get("MAX_REPLIES_PER_RUN", "5"))
 MIN_REPLY_SCORE = int(os.environ.get("MIN_REPLY_SCORE", "3"))

@@ -5,6 +5,7 @@ ROOT="/Users/sva/Documents/Repos/Github/home-ops/hermes/x-social"
 HOME_OPS_HERMES_SCRIPTS="${HOME_OPS_HERMES_SCRIPTS:-/Users/sva/Documents/Repos/Github/home-ops/hermes/scripts}"
 HERMES_PYTHON="${HERMES_PYTHON:-/Users/sva/.hermes/hermes-agent/venv/bin/python3}"
 PYTHON="${PYTHON:-/Users/sva/Documents/Repos/Github/home-ops/.venv/bin/python}"
+X_SOCIAL_STATE_DIR="${X_SOCIAL_STATE_DIR:-${HERMES_STATE_DIR:-$HOME/.local/state/home-ops}/x-social}"
 
 cd "$ROOT"
 
@@ -33,10 +34,11 @@ fi
 eval "$("$HERMES_PYTHON" "$HOME_OPS_HERMES_SCRIPTS/vault_mcp_social_env.py" --purpose post)"
 
 export HOME_OPS_HERMES_SCRIPTS
+export X_SOCIAL_STATE_DIR
 export HERMES_AUTOMATION_PROFILE="${HERMES_POSTING_PROFILE:-xposting}"
 export POST_USE_LLM="${POST_USE_LLM:-1}"
 
 "$PYTHON" scripts/fetch_metrics.py
 "$PYTHON" scripts/post.py
 
-echo "home-ops x-social state updated locally under $ROOT/state (Hermes cron only; no external runner or Git network writes)"
+echo "home-ops x-social state updated locally under $X_SOCIAL_STATE_DIR (Hermes cron only; no external runner or Git network writes)"

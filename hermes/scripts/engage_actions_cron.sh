@@ -5,6 +5,7 @@ ROOT="/Users/sva/Documents/Repos/Github/home-ops/hermes/x-social"
 HOME_OPS_HERMES_SCRIPTS="${HOME_OPS_HERMES_SCRIPTS:-/Users/sva/Documents/Repos/Github/home-ops/hermes/scripts}"
 HERMES_PYTHON="${HERMES_PYTHON:-/Users/sva/.hermes/hermes-agent/venv/bin/python3}"
 PYTHON="${PYTHON:-/Users/sva/Documents/Repos/Github/home-ops/.venv/bin/python}"
+X_SOCIAL_STATE_DIR="${X_SOCIAL_STATE_DIR:-${HERMES_STATE_DIR:-$HOME/.local/state/home-ops}/x-social}"
 
 cd "$ROOT"
 
@@ -39,6 +40,7 @@ fi
 eval "$("$HERMES_PYTHON" "$HOME_OPS_HERMES_SCRIPTS/vault_mcp_social_env.py" --purpose engage)"
 
 export HOME_OPS_HERMES_SCRIPTS
+export X_SOCIAL_STATE_DIR
 export HERMES_AUTOMATION_PROFILE="${HERMES_ENGAGING_PROFILE:-xengaging}"
 export ENGAGE_USE_LLM="${ENGAGE_USE_LLM:-1}"
 export MAX_REPLIES_PER_RUN="${MAX_REPLIES_PER_RUN:-5}"
@@ -46,4 +48,4 @@ export MIN_REPLY_SCORE="${MIN_REPLY_SCORE:-3}"
 
 "$PYTHON" scripts/engage.py
 
-echo "home-ops x-social engagement state updated locally under $ROOT/state (Hermes cron only; no external runner or Git network writes)"
+echo "home-ops x-social engagement state updated locally under $X_SOCIAL_STATE_DIR (Hermes cron only; no external runner or Git network writes)"
