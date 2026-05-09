@@ -2,7 +2,7 @@
 
 Canonical operational runbook for SVA's migrated Guru's Tech Bytes daily podcast automation.
 
-This document lives in `home-ops` because the durable Hermes/ops surface is version-controlled here. The episode-production scripts currently live in `/Users/sva/Documents/Repos/Gitea/automations`, the public-site publisher lives in `/Users/sva/Documents/Repos/Github/anit.guru`, and the concise human-facing wiki summary lives at `/Users/sva/Documents/Obsidian/AnITGuru/wiki/gurus-tech-bytes-pipeline.md`.
+This document lives in `home-ops` because the durable Hermes/ops surface is version-controlled here. The episode-production scripts now live under `home-ops/hermes/podcast/scripts`, the public-site publisher lives in `/Users/sva/Documents/Repos/Github/anit.guru`, and the concise human-facing wiki summary lives at `/Users/sva/Documents/Obsidian/AnITGuru/wiki/gurus-tech-bytes-pipeline.md`. The old `/Users/sva/Documents/Repos/Gitea/automations` copies are retired and must not be used by scheduled Hermes jobs.
 
 ## Current production schedule
 
@@ -11,7 +11,7 @@ This document lives in `home-ops` because the durable Hermes/ops surface is vers
 - Name: `Daily Guru's Tech Bytes producer and publisher`
 - Schedule: `0 6 * * *` in America/New_York local time.
 - Delivery: `origin` so the Telegram completion report returns to SVA.
-- Workdir: `/Users/sva/Documents/Repos/Gitea/automations`
+- Workdir: `/Users/sva/Documents/Repos/Github/home-ops/hermes/podcast`
 - Skill: `website-workflows`
 - Run mode: LLM-driven producer/publisher, not the old file watcher.
 
@@ -21,15 +21,10 @@ The watcher helper `hermes/scripts/share-latest-podcast-audio.sh` is intentional
 
 - `home-ops`
   - `hermes/podcast/README.md` — this canonical ops runbook.
-  - `hermes/scripts/hn_topic_refresh_hermes.py` — optional topic-refresh helper that enriches the HN topic table through Hermes one-shot profiles.
-  - `hermes/scripts/hermes_llm.py` — subprocess bridge for Hermes one-shot calls.
-  - `hermes/scripts/share-latest-podcast-audio.sh` — optional audio attachment watchdog.
-- `automations`
-  - `scripts/podcast-prompt.md` — production prompt and step-by-step producer spec.
-  - `scripts/morning-briefing.sh` — Algolia/Hacker News story fetch.
-  - `scripts/cocoindex_rank.py` — topic-index ranking and recent-episode dedupe.
-  - `scripts/chatterbox_tts_segments.sh` — segmented Chatterbox TTS plus `ffmpeg` loudness normalization.
-  - `docs/podcast-flow.md` — implementation details for the code in that repo.
+  - `hermes/podcast/scripts/podcast-prompt.md` — production prompt and step-by-step producer spec.
+  - `hermes/podcast/scripts/morning-briefing.sh` — Algolia/Hacker News story fetch.
+  - `hermes/podcast/scripts/cocoindex_rank.py` — topic-index ranking and recent-episode dedupe.
+  - `hermes/podcast/scripts/chatterbox_tts_segments.sh` — segmented Chatterbox TTS plus `ffmpeg` loudness normalization.
 - `anit.guru`
   - `scripts/publish-episode.mjs` — Cloudinary upload, episode markdown generation, site commit/push.
   - `content/podcast/YYYY-MM-DD.md` — generated episode pages.
@@ -38,7 +33,7 @@ The watcher helper `hermes/scripts/share-latest-podcast-audio.sh` is intentional
 
 ```mermaid
 flowchart TD
-    Cron["Hermes cron<br/>0 6 * * * America/New_York"] --> Producer["LLM-driven producer/publisher<br/>workdir: automations"]
+    Cron["Hermes cron<br/>0 6 * * * America/New_York"] --> Producer["LLM-driven producer/publisher<br/>workdir: home-ops/hermes/podcast"]
     Producer --> Env["Source ~/.hermes/secrets/podcast.env<br/>map SUPABASE_PG_DSN to COCOINDEX_DATABASE_URL if needed"]
     Env --> Fetch["morning-briefing.sh<br/>fetch current HN stories"]
     Fetch --> Rank["cocoindex_rank.py<br/>rank topics + mark recent duplicates"]
@@ -76,8 +71,8 @@ Expected variables include:
 Use the repo venv when available:
 
 ```bash
-cd /Users/sva/Documents/Repos/Gitea/automations
-PY=.venv/bin/python
+cd /Users/sva/Documents/Repos/Github/home-ops/hermes/podcast
+PY=/Users/sva/Documents/Repos/Github/home-ops/.venv/bin/python
 [ -x "$PY" ] || PY=python3
 ```
 
@@ -92,7 +87,7 @@ SITE_DIR=/Users/sva/Documents/Repos/Github/anit.guru
 mkdir -p "$PODCAST_DIR"
 ```
 
-Then run the workflow from `/Users/sva/Documents/Repos/Gitea/automations`:
+Then run the workflow from `/Users/sva/Documents/Repos/Github/home-ops/hermes/podcast`:
 
 1. Source environment if available:
    ```bash

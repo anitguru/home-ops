@@ -1,0 +1,67 @@
+# React core hooks
+/reference/react/useState
+/reference/react/useReducer
+/reference/react/useContext
+/reference/react/useRef
+/reference/react/useImperativeHandle
+/reference/react/useEffect
+/reference/react/useLayoutEffect
+/reference/react/useInsertionEffect
+/reference/react/useEffectEvent
+/reference/react/useMemo
+/reference/react/useCallback
+/reference/react/useTransition
+/reference/react/useDeferredValue
+/reference/react/useDebugValue
+/reference/react/useId
+/reference/react/useSyncExternalStore
+/reference/react/useActionState
+# React components
+/reference/react/Fragment
+/reference/react/Profiler
+/reference/react/Suspense
+/reference/react/StrictMode
+/reference/react/Activity
+# React APIs
+/reference/react/createContext
+/reference/react/lazy
+/reference/react/memo
+/reference/react/startTransition
+/reference/react/act
+/reference/react/use
+# React legacy
+/reference/react/Children
+/reference/react/cloneElement
+/reference/react/Component
+/reference/react/createElement
+/reference/react/createRef
+/reference/react/forwardRef
+/reference/react/isValidElement
+/reference/react/PureComponent
+# React DOM components
+/reference/react-dom/components/input
+/reference/react-dom/components/select
+/reference/react-dom/components/textarea
+/reference/react-dom/components/link
+/reference/react-dom/components/meta
+/reference/react-dom/components/script
+/reference/react-dom/components/style
+/reference/react-dom/components/title
+/reference/react-dom/components/common
+/reference/react-dom/components/option
+/reference/react-dom/components/progress
+# React DOM hooks
+/reference/react-dom/hooks/useFormStatus
+# React DOM client
+/reference/react-dom/client/createRoot
+/reference/react-dom/client/hydrateRoot
+# Section indexes
+/reference/react/hooks
+/reference/react/components
+/reference/react/apis
+/reference/react/legacy
+/reference/react-dom
+/reference/react-dom/hooks
+/reference/react-dom/components
+/reference/react-dom/client
+/reference/react-dom/server

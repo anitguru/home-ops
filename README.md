@@ -8,6 +8,7 @@ Version-controlled operational runbooks, Hermes profile steering, and helper scr
 - `hermes/podcast/README.md` — canonical Guru's Tech Bytes daily podcast producer/publisher runbook.
 - `hermes/wiki-freshness/` — deterministic wiki freshness audit implementation.
 - `hermes/x-social/` — X/Twitter posting and engagement automation logic.
+- `hermes/docs-wishlist/` — deterministic docs wishlist ingest audit migrated from Gitea schedule.
 - `hermes/mcp/` — local MCP notes/configuration docs.
 
 Runtime configs, logs, generated artifacts, caches, and secrets stay outside git unless a specific runbook says otherwise.

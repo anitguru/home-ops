@@ -1,0 +1,34 @@
+[
+  {
+    "name": "astro",
+    "display": "Astro",
+    "sitemap": "https://docs.astro.build/sitemap-0.xml",
+    "filter": "/en/",
+    "section": "## Web Frameworks",
+    "subsection": "### Astro"
+  },
+  {
+    "name": "tailwind",
+    "display": "Tailwind CSS",
+    "urllist": "site-urls/tailwind.txt",
+    "base_url": "https://tailwindcss.com",
+    "section": "## CSS Frameworks",
+    "subsection": "### Tailwind CSS"
+  },
+  {
+    "name": "typescript",
+    "display": "TypeScript",
+    "sitemap": "https://www.typescriptlang.org/sitemap-0.xml",
+    "filter": "/docs/handbook/",
+    "section": "## Languages",
+    "subsection": "### TypeScript"
+  },
+  {
+    "name": "react",
+    "display": "React",
+    "urllist": "site-urls/react.txt",
+    "base_url": "https://react.dev",
+    "section": "## Web Frameworks",
+    "subsection": "### React"
+  }
+]
