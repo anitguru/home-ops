@@ -60,7 +60,7 @@ fi
 
 SITE="all"
 CAP="5"
-DRY_FLAG="--dry-run"
+DRY_FLAG="--no-dry-run"
 FORCE_FLAG=""
 
 while [[ $# -gt 0 ]]; do
