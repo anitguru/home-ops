@@ -29,17 +29,14 @@ Before answering, load only the minimum steering needed:
 1. User/name bootstrap answers are direct: user is SVA; assistant is Kryten.
 2. For Hermes configuration/setup/troubleshooting, load the `hermes-agent` skill.
 3. For vault/knowledge questions, use `cocoindex-code` semantic search first, then read exact files from the vault only as needed.
-4. For homelab/service operations, search/read targeted vault docs or skills by topic; do not load every `_agent/*.md` file by default.
-5. If a task requires broad personal steering, read these vault files lazily and only then:
-   - `/Users/sva/Documents/Obsidian/AnITGuru/_agent/identity.md`
-   - `/Users/sva/Documents/Obsidian/AnITGuru/_agent/conventions.md`
-   - `/Users/sva/Documents/Obsidian/AnITGuru/_agent/context.md`
-   - `/Users/sva/Documents/Obsidian/AnITGuru/_agent/mcps.md`
-   - `/Users/sva/Documents/Obsidian/AnITGuru/_agent/working-context.md`
+4. For curated wiki edits, orient from `40-wiki/SCHEMA.md`, `40-wiki/index.md`, and recent `40-wiki/log.md`.
+5. For homelab/service operations, search/read targeted vault docs or skills by topic; do not expect or recreate an Obsidian `_agent/` folder.
 
 ## Vault rules
 
-The AnITGuru vault is synced Obsidian knowledge, not an ops scripts directory. Do not put executable scripts, generated artifacts, caches, logs, or transient task files directly in the vault. Vault writes should be durable notes, decisions, docs, indexes, or agent steering.
+The AnITGuru vault is synced Obsidian knowledge, not an ops scripts directory. Do not put executable scripts, caches, logs, or transient task files directly in it. Vault writes should be durable notes, decisions, docs, indexes, SOPs, or intentionally retained artifacts.
+
+No symlinks should exist between this vault and `~/.hermes` in either direction. Agent steering belongs in Hermes skills/config, not in Obsidian; do not recreate `_agent/`.
 
 Scripts and laptop ops automation should live in a version-controlled repo under `~/Documents/Repos/Github/anitguru/...` once the repo name is chosen. Until then, prefer documenting commands in the wiki over adding loose scripts.
 
@@ -48,10 +45,12 @@ Scripts and laptop ops automation should live in a version-controlled repo under
 
 Use this default placement for AnITGuru kb docs:
 
-- `wiki/services/<service>.md` or existing service note → durable ops docs/runbooks for a specific app/service.
-- `wiki/proxmox-lxc-<id>-<name>.md` / `wiki/proxmox-vm-<id>-<name>.md` → Proxmox entity docs that mirror the UI notes/TL;DR.
-- `wiki/standards/<standard>.md` → repeatable operating standards/policies such as “refresh CocoIndex after kb edits”, “update Proxmox notes after LXC/VM changes”, “scripts live in version-controlled repos”.
-- `_agent/` → agent steering/context only; avoid putting human-facing ops docs here unless they are specifically agent bootstrap material.
+- `40-wiki/services/<service>.md` → durable service docs.
+- `40-wiki/infrastructure/` → hosts, LXCs/VMs, DNS, storage, networks, and platform primitives.
+- `40-wiki/standards/<topic>-sop.md` → repeatable standards/policies/SOPs.
+- `40-wiki/runbooks/<procedure>.md` → operational procedures with commands and verification.
+- `40-wiki/decisions/<decision>.md` → ADR-style decisions and rationale.
+- `50-artifacts/` → durable Excalidraw files, diagrams, and intentionally retained visual artifacts.
 
 When creating or modifying LXC/VM/service docs, upsert the associated Proxmox UI notes with a short TL;DR and a reference to the kb detail note when tool access allows. After meaningful kb edits, refresh CocoIndex (`ccc index`) so semantic search stays current.
 
