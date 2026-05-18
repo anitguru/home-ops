@@ -27,7 +27,7 @@ if [[ ! -x "$CCC" ]]; then
 fi
 
 PROJECTS=(
-  "/Users/sva/Documents/Obsidian/AnITGuru"
+  "/Users/sva/Documents/Dropbox/Obsidian/AnITGuru"
   "/Users/sva/Documents/Repos/Gitea/automations"
   "/Users/sva/Documents/Repos/Gitea/observo"
   "/Users/sva/Documents/Repos/Github/anit.guru"

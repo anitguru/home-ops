@@ -2,7 +2,7 @@
 
 Canonical operational runbook for SVA's migrated Guru's Tech Bytes daily podcast automation.
 
-This document lives in `home-ops` because the durable Hermes/ops surface is version-controlled here. The episode-production scripts now live under `home-ops/hermes/podcast/scripts`, the public-site publisher lives in `/Users/sva/Documents/Repos/Github/anit.guru`, and the concise human-facing wiki summary lives at `/Users/sva/Documents/Obsidian/AnITGuru/wiki/gurus-tech-bytes-pipeline.md`. The old `/Users/sva/Documents/Repos/Gitea/automations` copies are retired and must not be used by scheduled Hermes jobs.
+This document lives in `home-ops` because the durable Hermes/ops surface is version-controlled here. The episode-production scripts now live under `home-ops/hermes/podcast/scripts`, the public-site publisher lives in `/Users/sva/Documents/Repos/Github/anit.guru`, and the concise human-facing wiki summary lives at `/Users/sva/Documents/Dropbox/Obsidian/AnITGuru/wiki/gurus-tech-bytes-pipeline.md`. The old `/Users/sva/Documents/Repos/Gitea/automations` copies are retired and must not be used by scheduled Hermes jobs.
 
 ## Current production schedule
 
