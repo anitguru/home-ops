@@ -1,7 +1,7 @@
-# Kryten Readable — update-safe Hermes dashboard theme
+# Hermes Readable — update-safe Hermes dashboard theme
 # Stored in home-ops and symlinked into ~/.hermes/dashboard-themes/ so Hermes updates do not overwrite it.
-name: kryten-readable
-label: Kryten Readable
+name: hermes-readable
+label: Hermes Readable
 description: Readable system fonts, normal casing, reduced tracking, and higher contrast for the native Hermes dashboard.
 
 palette:

@@ -4,7 +4,7 @@
 name: catppuccin-macchiato
 label: Catppuccin Macchiato
 notice: "Readable Catppuccin Macchiato colors with normal casing and system fonts."
-description: Catppuccin Macchiato palette for the native Hermes dashboard, with Kryten-readable typography and no all-caps dashboard chrome.
+description: Catppuccin Macchiato palette for the native Hermes dashboard, with Hermes-readable typography and no all-caps dashboard chrome.
 
 palette:
   background:
