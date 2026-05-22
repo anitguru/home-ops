@@ -408,3 +408,25 @@ def test_top_level_common_args_are_preserved_for_subcommands(monkeypatch, capsys
     assert exit_code == 0
     assert api.gets == [("site-2", "1c:f6:4c:3a:e8:13")]
     assert '"site_id": "site-2"' in capsys.readouterr().out
+
+
+def test_cli_writes_sanitized_audit_log(monkeypatch, tmp_path, capsys):
+    audit_log = tmp_path / "unifi-ops.jsonl"
+    monkeypatch.setenv("UNIFI_OPS_AUDIT_LOG", str(audit_log))
+    api = FakeUniFiApi(everett_client("DEFAULT"))
+    monkeypatch.setattr(unifi_ops, "UniFiApi", lambda: api)
+
+    exit_code = unifi_ops.main(["block", "everett", "computer"])
+
+    assert exit_code == 0
+    capsys.readouterr()
+    line = audit_log.read_text().strip()
+    assert "source_context" not in line
+    assert "API_KEY" not in line
+    event = unifi_ops.json.loads(line)
+    assert event["schema"] == "unifi_ops_audit_v1"
+    assert event["status"] == "success"
+    assert event["action"] == "block"
+    assert event["target"]["canonical_alias"] == "Everett computer"
+    assert event["mutated"] is False
+    assert event["requires_confirmation"] is True

@@ -528,7 +528,7 @@ def verify_source_context(
     if not source_context:
         raise SourceContextError("confirmed UniFi mutations require --source-context from a trusted wrapper/gateway")
     if not key:
-        raise SourceContextError("confirmed UniFi mutations require UNIFI_OPS_SOURCE_CONTEXT_KEY")
+        raise SourceContextError("confirmed UniFi mutations require a trusted source-context signing key")
     try:
         version, encoded_payload, signature = source_context.split(".", 2)
     except ValueError as exc:
@@ -777,6 +777,86 @@ def render_blocked(result: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def audit_log_path() -> Path:
+    configured = os.environ.get("UNIFI_OPS_AUDIT_LOG")
+    if configured:
+        return Path(configured).expanduser()
+    return Path("/Users/sva/Documents/Repos/Github/home-ops/hermes/logs/unifi-ops.jsonl")
+
+
+def append_audit_event(event: dict[str, Any]) -> None:
+    """Append a sanitized UniFi ops audit event.
+
+    The audit log is intentionally local runtime state under a gitignored path.
+    It records aliases/MAC/IP/state transitions and failures, but never records
+    API keys, Vault tokens, signed source-context tokens, or raw secret values.
+    """
+    path = audit_log_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    safe_event = {
+        "ts": int(time.time()),
+        "tool": "unifi_ops.py",
+        "schema": "unifi_ops_audit_v1",
+        **event,
+    }
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(safe_event, sort_keys=True, separators=(",", ":")) + "\n")
+
+
+def audit_success(command: str, args: argparse.Namespace, result: dict[str, Any]) -> None:
+    event: dict[str, Any] = {
+        "command": command,
+        "status": "success",
+        "site_id": result.get("site_id"),
+    }
+    if command in {"block", "unblock"}:
+        event.update(
+            {
+                "action": command,
+                "alias": " ".join(getattr(args, "alias", []) or []),
+                "target": result.get("target"),
+                "request_source": normalize_request_source(args.request_source) if args.request_source else None,
+                "confirm_requested": bool(args.confirm),
+                "requires_confirmation": result.get("requires_confirmation"),
+                "current_blocked": result.get("current_blocked"),
+                "desired_blocked": result.get("desired_blocked"),
+                "mutated": result.get("mutated"),
+                "idempotent": result.get("idempotent"),
+                "verified": result.get("verified"),
+                "verified_blocked": result.get("verified_blocked"),
+            }
+        )
+    elif command == "blocked":
+        event["devices"] = [
+            {
+                "target": item.get("target"),
+                "client": selected_client_fields(item.get("client", {})),
+                "blocked": item.get("blocked"),
+            }
+            for item in result.get("devices", [])
+        ]
+    append_audit_event(event)
+
+
+def audit_failure(command: str | None, args: argparse.Namespace, exc: Exception) -> None:
+    event: dict[str, Any] = {
+        "command": command,
+        "status": "failure",
+        "error_type": type(exc).__name__,
+        "error": str(exc),
+    }
+    if command in {"block", "unblock"}:
+        event.update(
+            {
+                "action": command,
+                "alias": " ".join(getattr(args, "alias", []) or []),
+                "request_source": normalize_request_source(args.request_source) if getattr(args, "request_source", None) else None,
+                "confirm_requested": bool(getattr(args, "confirm", False)),
+            }
+        )
+    append_audit_event(event)
+
+
 def add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="render machine-readable JSON")
     parser.add_argument("--site-id", default=argparse.SUPPRESS, help="explicit UniFi site UUID; defaults to pinned household site")
@@ -821,13 +901,16 @@ def main(argv: list[str] | None = None) -> int:
                 source_context_key=load_source_context_key() if args.confirm and args.source_context else None,
                 confirmation=args.confirmation,
             )
+            audit_success(args.command, args, result)
             print(json.dumps(result, indent=2, sort_keys=True) if getattr(args, "json", False) else render_result(result))
             return 0
         if args.command == "blocked":
             result = run_blocked(args.alias or None, site_id=getattr(args, "site_id", None))
+            audit_success(args.command, args, result)
             print(json.dumps(result, indent=2, sort_keys=True) if getattr(args, "json", False) else render_blocked(result))
             return 0
     except UniFiOpsError as exc:
+        audit_failure(getattr(args, "command", None), args, exc)
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     parser.error(f"unsupported command {args.command}")
