@@ -73,6 +73,7 @@ profiles:
     scheduling_owner: default
     notes:
     - Public-facing post copy should be concise, pragmatic, and only based on caller-provided source context.
+    - Scheduled posting wrappers may override the ad hoc default to xai-oauth/grok-4.3, but only with a minimal toolset such as terminal to avoid xAI's 200-tool request cap.
     - Cron/runtime state lives in home-ops; do not rely on Gitea Actions, runners, or pushes for scheduled posting.
     - Do not keep a persistent gateway or scheduler for this profile; default profile owns active cron visibility.
   xengaging:

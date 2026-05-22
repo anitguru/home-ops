@@ -6,6 +6,7 @@ HOME_OPS_HERMES_SCRIPTS="${HOME_OPS_HERMES_SCRIPTS:-/Users/sva/Documents/Repos/G
 HERMES_PYTHON="${HERMES_PYTHON:-/Users/sva/.hermes/hermes-agent/venv/bin/python3}"
 PYTHON="${PYTHON:-/Users/sva/Documents/Repos/Github/home-ops/.venv/bin/python}"
 X_SOCIAL_STATE_DIR="${X_SOCIAL_STATE_DIR:-${HERMES_STATE_DIR:-$HOME/.local/state/home-ops}/x-social}"
+OBSIDIAN_VAULT="${OBSIDIAN_VAULT:-/Users/sva/Documents/Dropbox/Obsidian/AnITGuru}"
 
 cd "$ROOT"
 
@@ -22,28 +23,28 @@ fi
 
 if [[ "${1:-}" == "--check" ]]; then
   "$HERMES_PYTHON" "$HOME_OPS_HERMES_SCRIPTS/vault_mcp_social_env.py" --purpose post --check
-  "$PYTHON" -m py_compile scripts/fetch_metrics.py scripts/post.py scripts/social_db.py
+  "$PYTHON" -m py_compile scripts/fetch_metrics.py scripts/growth_audit.py scripts/social_db.py scripts/state_paths.py
   env -u HERMES_TUI -u HERMES_TUI_ACTIVE_SESSION_FILE -u HERMES_GATEWAY_SESSION -u HERMES_INTERACTIVE -u HERMES_SESSION_KEY \
-    hermes -p xposting chat -Q --source xposting-cron-check --provider xai-oauth -m grok-4.3 --toolsets terminal \
-      -q 'Use terminal to print exactly: xposting grok profile ready'
-  echo "post_actions_cron check ok"
+    hermes -p xposting chat -Q --source x-growth-audit-check --provider xai-oauth -m grok-4.3 --toolsets terminal \
+      -q 'Return exactly: grok weekly audit profile ready'
+  echo "weekly_x_growth_audit_cron check ok"
   exit 0
 fi
 
 # Load X/Tavily/Postgres secrets from Vault MCP without writing them to disk.
+# fetch_metrics is read-only and refreshes the local performance ledger before audit.
 eval "$("$HERMES_PYTHON" "$HOME_OPS_HERMES_SCRIPTS/vault_mcp_social_env.py" --purpose post)"
 
 export HOME_OPS_HERMES_SCRIPTS
 export X_SOCIAL_STATE_DIR
-export HERMES_AUTOMATION_PROFILE="${HERMES_POSTING_PROFILE:-xposting}"
-# Grok is safe here because this one-shot profile is constrained to a tiny toolset.
-# Do not make Grok the default Telegram/provider profile unless Hermes has <200 exposed tools.
+export OBSIDIAN_VAULT
+export HERMES_AUDIT_PROFILE="${HERMES_AUDIT_PROFILE:-xposting}"
 export HERMES_AUTOMATION_TOOLSETS="${HERMES_AUTOMATION_TOOLSETS:-terminal}"
-export HERMES_POSTING_PROVIDER="${HERMES_POSTING_PROVIDER:-xai-oauth}"
-export HERMES_POSTING_MODEL="${HERMES_POSTING_MODEL:-grok-4.3}"
-export POST_USE_LLM="${POST_USE_LLM:-1}"
+export GROK_AUDIT_PROVIDER="${GROK_AUDIT_PROVIDER:-xai-oauth}"
+export GROK_AUDIT_MODEL="${GROK_AUDIT_MODEL:-grok-4.3}"
+export X_GROWTH_AUTOTUNE_CRONS="${X_GROWTH_AUTOTUNE_CRONS:-1}"
 
-"$PYTHON" scripts/fetch_metrics.py
-"$PYTHON" scripts/post.py
+"$PYTHON" scripts/fetch_metrics.py || echo "WARN: fetch_metrics failed; continuing with existing local ledger" >&2
+"$PYTHON" scripts/growth_audit.py
 
-echo "home-ops x-social state updated locally under $X_SOCIAL_STATE_DIR (Hermes cron only; no external runner or Git network writes)"
+echo "weekly x growth audit complete; report appended to $OBSIDIAN_VAULT/40-wiki/queries/x-growth-feedback.md"

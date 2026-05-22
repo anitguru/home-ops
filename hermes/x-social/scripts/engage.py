@@ -263,7 +263,12 @@ def draft_reply(their_text: str, their_username: str, related_post: dict[str, An
             f"Be specific and genuine. Do not include @{their_username} in your reply — it will be prepended. "
             "Output only the reply text."
         )
-        return run_hermes_prompt(prompt, timeout=180, source="engage-reply").strip().strip('"')
+        return run_hermes_prompt(
+            prompt,
+            toolsets=os.getenv("HERMES_AUTOMATION_TOOLSETS", "terminal"),
+            timeout=180,
+            source="engage-reply",
+        ).strip().strip('"')
     except Exception as exc:
         print(f"Hermes reply draft failed: {exc}", file=sys.stderr)
         return None

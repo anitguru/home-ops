@@ -36,7 +36,33 @@ HISTORY = state_paths.POSTS_HISTORY
 
 RECENT_DOMAIN_WINDOW = 5  # block same domain if it appeared in last N posts
 
-QUERY = "trending AI builder tools agents automation no-code 2026"
+# Growth-feedback mode: fewer link-first posts, more operator POV.
+# Three of every four posts are text-first; source URLs remain in the ledger for
+# provenance but are not placed in the main post unless the selected mode says so.
+POSTING_STRATEGIES = (
+    {
+        "name": "agent_ops_note",
+        "include_url": False,
+        "instruction": "Write a first-person agent-ops note from the hard-won builder perspective. Focus on boring production details like state, retries, auth, logs, rollback, cost ceilings, and data export.",
+    },
+    {
+        "name": "builder_question",
+        "include_url": False,
+        "instruction": "Ask a practical diagnostic question that invites other builders to reply with implementation details. No engagement bait; make it useful enough that replies teach something.",
+    },
+    {
+        "name": "self_hosting_note",
+        "include_url": False,
+        "instruction": "Write a self-hosting or homelab lesson with a clear tradeoff: speed vs ownership, SaaS convenience vs portability, or demo magic vs observable systems.",
+    },
+    {
+        "name": "source_take",
+        "include_url": True,
+        "instruction": "Write a sharp source-backed take, but make your point more important than the link. Do not summarize the title; add a specific opinionated takeaway.",
+    },
+)
+
+QUERY = "AI agents self-hosted automation n8n CrewAI MCP builder operations 2026"
 TAVILY_URL = "https://api.tavily.com/search"
 MAX_LEN = 280
 URL_COST = 24  # X counts any URL as 23 chars + 1 space
@@ -108,8 +134,33 @@ def top_performers(history: list[dict], n: int = 3) -> list[dict]:
     return [e for score, e in scored[:n] if score > 0]
 
 
-def craft_tweet_llm(signal: dict, answer: str, history: list[dict] | None = None) -> str | None:
+def choose_posting_strategy(history: list[dict] | None) -> dict:
+    """Rotate format so the feed stops looking like link automation."""
+    forced = os.getenv("POST_STRATEGY", "").strip()
+    if forced:
+        for strategy in POSTING_STRATEGIES:
+            if strategy["name"] == forced:
+                return strategy
+    count = len(history or [])
+    return POSTING_STRATEGIES[count % len(POSTING_STRATEGIES)]
+
+
+def clean_hashtags(raw: str) -> str:
+    tags = []
+    for tag in raw.strip().split():
+        if not tag.startswith("#"):
+            continue
+        lowered = tag.lower()
+        if lowered in {"#ai", "#tech", "#technology", "#startup", "#startups"}:
+            continue
+        tags.append(tag)
+    # Feedback from the first audit: hashtags were overused; keep them rare.
+    return " " + " ".join(tags[:1]) if tags else ""
+
+
+def craft_tweet_llm(signal: dict, answer: str, history: list[dict] | None = None) -> tuple[str, dict] | None:
     """Optionally use a Hermes one-shot profile to write a tweet in @anitdotguru's voice."""
+    strategy = choose_posting_strategy(history)
     if os.getenv("POST_USE_LLM", "1").lower() in {"0", "false", "no"}:
         return None
 
@@ -120,47 +171,75 @@ def craft_tweet_llm(signal: dict, answer: str, history: list[dict] | None = None
             examples = "\n".join(f'- "{e["text"].rsplit(" http", 1)[0]}"' for e in top)
             performers_block = f"\n\nHigh-engagement examples from your past posts:\n{examples}\nMatch the tone and specificity of these."
 
+    link_instruction = (
+        "Do NOT include the URL; the caller will append it."
+        if strategy["include_url"]
+        else "Do NOT include a URL, source name, or 'link in bio' style phrasing. The source is private context only."
+    )
     prompt = (
-        "You are @anitdotguru — a pragmatic technical expert who builds with AI, "
+        "You are @anitdotguru — a pragmatic technical operator who builds with AI, "
         "homelabs, and self-hosted tools. Conversational, never corporate. You share "
         "what you learned the hard way. No emojis, no thread format, no quotes around output.\n\n"
-        f"Write a single tweet comment about this article. Do NOT include the URL — I'll append it.\n\n"
+        "Growth feedback to apply:\n"
+        "- Stop making external links the center of every post.\n"
+        "- Prefer first-person build/break/learn operator lessons.\n"
+        "- Use fewer hashtags; only add one if it is very contextual.\n"
+        "- Lean into agent-infra realism: evals, logs, retries, auth, queues, state, rollback, cost, data portability.\n"
+        "- Vary the examples so anti-lock-in/self-hosting does not sound repetitive.\n\n"
+        f"Strategy: {strategy['name']} — {strategy['instruction']}\n"
+        f"{link_instruction}\n\n"
+        "Use this source/trend only as context, not as a headline to summarize.\n"
         f"Title: {signal['title']}\n"
-        f"Snippet: {signal.get('content', '')[:500]}\n"
-        f"Broader trend: {answer[:300]}"
+        f"Snippet: {signal.get('content', '')[:700]}\n"
+        f"Broader trend: {answer[:400]}"
         f"{performers_block}\n\n"
-        f"Add your own angle or takeaway — don't restate the title. "
-        f"Be specific and opinionated. One or two sentences max.\n\n"
-        f"After the tweet body, on a new line write: HASHTAGS: #tag1 #tag2\n"
-        f"Pick 1-2 specific contextual tags (e.g. #agentdev, #homelab, "
-        f"#selfhosted, #llm, #k8s, #mcp, #rag). No generic tags like #AI or #tech."
+        "Write one post under 240 chars. Be specific, opinionated, and useful. "
+        "Avoid generic phrases like 'the future of', 'game changer', 'worth watching', and 'AI is changing everything'.\n\n"
+        "After the post body, on a new line write either `HASHTAGS:` empty or one specific contextual tag. "
+        "No generic #AI/#tech tags."
     )
 
     try:
-        raw = run_hermes_prompt(prompt, timeout=240, source="post-draft").strip()
+        raw = run_hermes_prompt(
+            prompt,
+            provider=os.getenv("POST_LLM_PROVIDER") or os.getenv("HERMES_POSTING_PROVIDER"),
+            model=os.getenv("POST_LLM_MODEL") or os.getenv("HERMES_POSTING_MODEL"),
+            toolsets=os.getenv("HERMES_AUTOMATION_TOOLSETS", "terminal"),
+            timeout=240,
+            source="post-draft",
+        ).strip()
     except Exception as exc:
         print(f"Hermes draft failed: {exc}")
         return None
 
-    # Parse optional HASHTAGS line
     hashtag_suffix = ""
     if "\nHASHTAGS:" in raw:
         body_part, tag_part = raw.rsplit("\nHASHTAGS:", 1)
-        tags = [t for t in tag_part.strip().split() if t.startswith("#")][:2]
-        if tags:
-            hashtag_suffix = " " + " ".join(tags)
+        hashtag_suffix = clean_hashtags(tag_part)
         raw = body_part
 
     body = raw.strip().strip('"').strip("'")
-    body_budget = MAX_LEN - URL_COST - len(hashtag_suffix)
+    include_url = bool(strategy["include_url"])
+    body_budget = MAX_LEN - (URL_COST if include_url else 0) - len(hashtag_suffix)
     if len(body) > body_budget:
         body = textwrap.shorten(body, width=body_budget, placeholder="…")
 
-    return f"{body} {signal['url']}{hashtag_suffix}"
+    if include_url:
+        text = f"{body} {signal['url']}{hashtag_suffix}"
+    else:
+        text = f"{body}{hashtag_suffix}"
+    return text, strategy
 
 
-def craft_tweet_fallback(signal: dict) -> str:
+def craft_tweet_fallback(signal: dict, strategy: dict | None = None) -> str:
+    strategy = strategy or {"include_url": True}
     title = signal["title"].strip().rstrip(".")
+    if not strategy.get("include_url", True):
+        return textwrap.shorten(
+            f"Another agent-builder reminder: the demo is easy; the operational trail is the product. {title}",
+            width=MAX_LEN,
+            placeholder="…",
+        )
     body_budget = MAX_LEN - URL_COST
     body = textwrap.shorten(title, width=body_budget, placeholder="…")
     return f"{body} {signal['url']}"
@@ -204,13 +283,16 @@ def main() -> int:
         return 0
 
     answer = data.get("answer", "")
-    text = craft_tweet_llm(signal, answer, history)
+    strategy = choose_posting_strategy(history)
+    drafted = craft_tweet_llm(signal, answer, history)
     method = "llm"
-    if not text:
-        text = craft_tweet_fallback(signal)
+    if drafted:
+        text, strategy = drafted
+    else:
+        text = craft_tweet_fallback(signal, strategy)
         method = "fallback"
 
-    print(f"drafted [{method}] ({len(text)} chars): {text}")
+    print(f"drafted [{method}/{strategy['name']}] ({len(text)} chars): {text}")
 
     tweet_url = post(text)
     tweet_id = tweet_url.rstrip("/").split("/")[-1]
@@ -224,6 +306,8 @@ def main() -> int:
         "source_title": signal["title"],
         "text": text,
         "method": method,
+        "strategy": strategy["name"],
+        "includes_source_url_in_post": bool(strategy.get("include_url")),
     }
     append_history(entry)
     if db:

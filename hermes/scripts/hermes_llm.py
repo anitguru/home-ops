@@ -31,6 +31,7 @@ def run_hermes_prompt(
     profile: str | None = None,
     provider: str | None = None,
     model: str | None = None,
+    toolsets: str | None = None,
     timeout: int = 300,
     source: str = "automation-script",
 ) -> str:
@@ -49,6 +50,9 @@ def run_hermes_prompt(
     if profile:
         cmd.extend(["-p", profile])
     cmd.extend(["chat", "-q", prompt, "--quiet", "--source", source])
+    toolsets = toolsets if toolsets is not None else os.getenv("HERMES_AUTOMATION_TOOLSETS")
+    if toolsets:
+        cmd.extend(["--toolsets", toolsets])
     if provider:
         cmd.extend(["--provider", provider])
     if model:
