@@ -148,6 +148,51 @@ PINNED_TARGETS: tuple[InventoryTarget, ...] = (
         group_context="Everett's Stuff",
         connectivity="Wi-Fi only",
     ),
+    InventoryTarget(
+        canonical_alias="Harrison iPad",
+        aliases=(
+            "harrison ipad",
+            "harrisons ipad",
+            "harrison's ipad",
+            "block harrison ipad",
+            "spud ipad",
+            "spuds ipad",
+            "spud's ipad",
+            "ipad spuds",
+            "ipad spud's",
+            "ipad spud s",
+            "10.0.0.226",
+            "92:69:48:ed:19:06",
+        ),
+        mac_address="92:69:48:ed:19:06",
+        fixed_ip="10.0.0.226",
+        local_dns="",
+        group_context="Harrison's Stuff",
+        connectivity="Wi-Fi only",
+    ),
+    InventoryTarget(
+        canonical_alias="Corinne iPad",
+        aliases=(
+            "corinne ipad",
+            "corinnes ipad",
+            "corinne's ipad",
+            "block corinne ipad",
+            "pumpkin ipad",
+            "pumpkins ipad",
+            "pumpkin's ipad",
+            "ipad pumpkins",
+            "ipad pumpkin's",
+            "ipad pumpkin s",
+            "10.0.0.129",
+            "10.0.0.126",
+            "7e:7e:97:06:d3:05",
+        ),
+        mac_address="7e:7e:97:06:d3:05",
+        fixed_ip="10.0.0.129",
+        local_dns="",
+        group_context="Corinne's Stuff",
+        connectivity="Wi-Fi only",
+    ),
 )
 
 
@@ -159,6 +204,40 @@ class UniFiApiLike(Protocol):
     def get_client(self, site_id: str, client_id: str) -> dict[str, Any]: ...
 
     def execute_client_action(self, site_id: str, client_id: str, payload: dict[str, Any]) -> dict[str, Any]: ...
+
+
+def local_user_id(mac_address: str) -> str:
+    return f"local-user:{mac_address.lower()}"
+
+
+def local_user_mac(client_id: str) -> str | None:
+    prefix = "local-user:"
+    if client_id.startswith(prefix):
+        return client_id[len(prefix) :].lower()
+    return None
+
+
+def normalize_local_user_record(record: dict[str, Any]) -> dict[str, Any]:
+    mac = str(record.get("mac") or record.get("macAddress") or "").lower()
+    ip = str(record.get("fixed_ip") or record.get("last_ip") or record.get("ip") or record.get("ipAddress") or "")
+    is_wired = record.get("is_wired")
+    normalized = {
+        "id": local_user_id(mac) if mac else str(record.get("_id") or record.get("id") or ""),
+        "name": record.get("name") or record.get("hostname") or "unknown",
+        "macAddress": mac,
+        "ipAddress": ip,
+        "type": "WIRED" if is_wired is True else "WIRELESS" if is_wired is False else record.get("type"),
+        "source": "local-unifi-api /rest/user",
+        "blocked": record.get("blocked"),
+        "raw_id": record.get("_id") or record.get("id"),
+    }
+    return {key: value for key, value in normalized.items() if value not in (None, "")}
+
+
+def matches_target(client: dict[str, Any], target: InventoryTarget) -> bool:
+    mac_matches = bool(target.mac_address) and str(client.get("macAddress") or "").lower() == target.mac_address
+    ip_matches = bool(target.fixed_ip) and str(client.get("ipAddress") or "") == target.fixed_ip
+    return mac_matches or ip_matches
 
 
 def normalize_prefix(prefix: str) -> str:
@@ -371,8 +450,29 @@ class UniFiApi:
         path = "/" + path.lstrip("/")
         if not path.startswith("/integration/v1/"):
             raise ValueError("Only /integration/v1/... paths are allowed")
+        return self._request_url(method, self.cfg.api_base + path, body=body, query=query)
+
+    def request_network(
+        self,
+        method: str,
+        path: str,
+        body: dict[str, Any] | None = None,
+        query: dict[str, Any | None] | None = None,
+    ) -> dict[str, Any]:
+        path = "/" + path.lstrip("/")
+        if not path.startswith("/api/s/"):
+            raise ValueError("Only /api/s/... local Network API paths are allowed")
+        return self._request_url(method, self.cfg.api_base + path, body=body, query=query)
+
+    def _request_url(
+        self,
+        method: str,
+        url_without_query: str,
+        body: dict[str, Any] | None = None,
+        query: dict[str, Any | None] | None = None,
+    ) -> dict[str, Any]:
         qs = safe_query(query or {})
-        url = self.cfg.api_base + path + (f"?{qs}" if qs else "")
+        url = url_without_query + (f"?{qs}" if qs else "")
         data = None if body is None else json.dumps(body).encode()
         headers = {"X-API-KEY": self.cfg.api_key, "Accept": "application/json"}
         if data is not None:
@@ -390,9 +490,9 @@ class UniFiApi:
                 return {"status": response.status, "data": payload}
         except urllib.error.HTTPError as exc:
             detail = exc.read(800).decode(errors="replace")
-            raise UniFiOpsError(f"UniFi API HTTP {exc.code} for {method} {path}: {detail}") from exc
+            raise UniFiOpsError(f"UniFi API HTTP {exc.code} for {method} {url_without_query}: {detail}") from exc
         except urllib.error.URLError as exc:
-            raise UniFiOpsError(f"UniFi API request failed for {method} {path}: {exc}") from exc
+            raise UniFiOpsError(f"UniFi API request failed for {method} {url_without_query}: {exc}") from exc
 
     def pick_site_id(self, preferred: str | None = None) -> str:
         # Deterministic household default: do not silently pick the first site in
@@ -422,18 +522,54 @@ class UniFiApi:
                 client_id = str(item.get("id") or item.get("macAddress") or "")
                 if client_id:
                     matches[client_id] = item
+        exact = [item for item in matches.values() if matches_target(item, target)]
+        if exact:
+            return exact
+        return self.find_local_users(target)
+
+    def find_local_users(self, target: InventoryTarget) -> list[dict[str, Any]]:
+        payload = self.request_network("GET", "/api/s/default/rest/user", query={"limit": 1000})
+        data = payload.get("data")
+        if not isinstance(data, list):
+            return []
         exact = []
-        for item in matches.values():
-            mac = str(item.get("macAddress") or "").lower()
-            ip = str(item.get("ipAddress") or "")
-            if mac == target.mac_address or ip == target.fixed_ip:
-                exact.append(item)
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            normalized = normalize_local_user_record(item)
+            if matches_target(normalized, target):
+                exact.append(normalized)
         return exact
 
     def get_client(self, site_id: str, client_id: str) -> dict[str, Any]:
+        local_mac = local_user_mac(client_id)
+        if local_mac:
+            target = InventoryTarget(
+                canonical_alias=client_id,
+                aliases=(client_id,),
+                mac_address=local_mac,
+                fixed_ip="",
+                local_dns="",
+                group_context="",
+                connectivity="",
+            )
+            matches = self.find_local_users(target)
+            if len(matches) == 1:
+                return matches[0]
+            raise DeviceLookupError(f"expected exactly one local UniFi user for {local_mac}; found {len(matches)}")
         return self.request("GET", f"/integration/v1/sites/{site_id}/clients/{client_id}")
 
     def execute_client_action(self, site_id: str, client_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        local_mac = local_user_mac(client_id)
+        if local_mac:
+            action = str(payload.get("action") or "").upper()
+            if action == BLOCK_ACTION:
+                local_payload = {"cmd": "block-sta", "mac": local_mac}
+            elif action == UNBLOCK_ACTION:
+                local_payload = {"cmd": "unblock-sta", "mac": local_mac}
+            else:
+                raise ValueError(f"unsupported local UniFi client action: {action}")
+            return self.request_network("POST", "/api/s/default/cmd/stamgr", body=local_payload)
         return self.request("POST", f"/integration/v1/sites/{site_id}/clients/{client_id}/actions", body=payload)
 
 
@@ -700,7 +836,12 @@ def run_operation(
         )
         return result
     payload = {"action": BLOCK_ACTION if desired_blocked else UNBLOCK_ACTION}
-    result["mutation"] = {"endpoint": f"/integration/v1/sites/{picked_site_id}/clients/{client_id}/actions", "payload": payload}
+    local_mac = local_user_mac(client_id)
+    if local_mac:
+        local_payload = {"cmd": "block-sta" if desired_blocked else "unblock-sta", "mac": local_mac}
+        result["mutation"] = {"endpoint": "/api/s/default/cmd/stamgr", "payload": local_payload}
+    else:
+        result["mutation"] = {"endpoint": f"/integration/v1/sites/{picked_site_id}/clients/{client_id}/actions", "payload": payload}
     api.execute_client_action(picked_site_id, client_id, payload)
     verified_detail = api.get_client(picked_site_id, client_id)
     verified_blocked = extract_blocked(verified_detail)

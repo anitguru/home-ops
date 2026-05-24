@@ -17,12 +17,13 @@ def source_context(
     source="local-sva",
     action="block",
     confirmation="confirm block Everett computer",
+    target_alias=("everett", "computer"),
     expires_at=4_102_444_800,
 ):
     return unifi_ops.make_source_context(
         source=source,
         action=action,
-        target=unifi_ops.resolve_target(["everett", "computer"]),
+        target=unifi_ops.resolve_target(target_alias),
         confirmation=confirmation,
         key=TEST_SOURCE_CONTEXT_KEY,
         issued_at=1_700_000_000,
@@ -77,6 +78,26 @@ def test_resolves_pinned_everett_computer_alias_deterministically():
     assert target.fixed_ip == "10.0.0.182"
     assert target.local_dns == "everettmacmini.transformers.lan"
     assert target.confirmation_phrase("block") == "confirm block Everett computer"
+
+
+def test_resolves_harrison_ipad_from_household_and_unifi_aliases():
+    for alias in (["Harrison's", "iPad"], ["block", "harrison", "ipad"], ["spud", "ipad"], ["92:69:48:ed:19:06"]):
+        target = unifi_ops.resolve_target(alias)
+
+        assert target.canonical_alias == "Harrison iPad"
+        assert target.mac_address == "92:69:48:ed:19:06"
+        assert target.fixed_ip == "10.0.0.226"
+        assert target.confirmation_phrase("block") == "confirm block Harrison iPad"
+
+
+def test_resolves_corinne_ipad_from_household_and_unifi_aliases():
+    for alias in (["Corinne's", "iPad"], ["block", "corinne", "ipad"], ["pumpkin", "ipad"], ["7e:7e:97:06:d3:05"]):
+        target = unifi_ops.resolve_target(alias)
+
+        assert target.canonical_alias == "Corinne iPad"
+        assert target.mac_address == "7e:7e:97:06:d3:05"
+        assert target.fixed_ip == "10.0.0.129"
+        assert target.confirmation_phrase("block") == "confirm block Corinne iPad"
 
 
 def test_preflight_is_read_only_and_returns_confirmation_phrase():
@@ -176,12 +197,114 @@ def test_live_api_client_lookup_uses_only_filterable_mac_and_ip_fields():
             self.filters.append(query["filter"])
             return {"data": []}
 
+        def request_network(self, method, path, body=None, query=None):
+            return {"data": []}
+
     api = RecordingApi()
     target = unifi_ops.resolve_target(["everett", "computer"])
 
     api.find_clients("site-1", target)
 
     assert api.filters == ["macAddress.eq('1c:f6:4c:3a:e8:13')", "ipAddress.eq('10.0.0.182')"]
+
+
+def test_live_api_falls_back_to_persistent_user_record_when_client_is_offline():
+    class PersistentUserApi(unifi_ops.UniFiApi):
+        def __init__(self):
+            self.integration_filters = []
+            self.network_requests = []
+
+        def request(self, method, path, body=None, query=None):
+            assert query is not None
+            self.integration_filters.append(query["filter"])
+            return {"data": []}
+
+        def request_network(self, method, path, body=None, query=None):
+            self.network_requests.append((method, path, body, query))
+            return {
+                "data": [
+                    {
+                        "_id": "record-corinne-ipad",
+                        "name": "iPad Pumpkin's?",
+                        "hostname": "iPad",
+                        "mac": "7e:7e:97:06:d3:05",
+                        "last_ip": "10.0.0.126",
+                        "fixed_ip": "10.0.0.129",
+                        "blocked": False,
+                    }
+                ]
+            }
+
+    api = PersistentUserApi()
+
+    result = unifi_ops.run_operation("block", ["corinne", "ipad"], api=api, confirm=False)
+
+    assert result["mutated"] is False
+    assert result["requires_confirmation"] is True
+    assert result["current_blocked"] is False
+    assert result["client"]["id"] == "local-user:7e:7e:97:06:d3:05"
+    assert result["client"]["macAddress"] == "7e:7e:97:06:d3:05"
+    assert result["client"]["ipAddress"] == "10.0.0.129"
+    assert api.network_requests == [
+        ("GET", "/api/s/default/rest/user", None, {"limit": 1000}),
+        ("GET", "/api/s/default/rest/user", None, {"limit": 1000}),
+    ]
+
+
+def test_local_user_mutation_uses_stamgr_and_verifies_persistent_state():
+    class PersistentUserApi(unifi_ops.UniFiApi):
+        def __init__(self):
+            self.blocked = False
+            self.posts = []
+
+        def request(self, method, path, body=None, query=None):
+            return {"data": []}
+
+        def request_network(self, method, path, body=None, query=None):
+            if method == "POST":
+                assert body is not None
+                self.posts.append((path, body))
+                if body["cmd"] == "block-sta":
+                    self.blocked = True
+                return {"meta": {"rc": "ok"}, "data": []}
+            return {
+                "data": [
+                    {
+                        "_id": "record-corinne-ipad",
+                        "name": "iPad Pumpkin's?",
+                        "mac": "7e:7e:97:06:d3:05",
+                        "last_ip": "10.0.0.126",
+                        "fixed_ip": "10.0.0.129",
+                        "blocked": self.blocked,
+                    }
+                ]
+            }
+
+    api = PersistentUserApi()
+
+    result = unifi_ops.run_operation(
+        "block",
+        ["corinne", "ipad"],
+        api=api,
+        confirm=True,
+        request_source="local-sva",
+        source_context=source_context(
+            action="block",
+            target_alias=("corinne", "ipad"),
+            confirmation="confirm block Corinne iPad",
+        ),
+        source_context_key=TEST_SOURCE_CONTEXT_KEY,
+        confirmation="confirm block Corinne iPad",
+    )
+
+    assert result["mutated"] is True
+    assert result["verified"] is True
+    assert result["verified_blocked"] is True
+    assert result["mutation"] == {
+        "endpoint": "/api/s/default/cmd/stamgr",
+        "payload": {"cmd": "block-sta", "mac": "7e:7e:97:06:d3:05"},
+    }
+    assert api.posts == [("/api/s/default/cmd/stamgr", {"cmd": "block-sta", "mac": "7e:7e:97:06:d3:05"})]
 
 
 def test_mutation_denies_missing_request_source_before_posting():
