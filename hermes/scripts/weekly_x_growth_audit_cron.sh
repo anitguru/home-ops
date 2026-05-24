@@ -48,7 +48,10 @@ LOG_DIR="$X_SOCIAL_STATE_DIR/logs"
 mkdir -p "$LOG_DIR"
 export X_GROWTH_FETCH_METRICS_LOG="$LOG_DIR/weekly_x_growth_audit_fetch_metrics.log"
 
-if ! "$PYTHON" scripts/fetch_metrics.py >"$X_GROWTH_FETCH_METRICS_LOG" 2>&1; then
+if "$PYTHON" scripts/fetch_metrics.py >"$X_GROWTH_FETCH_METRICS_LOG" 2>&1; then
+  export X_GROWTH_FETCH_METRICS_SUCCESS=1
+else
+  export X_GROWTH_FETCH_METRICS_SUCCESS=0
   echo "WARN: fetch_metrics failed; continuing with existing local ledger (log: $X_GROWTH_FETCH_METRICS_LOG)" >&2
 fi
 "$PYTHON" scripts/growth_audit.py

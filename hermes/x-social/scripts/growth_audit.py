@@ -15,6 +15,8 @@ import statistics
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -175,6 +177,65 @@ def decide_schedules(latest: dict[str, Any]) -> dict[str, str]:
     return {"post_schedule": post_schedule, "engage_schedule": engage_schedule}
 
 
+def _float_metric(value: Any) -> float:
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _bool_env_metric(name: str, default: str = "0") -> float:
+    return 1.0 if os.getenv(name, default).lower() in {"1", "true", "yes", "ok"} else 0.0
+
+
+def push_prometheus_metrics(summary: dict[str, Any], grok_feedback: str, apply_results: list[str]) -> str:
+    """Best-effort Pushgateway export for the weekly audit outcome."""
+    pushgateway_url = os.getenv("PUSHGATEWAY_URL", "http://10.0.0.168:9091").rstrip("/")
+    grouping = os.getenv("X_GROWTH_PUSHGATEWAY_GROUPING", "job/hermes_weekly_x_growth_audit/instance/mbp")
+    endpoint = f"{pushgateway_url}/metrics/{grouping.strip('/')}"
+    latest = summary.get("latest_7d") or {}
+    previous = summary.get("previous_7d") or {}
+    delta = summary.get("delta_latest_vs_previous") or {}
+    grok_ok = not grok_feedback.lower().startswith("grok audit failed:")
+    cron_tuning_changed = 1.0 if any(" -> " in item for item in apply_results) else 0.0
+    metrics = {
+        "hermes_x_growth_audit_last_success_timestamp_seconds": time.time(),
+        "hermes_x_growth_audit_grok_success": 1.0 if grok_ok else 0.0,
+        "hermes_x_growth_audit_metrics_refresh_success": _bool_env_metric("X_GROWTH_FETCH_METRICS_SUCCESS", "0"),
+        "hermes_x_growth_audit_cron_tuning_changed": cron_tuning_changed,
+        "hermes_x_growth_audit_latest_posts": _float_metric(latest.get("posts")),
+        "hermes_x_growth_audit_latest_impressions": _float_metric(latest.get("impressions")),
+        "hermes_x_growth_audit_latest_engagements": _float_metric(latest.get("engagements")),
+        "hermes_x_growth_audit_latest_engagement_rate_pct": _float_metric(latest.get("engagement_rate_pct")),
+        "hermes_x_growth_audit_previous_impressions": _float_metric(previous.get("impressions")),
+        "hermes_x_growth_audit_previous_engagements": _float_metric(previous.get("engagements")),
+        "hermes_x_growth_audit_delta_impressions": _float_metric(delta.get("impressions")),
+        "hermes_x_growth_audit_delta_engagements": _float_metric(delta.get("engagements")),
+    }
+    lines = [
+        "# HELP hermes_x_growth_audit_last_success_timestamp_seconds Unix timestamp of the last completed weekly X growth audit.",
+        "# TYPE hermes_x_growth_audit_last_success_timestamp_seconds gauge",
+        "# HELP hermes_x_growth_audit_grok_success Whether the Grok audit call succeeded.",
+        "# TYPE hermes_x_growth_audit_grok_success gauge",
+        "# HELP hermes_x_growth_audit_metrics_refresh_success Whether X metrics refresh succeeded before the audit.",
+        "# TYPE hermes_x_growth_audit_metrics_refresh_success gauge",
+        "# HELP hermes_x_growth_audit_cron_tuning_changed Whether the audit changed a cron cadence.",
+        "# TYPE hermes_x_growth_audit_cron_tuning_changed gauge",
+    ]
+    for name, value in metrics.items():
+        if not any(line == f"# TYPE {name} gauge" for line in lines):
+            lines.append(f"# TYPE {name} gauge")
+        lines.append(f"{name} {value:.6f}")
+    payload = ("\n".join(lines) + "\n").encode()
+    request = urllib.request.Request(endpoint, data=payload, method="PUT")
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            response.read()
+        return f"pushed metrics to {endpoint}"
+    except (OSError, urllib.error.URLError, urllib.error.HTTPError) as exc:
+        return f"metrics push failed: {exc}"
+
+
 def find_cron_job_id(name: str) -> str | None:
     try:
         out = subprocess.check_output(["hermes", "cron", "list", "--all"], text=True, timeout=60)
@@ -220,7 +281,7 @@ def apply_schedule(name: str, desired: str) -> str:
         return f"{name}: failed to set {desired}: {exc}"
 
 
-def update_obsidian_report(date_s: str, summary: dict[str, Any], grok_feedback: str, schedules: dict[str, str], apply_results: list[str]) -> None:
+def update_obsidian_report(date_s: str, summary: dict[str, Any], grok_feedback: str, schedules: dict[str, str], apply_results: list[str], metrics_push_result: str) -> None:
     REPORT_PAGE.parent.mkdir(parents=True, exist_ok=True)
     if REPORT_PAGE.exists():
         text = REPORT_PAGE.read_text()
@@ -275,6 +336,7 @@ Initial strategy changes:
 
 - Desired posting schedule: `{schedules['post_schedule']}`
 - Desired engagement polling schedule: `{schedules['engage_schedule']}`
+- Pushgateway: {metrics_push_result}
 - Apply results:
 """
     for result in apply_results:
@@ -295,7 +357,7 @@ Initial strategy changes:
         f.write(log_line)
 
 
-def concise_recall(summary: dict[str, Any], grok_feedback: str, apply_results: list[str]) -> str:
+def concise_recall(summary: dict[str, Any], grok_feedback: str, apply_results: list[str], metrics_push_result: str) -> str:
     """Return a Telegram-friendly TL;DR for no-agent cron stdout delivery."""
     latest = summary.get("latest_7d") or {}
     previous = summary.get("previous_7d") or {}
@@ -332,6 +394,7 @@ def concise_recall(summary: dict[str, Any], grok_feedback: str, apply_results: l
         f"- Metrics refresh log: {os.getenv('X_GROWTH_FETCH_METRICS_LOG', '(not set)')}",
         f"- Latest 7d: {latest.get('posts', 0)} posts, {latest.get('impressions', 0)} impressions ({pct_change(latest.get('impressions'), previous.get('impressions'))}), {latest.get('engagements', 0)} engagements ({pct_change(latest.get('engagements'), previous.get('engagements'))}), engagement rate {latest.get('engagement_rate_pct', 0)}%",
         "- Cron tuning: " + "; ".join(apply_results),
+        f"- Pushgateway: {metrics_push_result}",
     ]
     if bullets:
         lines.append("")
@@ -371,9 +434,10 @@ def main() -> int:
         apply_results.append("autotune disabled by X_GROWTH_AUTOTUNE_CRONS")
 
     STRATEGY_STATE.parent.mkdir(parents=True, exist_ok=True)
-    STRATEGY_STATE.write_text(json.dumps({"summary": summary, "schedules": schedules, "apply_results": apply_results}, indent=2, sort_keys=True))
-    update_obsidian_report(date_s, summary, grok_feedback, schedules, apply_results)
-    print(concise_recall(summary, grok_feedback, apply_results))
+    metrics_push_result = push_prometheus_metrics(summary, grok_feedback, apply_results)
+    STRATEGY_STATE.write_text(json.dumps({"summary": summary, "schedules": schedules, "apply_results": apply_results, "metrics_push_result": metrics_push_result}, indent=2, sort_keys=True))
+    update_obsidian_report(date_s, summary, grok_feedback, schedules, apply_results, metrics_push_result)
+    print(concise_recall(summary, grok_feedback, apply_results, metrics_push_result))
     return 0
 
 
