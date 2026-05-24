@@ -295,6 +295,51 @@ Initial strategy changes:
         f.write(log_line)
 
 
+def concise_recall(summary: dict[str, Any], grok_feedback: str, apply_results: list[str]) -> str:
+    """Return a Telegram-friendly TL;DR for no-agent cron stdout delivery."""
+    latest = summary.get("latest_7d") or {}
+    previous = summary.get("previous_7d") or {}
+    grok_ok = not grok_feedback.lower().startswith("grok audit failed:")
+
+    def pct_change(current: Any, prior: Any) -> str:
+        try:
+            current_f = float(current or 0)
+            prior_f = float(prior or 0)
+        except (TypeError, ValueError):
+            return "n/a"
+        if prior_f == 0:
+            return "n/a"
+        return f"{((current_f - prior_f) / prior_f) * 100:+.0f}%"
+
+    feedback_lines = [ln.strip("- ").strip() for ln in grok_feedback.splitlines() if ln.strip()]
+    bullets: list[str] = []
+    for line in feedback_lines:
+        if line.lower().startswith(("latest week", "post formats:", "reply behavior:", "topics:", "cadence:")):
+            bullets.append(line)
+        if len(bullets) >= 3:
+            break
+    if not bullets and feedback_lines:
+        bullets = feedback_lines[:3]
+
+    lines = [
+        "Weekly Grok X growth audit complete",
+        f"Obsidian report: {REPORT_PAGE}",
+        "",
+        "TL;DR:",
+        f"- Grok LLM used: {'yes' if grok_ok else 'no/fallback'} ({os.getenv('GROK_AUDIT_PROVIDER', 'xai-oauth')} / {os.getenv('GROK_AUDIT_MODEL', 'grok-4.3')})",
+        "- Vault MCP used: yes (social/X + Postgres secrets loaded via vault_mcp_social_env.py)",
+        "- X metrics source: Tweepy/X API credentials from Vault MCP, not the xurl CLI",
+        f"- Metrics refresh log: {os.getenv('X_GROWTH_FETCH_METRICS_LOG', '(not set)')}",
+        f"- Latest 7d: {latest.get('posts', 0)} posts, {latest.get('impressions', 0)} impressions ({pct_change(latest.get('impressions'), previous.get('impressions'))}), {latest.get('engagements', 0)} engagements ({pct_change(latest.get('engagements'), previous.get('engagements'))}), engagement rate {latest.get('engagement_rate_pct', 0)}%",
+        "- Cron tuning: " + "; ".join(apply_results),
+    ]
+    if bullets:
+        lines.append("")
+        lines.append("Recall:")
+        lines.extend(f"- {bullet}" for bullet in bullets)
+    return "\n".join(lines)
+
+
 def main() -> int:
     now = datetime.now(timezone.utc)
     date_s = now.astimezone().date().isoformat()
@@ -328,9 +373,7 @@ def main() -> int:
     STRATEGY_STATE.parent.mkdir(parents=True, exist_ok=True)
     STRATEGY_STATE.write_text(json.dumps({"summary": summary, "schedules": schedules, "apply_results": apply_results}, indent=2, sort_keys=True))
     update_obsidian_report(date_s, summary, grok_feedback, schedules, apply_results)
-    print(f"wrote {REPORT_PAGE}")
-    for result in apply_results:
-        print(result)
+    print(concise_recall(summary, grok_feedback, apply_results))
     return 0
 
 

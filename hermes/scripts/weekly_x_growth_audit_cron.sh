@@ -44,7 +44,11 @@ export GROK_AUDIT_PROVIDER="${GROK_AUDIT_PROVIDER:-xai-oauth}"
 export GROK_AUDIT_MODEL="${GROK_AUDIT_MODEL:-grok-4.3}"
 export X_GROWTH_AUTOTUNE_CRONS="${X_GROWTH_AUTOTUNE_CRONS:-1}"
 
-"$PYTHON" scripts/fetch_metrics.py || echo "WARN: fetch_metrics failed; continuing with existing local ledger" >&2
-"$PYTHON" scripts/growth_audit.py
+LOG_DIR="$X_SOCIAL_STATE_DIR/logs"
+mkdir -p "$LOG_DIR"
+export X_GROWTH_FETCH_METRICS_LOG="$LOG_DIR/weekly_x_growth_audit_fetch_metrics.log"
 
-echo "weekly x growth audit complete; report appended to $OBSIDIAN_VAULT/40-wiki/queries/x-growth-feedback.md"
+if ! "$PYTHON" scripts/fetch_metrics.py >"$X_GROWTH_FETCH_METRICS_LOG" 2>&1; then
+  echo "WARN: fetch_metrics failed; continuing with existing local ledger (log: $X_GROWTH_FETCH_METRICS_LOG)" >&2
+fi
+"$PYTHON" scripts/growth_audit.py
