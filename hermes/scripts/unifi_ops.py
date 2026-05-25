@@ -193,6 +193,38 @@ PINNED_TARGETS: tuple[InventoryTarget, ...] = (
         group_context="Corinne's Stuff",
         connectivity="Wi-Fi only",
     ),
+    InventoryTarget(
+        canonical_alias="Oculus",
+        aliases=(
+            "oculus",
+            "meta quest",
+            "quest",
+            "vr headset",
+            "aa:ec:79:c5:38:e9",
+        ),
+        mac_address="aa:ec:79:c5:38:e9",
+        fixed_ip="",
+        local_dns="",
+        group_context="Household VR",
+        connectivity="Wi-Fi only",
+    ),
+    InventoryTarget(
+        canonical_alias="Corinne Desktop",
+        aliases=(
+            "corinne desktop",
+            "corinnes desktop",
+            "corinne's desktop",
+            "corinne desktop wired",
+            "corinnes desktop wired",
+            "corinne's desktop wired",
+            "00:e0:4c:b0:56:df",
+        ),
+        mac_address="00:e0:4c:b0:56:df",
+        fixed_ip="",
+        local_dns="",
+        group_context="Corinne's Stuff",
+        connectivity="Wired",
+    ),
 )
 
 
@@ -502,10 +534,9 @@ class UniFiApi:
     def find_clients(self, site_id: str, target: InventoryTarget) -> list[dict[str, Any]]:
         # The official Integration API documents macAddress and ipAddress as filterable for clients.
         # Name is intentionally not used here: some Network versions reject it as an invalid filter.
-        filters = [
-            f"macAddress.eq('{target.mac_address}')",
-            f"ipAddress.eq('{target.fixed_ip}')",
-        ]
+        filters = [f"macAddress.eq('{target.mac_address}')"]
+        if target.fixed_ip:
+            filters.append(f"ipAddress.eq('{target.fixed_ip}')")
         matches: dict[str, dict[str, Any]] = {}
         for filter_value in filters:
             payload = self.request(

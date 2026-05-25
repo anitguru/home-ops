@@ -100,6 +100,27 @@ def test_resolves_corinne_ipad_from_household_and_unifi_aliases():
         assert target.confirmation_phrase("block") == "confirm block Corinne iPad"
 
 
+def test_resolves_oculus_aliases():
+    for alias in (["oculus"], ["meta", "quest"], ["vr", "headset"], ["aa:ec:79:c5:38:e9"]):
+        target = unifi_ops.resolve_target(alias)
+
+        assert target.canonical_alias == "Oculus"
+        assert target.mac_address == "aa:ec:79:c5:38:e9"
+        assert target.fixed_ip == ""
+        assert target.confirmation_phrase("block") == "confirm block Oculus"
+
+
+def test_resolves_corinne_desktop_aliases():
+    for alias in (["Corinne's", "Desktop"], ["corinne", "desktop", "wired"], ["00:e0:4c:b0:56:df"]):
+        target = unifi_ops.resolve_target(alias)
+
+        assert target.canonical_alias == "Corinne Desktop"
+        assert target.mac_address == "00:e0:4c:b0:56:df"
+        assert target.fixed_ip == ""
+        assert target.connectivity == "Wired"
+        assert target.confirmation_phrase("block") == "confirm block Corinne Desktop"
+
+
 def test_preflight_is_read_only_and_returns_confirmation_phrase():
     api = FakeUniFiApi(everett_client("DEFAULT"))
 
@@ -206,6 +227,27 @@ def test_live_api_client_lookup_uses_only_filterable_mac_and_ip_fields():
     api.find_clients("site-1", target)
 
     assert api.filters == ["macAddress.eq('1c:f6:4c:3a:e8:13')", "ipAddress.eq('10.0.0.182')"]
+
+
+def test_live_api_lookup_does_not_emit_blank_ip_filter_for_mac_only_targets():
+    class RecordingApi(unifi_ops.UniFiApi):
+        def __init__(self):
+            self.filters = []
+
+        def request(self, method, path, body=None, query=None):
+            assert query is not None
+            self.filters.append(query["filter"])
+            return {"data": []}
+
+        def request_network(self, method, path, body=None, query=None):
+            return {"data": []}
+
+    api = RecordingApi()
+    target = unifi_ops.resolve_target(["oculus"])
+
+    api.find_clients("site-1", target)
+
+    assert api.filters == ["macAddress.eq('aa:ec:79:c5:38:e9')"]
 
 
 def test_live_api_falls_back_to_persistent_user_record_when_client_is_offline():
