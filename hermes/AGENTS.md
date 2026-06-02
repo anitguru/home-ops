@@ -16,7 +16,7 @@ This folder is the preferred working directory for Hermes sessions on this Mac. 
 
 When SVA uses these shorthand terms, interpret them consistently:
 
-- `kb`, `knowledge base`, `information vault`, `notes vault`, or `AnITGuru vault` → the Obsidian knowledge base at `/Users/sva/Documents/Dropbox/Obsidian/AnITGuru`. Use CocoIndex for semantic discovery and exact file reads/patches for grounded edits.
+- `kb`, `knowledge base`, `information vault`, `notes vault`, or `AnITGuru vault` → the Obsidian knowledge base at `/Users/sva/Library/CloudStorage/GoogleDrive-admin@vanhero.com/My Drive/Obsidian/AnITGuru`. Use CocoIndex for semantic discovery and exact file reads/patches for grounded edits.
 - `vault`, `HashiCorp vault`, `vault.anit.guru`, or `secrets vault` → the self-hosted HashiCorp Vault KV secrets store exposed through the `vault` MCP. Secrets live under the KV mount named `secret`, e.g. `secret/<name>`. Never print secret values.
 - `repo root` / `Repos root` → `/Users/sva/Documents/Repos`; choose `Github/` vs `Gitea/` according to the README/publishing target.
 
