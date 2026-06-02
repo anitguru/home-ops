@@ -27,7 +27,7 @@ if [[ ! -x "$CCC" ]]; then
 fi
 
 PROJECTS=(
-  "/Users/sva/Documents/Dropbox/Obsidian/AnITGuru"
+  "/Users/sva/Library/CloudStorage/GoogleDrive-admin@vanhero.com/My Drive/Obsidian/AnITGuru"
   "/Users/sva/Documents/Repos/Gitea/automations"
   "/Users/sva/Documents/Repos/Gitea/observo"
   "/Users/sva/Documents/Repos/Github/anit.guru"
@@ -48,6 +48,10 @@ for project in "${PROJECTS[@]}"; do
   log "Indexing: $project"
   (
     cd "$project" || exit 1
+    if [[ ! -f ".cocoindex_code/settings.yml" ]]; then
+      log "Initializing CocoIndex project: $project"
+      "$CCC" init || exit $?
+    fi
     "$CCC" index
   ) >> "$LOG_FILE" 2>&1
 
