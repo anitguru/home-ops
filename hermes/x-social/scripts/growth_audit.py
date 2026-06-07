@@ -34,7 +34,12 @@ if str(HOME_OPS_HERMES_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(HOME_OPS_HERMES_SCRIPTS))
 from hermes_llm import run_hermes_prompt
 
-VAULT = Path(os.environ.get("OBSIDIAN_VAULT", "/Users/sva/Documents/Dropbox/Obsidian/AnITGuru"))
+VAULT = Path(
+    os.environ.get(
+        "OBSIDIAN_VAULT",
+        "/Users/sva/Library/CloudStorage/GoogleDrive-admin@vanhero.com/My Drive/Obsidian/AnITGuru",
+    )
+)
 WIKI = VAULT / "40-wiki"
 REPORT_PAGE = WIKI / "queries" / "x-growth-feedback.md"
 WIKI_INDEX = WIKI / "index.md"

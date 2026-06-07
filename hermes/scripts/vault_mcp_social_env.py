@@ -18,20 +18,20 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-DEFAULT_MCP_URL = "https://vault-mcp.anit.guru/mcp"
+DEFAULT_MCP_URL = "https://hashivault.transformers.lan:8210/mcp"
 
 SECRET_MAP: dict[str, dict[str, str]] = {
-    "secret/X": {
+    "secret/x": {
         "CONSUMER_KEY": "X_CONSUMER_KEY",
         "CONSUMER_SECRET": "X_CONSUMER_SECRET",
         "ACCESS_TOKEN": "X_ACCESS_TOKEN",
         "ACCESS_TOKEN_SECRET": "X_ACCESS_TOKEN_SECRET",
         "BEARER_TOKEN": "X_BEARER_TOKEN",
     },
-    "secret/TAVILY": {
+    "secret/tavily": {
         "API_TOKEN": "TAVILY_API_TOKEN",
     },
-    "secret/POSTGRES": {
+    "secret/postgres": {
         "DSN": "PG_DSN",
     },
 }
