@@ -37,7 +37,7 @@ from hermes_llm import run_hermes_prompt
 VAULT = Path(
     os.environ.get(
         "OBSIDIAN_VAULT",
-        "/Users/sva/Library/CloudStorage/GoogleDrive-admin@vanhero.com/My Drive/Obsidian/AnITGuru",
+        "/Users/sva/Documents/Obsidian/Personal",
     )
 )
 WIKI = VAULT / "40-wiki"

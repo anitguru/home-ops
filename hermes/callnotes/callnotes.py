@@ -38,6 +38,7 @@ from hermes_llm import hermes_available, run_hermes_prompt  # noqa: E402
 REMOTE = os.environ.get("CALLNOTES_RCLONE_REMOTE", "svagml-remote-gdrive")
 VAULT = os.environ.get("CALLNOTES_OBSIDIAN_VAULT", "work")  # sva-s1
 VAULT_LABEL = os.environ.get("CALLNOTES_OBSIDIAN_LABEL", "sva-s1")
+LOCAL_VAULT_ROOT = Path(os.environ.get("CALLNOTES_LOCAL_VAULT_ROOT", "/Users/sva/Documents/Obsidian/Personal"))
 OBSIDIAN_MCP = os.environ.get("CALLNOTES_OBSIDIAN_MCP_URL", "https://obsidian-mcp.transformers.lan/mcp")
 OUTPUT_FOLDER = os.environ.get("CALLNOTES_OUTPUT_FOLDER", "01_Interactions")
 TODAY = date.today().isoformat()
@@ -328,9 +329,38 @@ class ObsidianMCP:
             raise CallnotesError(f"obsidian-mcp read verification returned no content for {path}")
 
 
+class LocalObsidianVault:
+    def __init__(self, root: Path):
+        self.root = root.expanduser()
+        if not self.root.exists():
+            raise CallnotesError(f"local Obsidian vault root not found: {self.root}")
+
+    def write_file(self, path: str, content: str) -> None:
+        target = (self.root / path).resolve()
+        root = self.root.resolve()
+        if root not in target.parents and target != root:
+            raise CallnotesError(f"refusing to write outside local vault: {path}")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+
+    def verify_file(self, path: str) -> None:
+        target = self.root / path
+        if not target.exists() or not target.read_text(encoding="utf-8").strip():
+            raise CallnotesError(f"local Obsidian read verification failed for {target}")
+
+
+def make_note_sink() -> LocalObsidianVault | ObsidianMCP:
+    if LOCAL_VAULT_ROOT.exists():
+        print(f"using local Obsidian vault root: {LOCAL_VAULT_ROOT}")
+        return LocalObsidianVault(LOCAL_VAULT_ROOT)
+    print(f"local Obsidian vault root absent — using Obsidian MCP: {OBSIDIAN_MCP}")
+    return ObsidianMCP(OBSIDIAN_MCP)
+
+
 def check_runtime() -> int:
     print(f"callnotes runtime cwd={Path.cwd()}")
     print(f"target obsidian vault={VAULT_LABEL}/{OUTPUT_FOLDER}")
+    print(f"local obsidian root={LOCAL_VAULT_ROOT} exists={LOCAL_VAULT_ROOT.exists()}")
     if not shutil.which("rclone"):
         print("ERROR: rclone not found on PATH", file=sys.stderr)
         return 1
@@ -355,7 +385,7 @@ def process_call_docs(*, dry_run: bool = False, keep_input: bool = False) -> int
             return 0
 
         print(f"Processing {len(call_docs)} file(s): {call_docs}")
-        mcp = None if dry_run else ObsidianMCP(OBSIDIAN_MCP)
+        note_sink = None if dry_run else make_note_sink()
         written_paths: list[str] = []
 
         with tempfile.TemporaryDirectory(prefix="callnotes-docx-") as tmpdir:
@@ -374,9 +404,9 @@ def process_call_docs(*, dry_run: bool = False, keep_input: bool = False) -> int
                 if dry_run:
                     print(f"  DRY_RUN: would write [{VAULT_LABEL}] {note_path} ({len(note_md)} chars)")
                 else:
-                    assert mcp is not None
-                    mcp.write_file(note_path, note_md)
-                    mcp.verify_file(note_path)
+                    assert note_sink is not None
+                    note_sink.write_file(note_path, note_md)
+                    note_sink.verify_file(note_path)
                     print(f"  NOTE_CREATED: [{VAULT_LABEL}] {note_path}")
                     written_paths.append(note_path)
 

@@ -8,7 +8,7 @@ Repo-backed runtime for the migrated `docs-wishlist` automation.
 - Launcher: `~/.hermes/scripts/docs_wishlist_cron.sh` → `home-ops/hermes/scripts/docs_wishlist_cron.sh`.
 - Runtime: `home-ops/hermes/docs-wishlist/rss_ingest.py`.
 - Default mode: deterministic `--dry-run`, `RSS_INGEST_USE_LLM=0`.
-- Default vault: local filesystem at `/Users/sva/Documents/Dropbox/Obsidian/AnITGuru` via `VAULT_ROOT`.
+- Default vault: local filesystem at `/Users/sva/Documents/Obsidian/Personal` via `VAULT_ROOT`.
 - Default scraper: self-hosted Firecrawl at `https://10.0.0.53`; bearer token comes from `FIRECRAWL_API_KEY` or `FIRECRAWL_API_TOKEN` if available in the environment / `~/.hermes/.env`.
 
 ## Manual checks

@@ -7,6 +7,7 @@ Normal mode prints shell-quoted `export NAME=VALUE` lines intended for
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import re
@@ -17,13 +18,39 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-DEFAULT_MCP_URL = "https://vault-mcp.anit.guru/mcp"
+DEFAULT_MCP_URL = "https://hashivault.transformers.lan:8210/mcp"
 SECRET_CANDIDATES: dict[str, tuple[str, ...]] = {
-    "secret/RCLONE": ("RCLONE_GDRIVE_CONF", "GDRIVE_CONF", "RCLONE_CONF_BASE64"),
-    "secret/GOOGLE_DRIVE": ("RCLONE_GDRIVE_CONF", "GDRIVE_CONF", "RCLONE_CONF_BASE64"),
-    "secret/GDRIVE": ("RCLONE_GDRIVE_CONF", "GDRIVE_CONF", "RCLONE_CONF_BASE64"),
+    "secret/rclone": ("RCLONE_GDRIVE_CONF", "GDRIVE_CONF", "RCLONE_CONF_BASE64"),
+    "secret/google_drive": ("RCLONE_GDRIVE_CONF", "GDRIVE_CONF", "RCLONE_CONF_BASE64"),
+    "secret/gdrive": ("RCLONE_GDRIVE_CONF", "GDRIVE_CONF", "RCLONE_CONF_BASE64"),
 }
 REQUIRED_ENV = ("RCLONE_GDRIVE_CONF",)
+
+
+def build_rclone_conf(data: dict[str, Any]) -> tuple[str, str] | None:
+    """Build a temporary rclone config from the current lowercase Vault secret shape."""
+    service_account = data.get("SERVICE_ACCOUNT_JSON")
+    if not service_account:
+        return None
+    if isinstance(service_account, dict):
+        service_account_text = json.dumps(service_account, separators=(",", ":"))
+    else:
+        service_account_text = str(service_account).strip()
+        try:
+            service_account_text = json.dumps(json.loads(service_account_text), separators=(",", ":"))
+        except json.JSONDecodeError:
+            service_account_text = service_account_text.replace("\n", "\\n")
+    remote_name = str(data.get("REMOTE_NAME") or "svagml-remote-gdrive")
+    lines = [
+        f"[{remote_name}]",
+        "type = drive",
+        f"scope = {data.get('SCOPE') or 'drive'}",
+        f"service_account_credentials = {service_account_text}",
+    ]
+    if data.get("IMPERSONATE_USER"):
+        lines.append(f"impersonate = {data['IMPERSONATE_USER']}")
+    conf = "\n".join(lines) + "\n"
+    return remote_name, base64.b64encode(conf.encode()).decode()
 
 
 class McpError(RuntimeError):
@@ -141,6 +168,14 @@ def collect_env(url: str, token: str) -> tuple[dict[str, str], dict[str, str]]:
                 values["RCLONE_GDRIVE_CONF"] = str(data[key])
                 sources["RCLONE_GDRIVE_CONF"] = f"{path}:{key}"
                 return values, sources
+        built = build_rclone_conf(data)
+        if built:
+            remote_name, encoded_conf = built
+            values["RCLONE_GDRIVE_CONF"] = encoded_conf
+            values["CALLNOTES_RCLONE_REMOTE"] = remote_name
+            sources["RCLONE_GDRIVE_CONF"] = f"{path}:SERVICE_ACCOUNT_JSON"
+            sources["CALLNOTES_RCLONE_REMOTE"] = f"{path}:REMOTE_NAME"
+            return values, sources
     return values, sources
 
 

@@ -26,7 +26,7 @@ The old Gitea schedule (`17 9 * * 1` UTC / Monday 09:17 UTC) is retired. The exi
 Default local mode uses:
 
 ```bash
-VAULT_ROOT=/Users/sva/Documents/Dropbox/Obsidian/AnITGuru
+VAULT_ROOT=/Users/sva/Documents/Obsidian/Personal
 ```
 
 If the local vault path does not exist, the script can fall back to Obsidian MCP using:

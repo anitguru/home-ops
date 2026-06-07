@@ -32,8 +32,8 @@ if [[ "${1:-}" == "--check" ]]; then
   export CALLNOTES_USE_LLM="0"
   "$PYTHON" callnotes.py --check --no-llm
   env -u HERMES_TUI -u HERMES_TUI_ACTIVE_SESSION_FILE -u HERMES_GATEWAY_SESSION -u HERMES_INTERACTIVE -u HERMES_SESSION_KEY \
-    hermes -p "$HERMES_AUTOMATION_PROFILE" chat -Q --source callnotes-cron-check --toolsets terminal \
-      -q 'Use terminal to print exactly: callnotes profile ready'
+    hermes -p "$HERMES_AUTOMATION_PROFILE" chat -Q --source callnotes-cron-check \
+      -q 'Reply with exactly: callnotes profile ready'
   echo "callnotes_cron check ok"
   exit 0
 fi
