@@ -53,7 +53,7 @@ payload = {
 pathlib.Path(sys.argv[2]).write_text(json.dumps(payload))
 PY
   echo "[tts] POST $(basename "$mp3")"
-  curl -fsS --retry 2 --retry-all-errors --connect-timeout 15 --max-time 240 \
+  curl -fsS --retry 2 --retry-all-errors --connect-timeout 30 --max-time 900 \
     -X POST "$TTS_URL" \
     -H "Content-Type: application/json" \
     --data-binary "@$json" \
