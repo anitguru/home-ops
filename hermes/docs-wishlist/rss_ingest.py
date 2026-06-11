@@ -14,10 +14,9 @@ Vault access (auto-selected):
   Local:  VAULT_ROOT env or --vault path
   MCP:    OBSIDIAN_MCP_URL + OBSIDIAN_MCP_TOKEN
 
-_raw/ lifecycle:
-  _raw/{slug}.md          status: pending   (written on fetch)
-  _raw/{slug}.md          status: processed (updated after wiki synthesis)
-  _raw/processed/{slug}.md                  (copy, canonical "done" marker)
+40-wiki import lifecycle:
+  40-wiki/raw/docs/imported-web-docs/{slug}.md  status: processed
+  40-wiki/log.md                                ingest log entry
 
 Usage:
   python rss_ingest.py --url https://docs.astro.build/en/basics/project-structure/ [--dry-run]
@@ -48,7 +47,9 @@ from hermes_llm import run_hermes_prompt
 # ---------------------------------------------------------------------------
 
 DEFAULT_FEED  = "https://astro.build/rss.xml"
-STATE_PATH    = "_agent/state/rss-astro.json"
+IMPORTED_DOCS_DIR = "40-wiki/raw/docs/imported-web-docs"
+WIKI_LOG_PATH = "40-wiki/log.md"
+STATE_PATH = f"{IMPORTED_DOCS_DIR}/state/rss-astro.json"
 
 # ---------------------------------------------------------------------------
 # Vault client
@@ -173,13 +174,13 @@ def make_client(vault_arg: str | None = None) -> VaultClient:
 
 def list_wiki_slugs(vault: VaultClient) -> set[str]:
     if isinstance(vault, LocalVaultClient):
-        wiki_dir = vault.root / "wiki"
-        return {p.stem for p in wiki_dir.glob("*.md")} if wiki_dir.exists() else set()
+        docs_dir = vault.root / IMPORTED_DOCS_DIR
+        return {p.stem for p in docs_dir.glob("*.md")} if docs_dir.exists() else set()
     if not vault._sid:
         vault._init()
     result = vault._rpc("tools/call", {
         "name": "search",
-        "arguments": {"vault": vault.vault, "query": "**Summary**", "path": "wiki"},
+        "arguments": {"vault": vault.vault, "query": "status: processed", "path": IMPORTED_DOCS_DIR},
     })
     content = result.get("content", []) if isinstance(result, dict) else []
     slugs: set[str] = set()
@@ -404,11 +405,9 @@ Source: {url}
 def ingest_url(url: str, title: str, feed_url: str,
                vault: VaultClient, dry_run: bool, force: bool = False) -> bool:
     slug           = url_to_slug(url)
-    raw_path       = f"_raw/{slug}.md"
-    processed_path = f"_raw/processed/{slug}.md"
-    wiki_path      = f"wiki/{slug}.md"
+    raw_path       = f"{IMPORTED_DOCS_DIR}/{slug}.md"
 
-    if not force and (vault.file_exists(processed_path) or vault.file_exists(wiki_path)):
+    if not force and vault.file_exists(raw_path):
         print(f"  [{slug}] already ingested — skipping (use --force to re-ingest)")
         return False
 
@@ -418,7 +417,7 @@ def ingest_url(url: str, title: str, feed_url: str,
     except Exception as e:
         print(f"  [{slug}] FETCH ERROR: {e}")
         return False
-    print(f"  [{slug}] {len(content)} chars — synthesizing with Hermes...")
+    print(f"  [{slug}] {len(content)} chars — preparing imported web-doc capture...")
 
     now = datetime.now(timezone.utc).isoformat()
     raw_text = (
@@ -427,46 +426,20 @@ def ingest_url(url: str, title: str, feed_url: str,
         + content
     )
 
-    try:
-        wiki_text = synthesize(content, url, title, raw_path)
-    except Exception as e:
-        print(f"  [{slug}] SYNTHESIS ERROR: {e}")
-        return False
-
-    # Extract summary for index entry
-    summary = next(
-        (l[len("**Summary**:"):].strip() for l in wiki_text.splitlines()
-         if l.startswith("**Summary**:")),
-        title,
-    )
+    processed_text = raw_text.replace("status: pending", "status: processed", 1)
 
     if dry_run:
-        print(f"  [{slug}] DRY RUN — would write {raw_path} + {wiki_path}")
-        print(f"    Summary: {summary[:100]}")
+        print(f"  [{slug}] DRY RUN — would write {raw_path}")
         return True
 
-    # Write _raw/ (pending → will be updated to processed below)
-    vault.write_file(raw_path, raw_text)
-
-    # Write wiki/
-    vault.write_file(wiki_path, wiki_text)
-
-    # Write _raw/processed/ (canonical done marker) + update status in _raw/
-    processed_text = raw_text.replace("status: pending", "status: processed", 1)
-    vault.write_file(processed_path, processed_text)
+    # Write the imported web-doc capture under the current 40-wiki raw-doc convention.
     vault.write_file(raw_path, processed_text)
 
-    # Update wiki/index.md
-    section, subsection = url_to_index_section(url)
-    index = vault.read_file("wiki/index.md") or ""
-    vault.write_file("wiki/index.md",
-                     append_to_index(index, section, subsection,
-                                     f"- [[{slug}]] - {summary}"))
-
-    # Append to wiki/log.md
+    # Append to 40-wiki/log.md. Imported docs are raw captures, not curated pages,
+    # so they are not added to 40-wiki/index.md.
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    vault.append_file("wiki/log.md",
-                      f"\n- {ts}: Ingested [{title}]({wiki_path}) from {url}\n")
+    vault.append_file(WIKI_LOG_PATH,
+                      f"\n- {ts}: Imported web doc [{title}]({raw_path}) from {url}\n")
 
     print(f"  [{slug}] done ✓")
     return True
@@ -559,9 +532,9 @@ def run_wishlist(site_name: str, sites_cfg: list[dict],
     all_urls = load_site_urls(site)
     print(f"[wishlist:{site_name}] {len(all_urls)} total source URLs")
 
-    print(f"[wishlist:{site_name}] listing existing wiki slugs...")
+    print(f"[wishlist:{site_name}] listing existing imported web-doc slugs...")
     existing = list_wiki_slugs(vault)
-    print(f"[wishlist:{site_name}] {len(existing)} pages already in wiki")
+    print(f"[wishlist:{site_name}] {len(existing)} pages already imported")
 
     missing = [u for u in all_urls if url_to_slug(u) not in existing]
     print(f"[wishlist:{site_name}] {len(missing)} missing — ingesting up to {cap}")
@@ -595,7 +568,7 @@ def main() -> None:
     parser.add_argument("--dry-run",    dest="dry_run", action="store_true",  default=True)
     parser.add_argument("--no-dry-run", dest="dry_run", action="store_false")
     parser.add_argument("--force",  action="store_true", default=False,
-                        help="Re-ingest even if wiki/ or _raw/processed/ already exists")
+                        help="Re-ingest even if 40-wiki/raw/docs/imported-web-docs/ already exists")
     parser.add_argument("--limit",  type=int, default=None)
     parser.add_argument("--wishlist", metavar="SITE",
                         help="Ingest missing pages for SITE defined in --sites-config")
