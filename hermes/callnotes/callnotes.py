@@ -39,7 +39,7 @@ REMOTE = os.environ.get("CALLNOTES_RCLONE_REMOTE", "svagml-remote-gdrive")
 VAULT = os.environ.get("CALLNOTES_OBSIDIAN_VAULT", "work")  # sva-s1
 VAULT_LABEL = os.environ.get("CALLNOTES_OBSIDIAN_LABEL", "sva-s1")
 LOCAL_VAULT_ROOT = Path(os.environ.get("CALLNOTES_LOCAL_VAULT_ROOT", "/Users/sva/Documents/Obsidian/Personal"))
-OBSIDIAN_MCP = os.environ.get("CALLNOTES_OBSIDIAN_MCP_URL", "https://obsidian-mcp.transformers.lan/mcp")
+OBSIDIAN_MCP = os.environ.get("CALLNOTES_OBSIDIAN_MCP_URL", "").strip()
 OUTPUT_FOLDER = os.environ.get("CALLNOTES_OUTPUT_FOLDER", "01_Interactions")
 TODAY = date.today().isoformat()
 
@@ -280,7 +280,7 @@ class ObsidianMCP:
         response.raise_for_status()
         session_id = response.headers.get("mcp-session-id")
         if not session_id:
-            raise CallnotesError("obsidian-mcp did not return an MCP session id")
+            raise CallnotesError("remote Obsidian MCP did not return an MCP session id")
         return session_id
 
     def _notify_initialized(self) -> None:
@@ -300,12 +300,12 @@ class ObsidianMCP:
             if line and line.startswith(b"data: "):
                 payload = json.loads(line[6:])
                 if payload.get("error"):
-                    raise CallnotesError(f"obsidian-mcp error: {payload['error']}")
+                    raise CallnotesError(f"remote Obsidian MCP error: {payload['error']}")
                 result = payload.get("result", {})
                 if result.get("isError"):
-                    raise CallnotesError(f"obsidian-mcp tool error: {result.get('content')}")
+                    raise CallnotesError(f"remote Obsidian MCP tool error: {result.get('content')}")
                 return result
-        raise CallnotesError("obsidian-mcp returned no tool result")
+        raise CallnotesError("remote Obsidian MCP returned no tool result")
 
     def call_tool(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         response = self._post(
@@ -326,7 +326,7 @@ class ObsidianMCP:
         result = self.call_tool("read_file", {"vault": VAULT, "path": path})
         content = result.get("content", [])
         if not content:
-            raise CallnotesError(f"obsidian-mcp read verification returned no content for {path}")
+            raise CallnotesError(f"remote Obsidian MCP read verification returned no content for {path}")
 
 
 class LocalObsidianVault:
@@ -353,7 +353,12 @@ def make_note_sink() -> LocalObsidianVault | ObsidianMCP:
     if LOCAL_VAULT_ROOT.exists():
         print(f"using local Obsidian vault root: {LOCAL_VAULT_ROOT}")
         return LocalObsidianVault(LOCAL_VAULT_ROOT)
-    print(f"local Obsidian vault root absent — using Obsidian MCP: {OBSIDIAN_MCP}")
+    if not OBSIDIAN_MCP:
+        raise CallnotesError(
+            "local Obsidian vault root absent and CALLNOTES_OBSIDIAN_MCP_URL is not set; "
+            "remote MCP fallback has no default LAN hostname"
+        )
+    print(f"local Obsidian vault root absent — using remote Obsidian MCP: {OBSIDIAN_MCP}")
     return ObsidianMCP(OBSIDIAN_MCP)
 
 
