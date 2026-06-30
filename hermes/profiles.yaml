@@ -94,23 +94,6 @@ profiles:
     - Only draft replies for mentions that deterministic engagement scoring already selected.
     - Cron/runtime state lives in home-ops; do not rely on Gitea Actions, runners, or pushes for scheduled engagement.
     - Do not keep a persistent gateway or scheduler for this profile; default profile owns active cron visibility.
-  callnotes:
-    purpose: One-shot transcript-to-meeting-note structuring profile invoked by default-profile Hermes cron wrappers.
-    primary_repo: home-ops
-    repos:
-    - home-ops
-    needs:
-    - terminal
-    - file
-    default_model:
-      provider: openai-codex
-      model: gpt-5.5
-    default_cwd: /Users/sva/Documents/Repos/Github/home-ops/hermes/callnotes
-    scheduling_owner: default
-    notes:
-    - Default-profile cron owns the old callnotes schedule; this profile only structures transcript text on demand.
-    - Cron/runtime state lives in home-ops; do not rely on Gitea Actions, runners, or pushes for scheduled callnotes.
-    - Do not keep a persistent gateway or scheduler for this profile.
   anit-guru:
     purpose: Main SVA/AnITGuru persona site, X social, YouTube, Guru's Tech Bytes, audience-building and monetization goals.
     primary_repo: anit-guru
