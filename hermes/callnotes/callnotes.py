@@ -38,7 +38,7 @@ from hermes_llm import hermes_available, run_hermes_prompt  # noqa: E402
 REMOTE = os.environ.get("CALLNOTES_RCLONE_REMOTE", "svagml-remote-gdrive")
 VAULT = os.environ.get("CALLNOTES_OBSIDIAN_VAULT", "work")  # sva-s1
 VAULT_LABEL = os.environ.get("CALLNOTES_OBSIDIAN_LABEL", "sva-s1")
-LOCAL_VAULT_ROOT = Path(os.environ.get("CALLNOTES_LOCAL_VAULT_ROOT", "/Users/sva/Documents/Obsidian/Personal"))
+LOCAL_VAULT_ROOT = Path(os.environ.get("CALLNOTES_LOCAL_VAULT_ROOT", "/Users/sva/02-Areas/Personal"))
 OBSIDIAN_MCP = os.environ.get("CALLNOTES_OBSIDIAN_MCP_URL", "").strip()
 OUTPUT_FOLDER = os.environ.get("CALLNOTES_OUTPUT_FOLDER", "01_Interactions")
 TODAY = date.today().isoformat()

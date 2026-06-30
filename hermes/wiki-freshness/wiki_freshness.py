@@ -210,7 +210,7 @@ def make_client(vault_arg: str | None) -> VaultClient:
         vault_arg
         or os.getenv("VAULT_ROOT")
         or os.getenv("WIKI_PATH")
-        or "/Users/sva/Documents/Obsidian/Personal"
+        or "/Users/sva/02-Areas/Personal"
     )
     if Path(vault_root).exists():
         return LocalVaultClient(Path(vault_root))

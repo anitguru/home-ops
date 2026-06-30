@@ -14,7 +14,7 @@ Repo-backed Hermes/default-profile cron migration of the old Gitea `callnotes` w
 - Scan Google Drive remote `svagml-remote-gdrive` for root-level `call.docx` or `call*.docx` files (for example, Google Recorder exports renamed to `call - ... .docx`).
 - Convert DOCX transcript text with `python-docx`.
 - Structure into Mortenson-style SentinelOne meeting notes.
-- Write to the local Obsidian/WebDAV mirror at `/Users/sva/Documents/Obsidian/Personal` folder `01_Interactions` as `<YYYY-MM-DD>-Call.md`; fall back to Obsidian MCP only if the local mirror is absent.
+- Write to the local Obsidian/WebDAV mirror at `/Users/sva/02-Areas/Personal` folder `01_Interactions` as `<YYYY-MM-DD>-Call.md`; fall back to Obsidian MCP only if the local mirror is absent.
 - Force `[[Steve VanAllen]]` and preserve the old Steve alias normalization.
 - Delete `call.docx` from Drive only after Obsidian write + read verification succeeds.
 - No input exits cleanly with `NO_INPUT`.

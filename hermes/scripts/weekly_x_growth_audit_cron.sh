@@ -6,7 +6,7 @@ HOME_OPS_HERMES_SCRIPTS="${HOME_OPS_HERMES_SCRIPTS:-/Users/sva/Documents/Repos/G
 HERMES_PYTHON="${HERMES_PYTHON:-/Users/sva/.hermes/hermes-agent/venv/bin/python3}"
 PYTHON="${PYTHON:-/Users/sva/Documents/Repos/Github/home-ops/.venv/bin/python}"
 X_SOCIAL_STATE_DIR="${X_SOCIAL_STATE_DIR:-${HERMES_STATE_DIR:-$HOME/.local/state/home-ops}/x-social}"
-OBSIDIAN_VAULT="${OBSIDIAN_VAULT:-/Users/sva/Documents/Obsidian/Personal}"
+OBSIDIAN_VAULT="${OBSIDIAN_VAULT:-/Users/sva/02-Areas/Personal}"
 
 cd "$ROOT"
 

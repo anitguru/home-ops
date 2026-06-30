@@ -25,7 +25,7 @@ fi
 
 export HOME_OPS_HERMES_SCRIPTS
 export WIKI_FRESHNESS_USE_LLM="${WIKI_FRESHNESS_USE_LLM:-0}"
-export VAULT_ROOT="${VAULT_ROOT:-/Users/sva/Documents/Obsidian/Personal}"
+export VAULT_ROOT="${VAULT_ROOT:-/Users/sva/02-Areas/Personal}"
 export OBSIDIAN_MCP_VAULT="${OBSIDIAN_MCP_VAULT:-personal}"
 
 if [[ "${1:-}" == "--check" ]]; then

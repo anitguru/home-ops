@@ -7,7 +7,7 @@ This folder is the preferred working directory for Hermes sessions on this Mac. 
 ## Home layout
 
 - Hermes cwd: `/Users/sva/Documents/Agents/Hermes`
-- AnITGuru Obsidian vault: `/Users/sva/Documents/Obsidian/Personal`
+- AnITGuru Obsidian vault: `/Users/sva/02-Areas/Personal`
 - Version-controlled repos: `/Users/sva/Documents/Repos/Github` and `/Users/sva/Documents/Repos/Gitea`
 - General inboxes: `/Users/sva/Documents/Inbox`
 
@@ -16,7 +16,7 @@ This folder is the preferred working directory for Hermes sessions on this Mac. 
 
 When SVA uses these shorthand terms, interpret them consistently:
 
-- `kb`, `knowledge base`, `information vault`, `notes vault`, or `AnITGuru vault` → the Obsidian knowledge base mirrored locally at `/Users/sva/Documents/Obsidian/Personal`, with WebDAV on vectorsigma as the source of truth. Use vectorsigma `ccc search` over SSH for semantic discovery; use local exact file reads/patches for grounded edits.
+- `kb`, `knowledge base`, `information vault`, `notes vault`, or `AnITGuru vault` → the Obsidian knowledge base mirrored locally at `/Users/sva/02-Areas/Personal`, with WebDAV on vectorsigma as the source of truth. Use vectorsigma `ccc search` over SSH for semantic discovery; use local exact file reads/patches for grounded edits.
 - `vault`, `HashiCorp vault`, `vault.anit.guru`, or `secrets vault` → the self-hosted HashiCorp Vault KV secrets store exposed through the `vault` MCP. Secrets live under the KV mount named `secret`, e.g. `secret/<name>`. Never print secret values.
 - `repo root` / `Repos root` → `/Users/sva/Documents/Repos`; choose `Github/` vs `Gitea/` according to the README/publishing target.
 

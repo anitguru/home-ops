@@ -5,7 +5,7 @@ ROOT="/Users/sva/Documents/Repos/Github/home-ops/hermes/docs-wishlist"
 HOME_OPS_HERMES_SCRIPTS="${HOME_OPS_HERMES_SCRIPTS:-/Users/sva/Documents/Repos/Github/home-ops/hermes/scripts}"
 HERMES_PYTHON="${HERMES_PYTHON:-/Users/sva/.hermes/hermes-agent/venv/bin/python3}"
 PYTHON="${PYTHON:-/Users/sva/Documents/Repos/Github/home-ops/.venv/bin/python}"
-VAULT_ROOT_DEFAULT="/Users/sva/Documents/Obsidian/Personal"
+VAULT_ROOT_DEFAULT="/Users/sva/02-Areas/Personal"
 CA_BUNDLE_DEFAULT="/Users/sva/.hermes/certs/transformers-lan-ca-bundle.pem"
 
 # Keep this deterministic by default and avoid nested/direct-provider leakage.
