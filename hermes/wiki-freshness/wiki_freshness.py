@@ -66,24 +66,42 @@ class VaultClient:
 
 class LocalVaultClient(VaultClient):
     def __init__(self, root: Path):
-        self.root     = root
-        self.wiki_dir = root / "wiki"
+        self.root = root
+        # The current AnITGuru vault stores maintained pages and raw captures
+        # under 40-wiki/. Keep legacy wiki/ support for older fixtures/vaults.
+        current_wiki = root / "40-wiki"
+        self.wiki_dir = current_wiki if current_wiki.is_dir() else root / "wiki"
+        self.wiki_prefix = self.wiki_dir.relative_to(root).as_posix()
         self.log_file = self.wiki_dir / "log.md"
 
     def list_wiki_pages(self) -> list[str]:
-        return sorted(
-            p.stem for p in self.wiki_dir.glob("*.md")
-            if p.stem not in SKIP_STEMS
-        )
+        pages = []
+        for path in self.wiki_dir.rglob("*.md"):
+            if path.stem in SKIP_STEMS:
+                continue
+            text = path.read_text(encoding="utf-8", errors="replace")
+            # Legacy pages link to _raw files through **Sources**. Current
+            # 40-wiki/raw captures carry canonical URLs in frontmatter.
+            if "**Sources**:" not in text and not extract_declared_source_url(text):
+                continue
+            pages.append(path.relative_to(self.wiki_dir).as_posix())
+        return sorted(pages)
 
     def read_wiki_page(self, name: str) -> str:
-        return (self.wiki_dir / f"{name}.md").read_text(encoding="utf-8", errors="replace")
+        rel = Path(name)
+        path = self.wiki_dir / (rel if rel.suffix == ".md" else rel.with_suffix(".md"))
+        return path.read_text(encoding="utf-8", errors="replace")
 
     def read_raw_file(self, rel_path: str) -> str | None:
-        path = self.root / rel_path.lstrip("/")
-        if not path.exists():
-            return None
-        return path.read_text(encoding="utf-8", errors="replace")
+        rel = Path(rel_path.lstrip("/"))
+        candidates = [self.root / rel, self.wiki_dir / rel]
+        parts = rel.parts
+        if parts and parts[0] == "_raw":
+            candidates.append(self.wiki_dir / "raw" / Path(*parts[1:]))
+        for path in candidates:
+            if path.is_file():
+                return path.read_text(encoding="utf-8", errors="replace")
+        return None
 
     def append_log(self, content: str) -> None:
         with open(self.log_file, "a", encoding="utf-8") as f:
@@ -248,17 +266,26 @@ def parse_sources(text: str) -> list[str]:
     return []
 
 
+def extract_declared_source_url(text: str) -> str | None:
+    """Return a canonical HTTP URL declared in frontmatter, if present."""
+    m = re.match(r"^---\s*\n(.*?)\n---", text, re.DOTALL)
+    if not m:
+        return None
+    fm = m.group(1)
+    for key in ("url", "source"):
+        for line in fm.splitlines():
+            if re.match(rf"^{key}\s*:", line):
+                url = line.partition(":")[2].strip().strip('"').strip("'")
+                if url.startswith("http"):
+                    return url
+    return None
+
+
 def extract_source_url(text: str) -> str | None:
     """Prefer frontmatter url/source, then fall back to first URL in body."""
-    m = re.match(r"^---\s*\n(.*?)\n---", text, re.DOTALL)
-    if m:
-        fm = m.group(1)
-        for key in ("url", "source"):
-            for line in fm.splitlines():
-                if re.match(rf"^{key}\s*:", line):
-                    url = line.partition(":")[2].strip().strip('"').strip("'")
-                    if url.startswith("http"):
-                        return url
+    declared = extract_declared_source_url(text)
+    if declared:
+        return declared
     m = re.search(r"https?://[^\s)>'\"]+", text)
     return m.group(0) if m else None
 
@@ -303,8 +330,18 @@ def build_inventory(client: VaultClient) -> dict:
     missing = []
     seen = set()
     for name in pages:
-        page = parse_wiki_page(name, client.read_wiki_page(name))
-        pages_meta.append({"name": name, "path": f"wiki/{name}.md", "sources": page["sources"], "confidence": page["confidence"]})
+        text = client.read_wiki_page(name)
+        page = parse_wiki_page(name, text)
+        page_path = name if name.endswith(".md") else f"{name}.md"
+        if isinstance(client, LocalVaultClient):
+            page_path = f"{client.wiki_prefix}/{page_path}"
+        else:
+            page_path = f"wiki/{page_path}"
+        pages_meta.append({"name": name, "path": page_path, "sources": page["sources"], "confidence": page["confidence"]})
+        direct_url = extract_declared_source_url(text)
+        if direct_url and page_path not in seen:
+            seen.add(page_path)
+            sources.append({"path": page_path, "url": direct_url, "status": "unchecked", "http_status": None})
         for src in page["sources"]:
             raw = client.read_raw_file(src)
             if raw is None:
@@ -457,8 +494,12 @@ async def run(dry_run: bool, limit: int | None, client: VaultClient, use_llm: bo
                 "details":           [],
             }
 
-            url = None
+            # Current raw captures put canonical URLs directly in frontmatter;
+            # legacy maintained pages point to a separate _raw capture.
+            url = extract_declared_source_url(text)
             for src_ref in page["sources"]:
+                if url:
+                    break
                 url = source_url_from_raw(client, src_ref)
                 if url:
                     break

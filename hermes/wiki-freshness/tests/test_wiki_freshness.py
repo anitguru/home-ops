@@ -67,6 +67,29 @@ def test_inventory_local_vault_maps_pages_to_sources(tmp_path):
     assert report["sources"][0]["url"] == "https://example.com/source"
 
 
+def test_current_40_wiki_layout_recurses_and_reads_direct_source_frontmatter(tmp_path):
+    capture = tmp_path / "40-wiki" / "raw" / "docs" / "example.md"
+    capture.parent.mkdir(parents=True)
+    capture.write_text(
+        "---\nsource: https://example.com/current\nstatus: processed\n---\n# Current capture\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "40-wiki" / "services").mkdir()
+    (tmp_path / "40-wiki" / "services" / "note.md").write_text(
+        "# Note without a canonical source\n",
+        encoding="utf-8",
+    )
+
+    client = wf.LocalVaultClient(tmp_path)
+    report = wf.build_inventory(client)
+
+    assert client.list_wiki_pages() == ["raw/docs/example.md"]
+    assert report["page_count"] == 1
+    assert report["source_count"] == 1
+    assert report["pages"][0]["path"] == "40-wiki/raw/docs/example.md"
+    assert report["sources"][0]["url"] == "https://example.com/current"
+
+
 def test_render_markdown_report_includes_counts_and_statuses():
     report = {
         "page_count": 1,

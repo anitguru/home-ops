@@ -14,12 +14,12 @@ The old Gitea schedule (`17 9 * * 1` UTC / Monday 09:17 UTC) is retired. The exi
 
 ## What it does
 
-1. Inventories `wiki/*.md` pages except README/SCHEMA/index/log/freshness-report.
-2. Extracts `_raw/...` source references from each page's `**Sources**:` line.
-3. Reads the raw source frontmatter/body to find the canonical URL.
+1. Inventories source-backed Markdown recursively under the current `40-wiki/` tree, with legacy `wiki/` compatibility.
+2. Reads canonical URLs directly from current `40-wiki/raw/**` frontmatter and still understands legacy `_raw/...` references from `**Sources**:` lines.
+3. Skips ordinary maintained notes that have neither source frontmatter nor a legacy source reference, avoiding noisy `no_url` results.
 4. Performs HTTP reachability checks.
 5. Prints a report to stdout for Hermes no-agent cron delivery.
-6. Only writes to `wiki/log.md` when explicitly run with `--no-dry-run` and attention items exist.
+6. Only writes to `40-wiki/log.md` (or legacy `wiki/log.md`) when explicitly run with `--no-dry-run` and attention items exist.
 
 ## Vault access
 
