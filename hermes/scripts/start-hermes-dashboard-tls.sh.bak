@@ -23,7 +23,7 @@ resolved="$(dig +short @"$DNS_SERVER" "$HOST_ALIAS" A 2>/dev/null | tail -n 1 ||
 if [[ "$resolved" != "$LAN_IP" ]]; then
   cat >&2 <<EOF
 Warning: $HOST_ALIAS does not resolve to $LAN_IP via $DNS_SERVER yet.
-Create/repair the UniFi local DNS A record:
+Create/repair the CoreDNS/local DNS A record:
   $HOST_ALIAS -> $LAN_IP
 
 Current $DNS_SERVER answer: ${resolved:-<none>}

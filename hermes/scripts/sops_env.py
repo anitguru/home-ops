@@ -39,10 +39,6 @@ PURPOSES: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("X_ACCESS_TOKEN_SECRET", "x", "ACCESS_TOKEN_SECRET"),
         ("PG_DSN", "postgres", "DSN"),
     ),
-    "unifi": (
-        ("UNIFI_API_KEY", "unifi", "API_KEY"),
-        ("UNIFI_BASE_URL", "unifi", "BASE_URL"),
-    ),
 }
 
 

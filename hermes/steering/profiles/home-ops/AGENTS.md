@@ -6,4 +6,4 @@ Use `/Users/sva/Documents/Repos/Github/home-ops` as the source of truth for dura
 
 Cron/automation scripts should live in `home-ops/hermes/scripts/` unless a more specific repo owns them. Keep generated reports/logs outside git or under ignored paths.
 
-UniFi/network-control workflow now lives in this `home-ops` profile rather than a separate `unifi-ops` profile. Keep discovery in the read-only `unifi-network` MCP, and use `hermes/scripts/unifi_ops.py` only for deterministic confirmed client-control scaffolding with exact confirmation and audit logging.
+The former UniFi stack and its Hermes MCP/client-control helpers are retired. Current home-network work uses the Netgear PR60X router, MS510TXUP switch, and Ruckus R770 AP; do not recreate or call UniFi tooling.

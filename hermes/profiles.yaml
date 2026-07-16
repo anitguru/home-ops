@@ -276,7 +276,6 @@ profiles:
     repos:
     - home-ops
     needs:
-    - vault
     - cronjob
     - terminal
     - file
@@ -287,9 +286,7 @@ profiles:
       provider: openai-codex
       model: gpt-5.4-mini
     mcp_servers:
-    - vault
     - cocoindex-home-ops
-    - unifi-network
     default_cwd: /Users/sva/Documents/Repos/Github/home-ops
     aliases:
     - home-ops
