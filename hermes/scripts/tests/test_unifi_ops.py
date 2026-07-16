@@ -70,6 +70,31 @@ def everett_client(access_type="DEFAULT"):
     }
 
 
+def test_load_config_falls_back_to_sops_store(monkeypatch):
+    monkeypatch.delenv("UNIFI_API_KEY", raising=False)
+    monkeypatch.delenv("UNIFI_BASE_URL", raising=False)
+    values = {"API_KEY": "test-api-key", "BASE_URL": "https://unifi.test"}
+    monkeypatch.setattr(unifi_ops, "get_secret", lambda vendor, key: values[key])
+
+    cfg = unifi_ops.load_config()
+
+    assert cfg.api_key == "test-api-key"
+    assert cfg.base_url == "https://unifi.test"
+
+
+def test_source_context_key_comes_from_sops_not_environment(monkeypatch):
+    monkeypatch.setenv("UNIFI_OPS_SOURCE_CONTEXT_KEY", "caller-controlled")
+
+    def fake_secret(vendor, key):
+        if key == "SOURCE_CONTEXT_KEY":
+            return "trusted-sops-key"
+        raise unifi_ops.SecretError("missing")
+
+    monkeypatch.setattr(unifi_ops, "get_secret", fake_secret)
+
+    assert unifi_ops.load_source_context_key() == "trusted-sops-key"
+
+
 def test_resolves_pinned_everett_computer_alias_deterministically():
     target = unifi_ops.resolve_target(["Everett's", "computer"])
 
@@ -471,7 +496,7 @@ def test_cli_confirm_requires_explicit_request_source_even_if_env_set(monkeypatc
 
 def test_cli_ignores_caller_controlled_env_source_context_key(monkeypatch, capsys):
     monkeypatch.setenv("UNIFI_OPS_SOURCE_CONTEXT_KEY", TEST_SOURCE_CONTEXT_KEY)
-    monkeypatch.setattr(unifi_ops, "load_source_context_key", lambda: "vault-backed-key")
+    monkeypatch.setattr(unifi_ops, "load_source_context_key", lambda: "sops-backed-key")
     api = FakeUniFiApi(everett_client("DEFAULT"))
     monkeypatch.setattr(unifi_ops, "UniFiApi", lambda: api)
 

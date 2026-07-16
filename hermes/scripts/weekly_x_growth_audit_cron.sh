@@ -22,7 +22,7 @@ if [[ ! -x "$PYTHON" ]]; then
 fi
 
 if [[ "${1:-}" == "--check" ]]; then
-  "$HERMES_PYTHON" "$HOME_OPS_HERMES_SCRIPTS/vault_mcp_social_env.py" --purpose post --check
+  "$HERMES_PYTHON" "$HOME_OPS_HERMES_SCRIPTS/sops_env.py" --purpose post --check
   "$PYTHON" -m py_compile scripts/fetch_metrics.py scripts/growth_audit.py scripts/social_db.py scripts/state_paths.py
   env -u HERMES_TUI -u HERMES_TUI_ACTIVE_SESSION_FILE -u HERMES_GATEWAY_SESSION -u HERMES_INTERACTIVE -u HERMES_SESSION_KEY \
     hermes -p xposting chat -Q --source x-growth-audit-check --provider xai-oauth -m grok-4.3 --toolsets terminal \
@@ -31,9 +31,9 @@ if [[ "${1:-}" == "--check" ]]; then
   exit 0
 fi
 
-# Load X/Tavily/Postgres secrets from Vault MCP without writing them to disk.
+# Load X/Tavily/Postgres secrets from the local SOPS+age store without writing plaintext to disk.
 # fetch_metrics is read-only and refreshes the local performance ledger before audit.
-eval "$("$HERMES_PYTHON" "$HOME_OPS_HERMES_SCRIPTS/vault_mcp_social_env.py" --purpose post)"
+eval "$("$HERMES_PYTHON" "$HOME_OPS_HERMES_SCRIPTS/sops_env.py" --purpose post)"
 
 export HOME_OPS_HERMES_SCRIPTS
 export X_SOCIAL_STATE_DIR

@@ -3,7 +3,7 @@
 
 Credentials are resolved in this order:
 1. UNIFI_API_KEY / UNIFI_BASE_URL environment variables.
-2. HashiCorp Vault via the Vault MCP HTTP endpoint, reading secret/UNIFI.
+2. The local SOPS+age store via `secret unifi <KEY>`.
 
 The server intentionally exposes only GET/read tools. Do not add mutating UniFi
 operations here without updating hermes/mcp/unifi-network-mcp.md first.
@@ -13,7 +13,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import ssl
 import sys
 import urllib.error
@@ -25,7 +24,8 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-DEFAULT_MCP_URL = "https://vault-mcp.anit.guru/mcp"
+from sops_env import SecretError, get_secret
+
 DEFAULT_BASE_URL = "https://10.0.0.1"
 DEFAULT_NETWORK_PREFIX = "/proxy/network"
 
@@ -33,10 +33,6 @@ mcp = FastMCP("unifi-network")
 
 
 class ConfigError(RuntimeError):
-    pass
-
-
-class McpVaultError(RuntimeError):
     pass
 
 
@@ -59,127 +55,18 @@ def normalize_prefix(prefix: str) -> str:
     return prefix.rstrip("/")
 
 
-def token_from_env_file() -> str | None:
-    candidates = [os.environ.get("HERMES_ENV_PATH")]
-    hermes_profile = os.environ.get("HERMES_PROFILE")
-    if hermes_profile:
-        candidates.append(str(Path.home().parent / hermes_profile / ".env"))
-    candidates.extend(
-        [
-            os.path.expanduser("~/.hermes/profiles/home-ops/.env"),
-            os.path.expanduser("~/.hermes/.env"),
-        ]
-    )
-    for env_path in candidates:
-        if not env_path:
-            continue
-        path = Path(env_path).expanduser()
-        if not path.exists():
-            continue
-        text = path.read_text(errors="replace")
-        match = re.search(r"^VAULT_MCP_TOKEN=(.+)$", text, re.MULTILINE)
-        if match:
-            return match.group(1).strip().strip('"').strip("'")
-    return None
-
-
-def parse_sse_json(raw: str) -> dict[str, Any]:
-    data_lines: list[str] = []
-    for line in raw.splitlines():
-        if line.startswith("data:"):
-            data_lines.append(line[5:].strip())
-    if not data_lines:
-        return {}
-    return json.loads("\n".join(data_lines))
-
-
-def mcp_call(url: str, token: str, payload: dict[str, Any], session_id: str | None = None) -> tuple[dict[str, Any], str | None]:
-    headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json, text/event-stream",
-        "Authorization": f"Bearer {token}",
-    }
-    if session_id:
-        headers["Mcp-Session-Id"] = session_id
-    request = urllib.request.Request(url, data=json.dumps(payload).encode(), headers=headers)
-    try:
-        with urllib.request.urlopen(request, timeout=20) as response:
-            raw = response.read().decode(errors="replace")
-            new_session = response.headers.get("Mcp-Session-Id") or session_id
-    except urllib.error.HTTPError as exc:
-        detail = exc.read(300).decode(errors="replace")
-        raise McpVaultError(f"Vault MCP HTTP {exc.code}: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise McpVaultError(f"Vault MCP request failed: {exc}") from exc
-    data = parse_sse_json(raw)
-    if data.get("error"):
-        raise McpVaultError(json.dumps(data["error"], sort_keys=True))
-    return data, new_session
-
-
-def open_vault_session(url: str, token: str) -> str | None:
-    _, session_id = mcp_call(
-        url,
-        token,
-        {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {"name": "unifi-network-mcp", "version": "1"},
-            },
-        },
-    )
-    try:
-        mcp_call(
-            url,
-            token,
-            {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
-            session_id,
-        )
-    except Exception:
-        pass
-    return session_id
-
-
-def read_vault_secret(url: str, token: str, path: str) -> dict[str, Any]:
-    session_id = open_vault_session(url, token)
-    response, _ = mcp_call(
-        url,
-        token,
-        {
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "tools/call",
-            "params": {"name": "read_secret", "arguments": {"path": path}},
-        },
-        session_id,
-    )
-    content = response.get("result", {}).get("content", [])
-    if not content:
-        raise McpVaultError(f"empty Vault MCP response for {path}")
-    text = content[0].get("text", "")
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise McpVaultError(f"non-JSON Vault secret response for {path}") from exc
-    if not isinstance(data, dict):
-        raise McpVaultError(f"unexpected Vault secret shape for {path}")
-    return data
-
-
 def load_config() -> UniFiConfig:
     base_url = os.environ.get("UNIFI_BASE_URL") or DEFAULT_BASE_URL
     api_key = os.environ.get("UNIFI_API_KEY")
     if not api_key:
-        token = os.environ.get("VAULT_MCP_TOKEN") or token_from_env_file()
-        if not token:
-            raise ConfigError("UNIFI_API_KEY is unset and VAULT_MCP_TOKEN was not found")
-        secret = read_vault_secret(os.environ.get("VAULT_MCP_URL", DEFAULT_MCP_URL), token, "secret/UNIFI")
-        base_url = str(secret.get("BASE_URL") or base_url)
-        api_key = str(secret.get("API_KEY") or "")
+        try:
+            api_key = get_secret("unifi", "API_KEY")
+        except SecretError as exc:
+            raise ConfigError(f"UniFi API key is unavailable in the SOPS store: {exc}") from exc
+        try:
+            base_url = get_secret("unifi", "BASE_URL") or base_url
+        except SecretError:
+            pass
     if not api_key:
         raise ConfigError("UniFi API key is missing")
     return UniFiConfig(

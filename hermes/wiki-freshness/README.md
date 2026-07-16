@@ -35,7 +35,7 @@ If the local vault path does not exist, the script can fall back to Obsidian MCP
 - `OBSIDIAN_MCP_TOKEN`
 - `OBSIDIAN_MCP_VAULT` (defaults to `personal`)
 
-Do not print token values. If MCP secrets are needed for a future hosted/non-local run, load them through a Vault MCP helper in `home-ops/hermes/scripts/` rather than embedding them in cron definitions.
+Do not print token values. If secrets are needed for a future hosted/non-local run, load them through the SOPS+age `secret <vendor> <KEY>` helper or `home-ops/hermes/scripts/sops_env.py` rather than embedding them in cron definitions.
 
 ## LLM policy
 

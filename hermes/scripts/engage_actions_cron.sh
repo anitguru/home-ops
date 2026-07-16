@@ -21,7 +21,7 @@ if [[ ! -x "$PYTHON" ]]; then
 fi
 
 if [[ "${1:-}" == "--check" ]]; then
-  "$HERMES_PYTHON" "$HOME_OPS_HERMES_SCRIPTS/vault_mcp_social_env.py" --purpose engage --check
+  "$HERMES_PYTHON" "$HOME_OPS_HERMES_SCRIPTS/sops_env.py" --purpose engage --check
   "$PYTHON" -m py_compile scripts/engage.py scripts/social_db.py
   env -u HERMES_TUI -u HERMES_TUI_ACTIVE_SESSION_FILE -u HERMES_GATEWAY_SESSION -u HERMES_INTERACTIVE -u HERMES_SESSION_KEY \
     hermes -p xengaging chat -Q --source xengaging-cron-check --toolsets terminal \
@@ -36,8 +36,8 @@ if [[ "$HOUR_ET" -ge 23 || "$HOUR_ET" -lt 8 ]]; then
   exit 0
 fi
 
-# Load X/Postgres secrets from Vault MCP without writing them to disk.
-eval "$("$HERMES_PYTHON" "$HOME_OPS_HERMES_SCRIPTS/vault_mcp_social_env.py" --purpose engage)"
+# Load X/Postgres secrets from the local SOPS+age store without writing plaintext to disk.
+eval "$("$HERMES_PYTHON" "$HOME_OPS_HERMES_SCRIPTS/sops_env.py" --purpose engage)"
 
 export HOME_OPS_HERMES_SCRIPTS
 export X_SOCIAL_STATE_DIR

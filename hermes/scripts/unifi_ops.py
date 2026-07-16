@@ -10,7 +10,7 @@ Safe flow:
 
 Credentials are resolved in this order:
 1. UNIFI_API_KEY / UNIFI_BASE_URL environment variables.
-2. HashiCorp Vault via the Vault MCP HTTP endpoint, reading secret/UNIFI.
+2. The local SOPS+age store via `secret unifi <KEY>`.
 
 No secrets are printed.
 """
@@ -33,10 +33,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-DEFAULT_MCP_URL = "https://vault-mcp.anit.guru/mcp"
+from sops_env import SecretError, get_secret
+
 DEFAULT_BASE_URL = "https://10.0.0.1"
 DEFAULT_NETWORK_PREFIX = "/proxy/network"
-DEFAULT_VAULT_SECRET_PATH = "secret/UNIFI"
 DEFAULT_SITE_ID = "88f7af54-98f8-306a-a1c7-c9349722b1f6"
 
 BLOCK_ACTION = "BLOCK"
@@ -56,10 +56,6 @@ class UniFiOpsError(RuntimeError):
 
 
 class ConfigError(UniFiOpsError):
-    pass
-
-
-class McpVaultError(UniFiOpsError):
     pass
 
 
@@ -307,128 +303,18 @@ def resolve_target(alias_tokens: list[str] | tuple[str, ...] | str) -> Inventory
     raise AliasError(f"unknown device alias '{wanted}'; known pinned targets: {known}")
 
 
-def token_from_env_file() -> str | None:
-    candidates = [os.environ.get("HERMES_ENV_PATH")]
-    hermes_home = os.environ.get("HERMES_HOME")
-    if hermes_home:
-        candidates.append(str(Path(hermes_home).expanduser() / ".env"))
-    candidates.extend(
-        [
-            os.path.expanduser("~/.hermes/profiles/home-ops/.env"),
-            os.path.expanduser("~/.hermes/.env"),
-        ]
-    )
-    for env_path in candidates:
-        if not env_path:
-            continue
-        path = Path(env_path).expanduser()
-        if not path.exists():
-            continue
-        text = path.read_text(errors="replace")
-        match = re.search(r"^VAULT_MCP_TOKEN=(.+)$", text, re.MULTILINE)
-        if match:
-            return match.group(1).strip().strip('"').strip("'")
-    return None
-
-
-def parse_sse_json(raw: str) -> dict[str, Any]:
-    data_lines = [line[5:].strip() for line in raw.splitlines() if line.startswith("data:")]
-    if not data_lines:
-        return {}
-    return json.loads("\n".join(data_lines))
-
-
-def mcp_call(url: str, token: str, payload: dict[str, Any], session_id: str | None = None) -> tuple[dict[str, Any], str | None]:
-    headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json, text/event-stream",
-        "Authorization": f"Bearer {token}",
-    }
-    if session_id:
-        headers["Mcp-Session-Id"] = session_id
-    request = urllib.request.Request(url, data=json.dumps(payload).encode(), headers=headers)
-    try:
-        with urllib.request.urlopen(request, timeout=20) as response:
-            raw = response.read().decode(errors="replace")
-            new_session = response.headers.get("Mcp-Session-Id") or session_id
-    except urllib.error.HTTPError as exc:
-        detail = exc.read(300).decode(errors="replace")
-        raise McpVaultError(f"Vault MCP HTTP {exc.code}: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise McpVaultError(f"Vault MCP request failed: {exc}") from exc
-    data = parse_sse_json(raw)
-    if data.get("error"):
-        raise McpVaultError(json.dumps(data["error"], sort_keys=True))
-    return data, new_session
-
-
-def open_vault_session(url: str, token: str) -> str | None:
-    _, session_id = mcp_call(
-        url,
-        token,
-        {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {"name": "unifi-ops", "version": "1"},
-            },
-        },
-    )
-    try:
-        mcp_call(
-            url,
-            token,
-            {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
-            session_id,
-        )
-    except Exception:
-        pass
-    return session_id
-
-
-def read_vault_secret(url: str, token: str, path: str) -> dict[str, Any]:
-    session_id = open_vault_session(url, token)
-    response, _ = mcp_call(
-        url,
-        token,
-        {
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "tools/call",
-            "params": {"name": "read_secret", "arguments": {"path": path}},
-        },
-        session_id,
-    )
-    content = response.get("result", {}).get("content", [])
-    if not content:
-        raise McpVaultError(f"empty Vault MCP response for {path}")
-    text = content[0].get("text", "")
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise McpVaultError(f"non-JSON Vault secret response for {path}") from exc
-    if not isinstance(data, dict):
-        raise McpVaultError(f"unexpected Vault secret shape for {path}")
-    return data
-
-
 def load_config() -> UniFiConfig:
     base_url = os.environ.get("UNIFI_BASE_URL") or DEFAULT_BASE_URL
     api_key = os.environ.get("UNIFI_API_KEY")
     if not api_key:
-        token = os.environ.get("VAULT_MCP_TOKEN") or token_from_env_file()
-        if not token:
-            raise ConfigError("UNIFI_API_KEY is unset and VAULT_MCP_TOKEN was not found")
-        secret = read_vault_secret(
-            os.environ.get("VAULT_MCP_URL", DEFAULT_MCP_URL),
-            token,
-            os.environ.get("UNIFI_VAULT_SECRET_PATH", DEFAULT_VAULT_SECRET_PATH),
-        )
-        base_url = str(secret.get("BASE_URL") or base_url)
-        api_key = str(secret.get("API_KEY") or "")
+        try:
+            api_key = get_secret("unifi", "API_KEY")
+        except SecretError as exc:
+            raise ConfigError(f"UniFi API key is unavailable in the SOPS store: {exc}") from exc
+        try:
+            base_url = get_secret("unifi", "BASE_URL") or base_url
+        except SecretError:
+            pass
     if not api_key:
         raise ConfigError("UniFi API key is missing")
     return UniFiConfig(
@@ -440,27 +326,26 @@ def load_config() -> UniFiConfig:
 
 
 def load_source_context_key() -> str:
-    """Load the source-context verification key from Vault only.
+    """Load the source-context verification key from the SOPS store only.
 
     Deliberately do not accept a caller-controlled environment override here: a
-    confirmed mutation must be authorized by a trusted wrapper/gateway that knows
-    the same Vault-backed key, not by a user shell setting arbitrary env vars.
+    confirmed mutation must be authorized by a trusted wrapper/gateway that reads
+    the same age-encrypted local store, not by a user shell setting arbitrary env vars.
     """
-    token = os.environ.get("VAULT_MCP_TOKEN") or token_from_env_file()
-    if not token:
-        raise ConfigError("VAULT_MCP_TOKEN was not found for UniFi source-context verification")
-    secret = read_vault_secret(
-        os.environ.get("VAULT_MCP_URL", DEFAULT_MCP_URL),
-        token,
-        os.environ.get("UNIFI_VAULT_SECRET_PATH", DEFAULT_VAULT_SECRET_PATH),
-    )
-    key = str(secret.get("SOURCE_CONTEXT_KEY") or secret.get("UNIFI_OPS_SOURCE_CONTEXT_KEY") or "")
-    if key:
-        return key
-    api_key = str(secret.get("API_KEY") or "")
+    for key_name in ("SOURCE_CONTEXT_KEY", "UNIFI_OPS_SOURCE_CONTEXT_KEY"):
+        try:
+            key = get_secret("unifi", key_name)
+        except SecretError:
+            continue
+        if key:
+            return key
+    try:
+        api_key = get_secret("unifi", "API_KEY")
+    except SecretError as exc:
+        raise ConfigError(f"UniFi source-context key is unavailable in the SOPS store: {exc}") from exc
     if api_key:
         return hmac.new(api_key.encode(), b"unifi_ops_source_context_v1", hashlib.sha256).hexdigest()
-    raise ConfigError("secret/UNIFI is missing SOURCE_CONTEXT_KEY and API_KEY for confirmed UniFi mutations")
+    raise ConfigError("SOPS vendor unifi is missing SOURCE_CONTEXT_KEY and API_KEY")
 
 
 def ssl_context(verify_tls: bool) -> ssl.SSLContext | None:
@@ -961,7 +846,7 @@ def append_audit_event(event: dict[str, Any]) -> None:
 
     The audit log is intentionally local runtime state under a gitignored path.
     It records aliases/MAC/IP/state transitions and failures, but never records
-    API keys, Vault tokens, signed source-context tokens, or raw secret values.
+    API keys, SOPS-derived values, signed source-context tokens, or raw secret values.
     """
     path = audit_log_path()
     path.parent.mkdir(parents=True, exist_ok=True)

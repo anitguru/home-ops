@@ -10,7 +10,7 @@ Give Hermes agents safe MCP access to the local UniFi Network application on the
 
 - Start read-only. Expose inventory/inspection tools only: sites, devices, device stats, clients, networks, DNS policies, and a constrained generic GET helper.
 - Do not expose mutation endpoints such as adopt/remove device, restart/power-cycle device or port, create/update/delete network, WiFi, firewall, ACL, DNS policy, or voucher operations in the first pass.
-- Resolve credentials at runtime from Vault MCP via `VAULT_MCP_TOKEN`, or from explicit `UNIFI_API_KEY` / `UNIFI_BASE_URL` env vars if a caller provides them.
+- Resolve credentials at runtime from the local SOPS+age `unifi` vendor via `secret unifi <KEY>`, or from explicit `UNIFI_API_KEY` / `UNIFI_BASE_URL` env vars if a trusted caller provides them.
 - Never log or print the UniFi API key. Smoke tests report endpoint status/counts only.
 
 ## Runtime design
@@ -69,5 +69,5 @@ Failure modes are fail-closed: ambiguous/incomplete alias, missing client,
 unrecognized blocked state, missing/wrong confirmation phrase, missing/untrusted
 source, missing/invalid/expired/mismatched signed source context on confirmed
 mutation, API errors, and failed post-mutation verification all exit non-zero
-before reporting success. Secrets are loaded from env or Vault MCP `secret/UNIFI`
-and are never printed.
+before reporting success. Secrets are loaded from env or the SOPS+age `unifi`
+vendor and are never printed.
