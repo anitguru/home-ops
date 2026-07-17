@@ -2,14 +2,14 @@
 
 Canonical operational runbook for SVA's migrated Guru's Tech Bytes daily podcast automation.
 
-This document lives in `home-ops` because the durable Hermes/ops surface is version-controlled here. The episode-production scripts now live under `home-ops/hermes/podcast/scripts`, the public-site publisher lives in `/Users/sva/Documents/Repos/Github/anit.guru`, and the concise human-facing wiki summary lives at `/Users/sva/02-Areas/Personal/wiki/gurus-tech-bytes-pipeline.md`. The old `/Users/sva/Documents/Repos/Gitea/automations` copies are retired and must not be used by scheduled Hermes jobs.
+This document lives in `home-ops` because the durable Hermes/ops surface is version-controlled here. The episode-production scripts now live under `home-ops/hermes/podcast/scripts`, the public-site publisher lives in `/Users/sva/Documents/Repos/Github/anit.guru`, and the concise human-facing wiki summary lives at `/Users/sva/02-Areas/Personal/40-wiki/runbooks/gurus-tech-bytes-podcast-process.md`. The old `/Users/sva/Documents/Repos/Gitea/automations` copies are retired and must not be used by scheduled Hermes jobs.
 
 ## Current production schedule
 
 - Scheduler: default Hermes gateway cron, not the paused `automations` profile gateway.
 - Job ID: `a694c08ba15f`
 - Name: `Daily Guru's Tech Bytes producer and publisher`
-- Schedule: `0 6 * * *` in America/New_York local time.
+- Schedule: `0 6 * * *` in the Hermes scheduler's local timezone; episode dates are computed in `America/New_York`.
 - Delivery: `origin` so the Telegram completion report returns to SVA.
 - Workdir: `/Users/sva/Documents/Repos/Github/home-ops/hermes/podcast`
 - Skill: `website-workflows`
@@ -33,7 +33,7 @@ The watcher helper `hermes/scripts/share-latest-podcast-audio.sh` is intentional
 
 ```mermaid
 flowchart TD
-    Cron["Hermes cron<br/>0 6 * * * America/New_York"] --> Producer["LLM-driven producer/publisher<br/>workdir: home-ops/hermes/podcast"]
+    Cron["Hermes cron<br/>0 6 * * * scheduler local time"] --> Producer["LLM-driven producer/publisher<br/>episode date: America/New_York"]
     Producer --> Env["Load purpose=podcast from SOPS+age<br/>via hermes/scripts/sops_env.py"]
     Env --> Fetch["morning-briefing.sh<br/>fetch current HN stories"]
     Fetch --> Rank["cocoindex_rank.py<br/>rank topics + mark recent duplicates"]
@@ -96,7 +96,7 @@ Then run the workflow from `/Users/sva/Documents/Repos/Github/home-ops/hermes/po
    SOPS_ENV=/Users/sva/Documents/Repos/Github/home-ops/hermes/scripts/sops_env.py
    "$PY" "$SOPS_ENV" --purpose podcast --check
    eval "$("$PY" "$SOPS_ENV" --purpose podcast)"
-   tailscale up
+   tailscale status || tailscale up
    export TTS_CONNECT_HOST=chatterbox.tail099001.ts.net
    export WHISPER_CONNECT_HOST=whisper.tail099001.ts.net
    ```

@@ -2,7 +2,7 @@
 
 You are an automation agent. Execute all steps **sequentially and exactly**. Fail loudly if any step fails.
 
-Environment variables available: `PODCAST_DIR`, `SITE_DIR`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `COCOINDEX_DATABASE_URL`, `TTS_URL`, `TTS_VOICE`, `TTS_LOUDNORM`, `WHISPER_URL`. Credential variables are loaded from SOPS by the outer cron prompt; never source a plaintext env file.
+Environment variables available: `PODCAST_DIR`, `SITE_DIR`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `COCOINDEX_DATABASE_URL`, `TTS_URL`, `TTS_CONNECT_HOST`, `TTS_VOICE`, `TTS_LOUDNORM`, `WHISPER_URL`, `WHISPER_CONNECT_HOST`. Credential variables are loaded from SOPS by the outer cron prompt; never source a plaintext env file. The outer cron exports the two `*_CONNECT_HOST` values for off-home Tailscale transport.
 
 ---
 
@@ -10,8 +10,8 @@ Environment variables available: `PODCAST_DIR`, `SITE_DIR`, `CLOUDINARY_CLOUD_NA
 
 Get today's date and day name:
 ```
-TODAY=$(date +%Y-%m-%d)
-DAY_NAME=$(date +"%A")
+TODAY=$(TZ=America/New_York date +%Y-%m-%d)
+DAY_NAME=$(TZ=America/New_York date +"%A")
 ```
 
 Set working dir:
@@ -22,7 +22,7 @@ mkdir -p "$PODCAST_DIR"
 
 Determine episode number from the Supabase `podcast_episodes` table. Same-day re-runs reuse the existing number; new days increment:
 ```bash
-EPISODE_NUM=$(python3 -c "
+EPISODE_NUM=$("$PY" -c "
 import psycopg, os
 dsn = os.environ['COCOINDEX_DATABASE_URL']
 with psycopg.connect(dsn) as conn:
@@ -55,26 +55,12 @@ Validate `$PODCAST_DIR/stories.json` exists and contains ≥ 5 stories. If not �
 
 ---
 
-## STEP 1.5 — OPTIONAL TOPIC REFRESH + RANK STORIES
+## STEP 1.5 — RANK STORIES
 
-For an ad hoc enrichment/quality test, refresh HN topics through Hermes in dry-run mode first:
-
-```bash
-python3 /Users/sva/Documents/Repos/Github/home-ops/hermes/scripts/hn_topic_refresh_hermes.py \
-  --limit 3 \
-  --comments-per-story 1 \
-  --profile default \
-  --provider openai-codex \
-  --model gpt-5.4-mini \
-  --json
-```
-
-If the extracted topics look good and `COCOINDEX_DATABASE_URL` is set, rerun with `--write`. For local-model testing, use `--profile automations` and omit provider/model overrides so the Qwen-backed Hermes profile is used.
-
-Then run the topic ranker. This queries the persistent topic table when available and otherwise writes `ranked-stories.json` using deterministic HN score/comment fallback:
+Run the topic ranker against the persisted CocoIndex topic data and recent-episode database:
 
 ```bash
-python3 scripts/cocoindex_rank.py "$PODCAST_DIR"
+"$PY" scripts/cocoindex_rank.py "$PODCAST_DIR"
 ```
 
 Validate `$PODCAST_DIR/ranked-stories.json` and `$PODCAST_DIR/cocoindex-proof.json` exist. The proof file must be used in the final update so CocoIndex value is reported as more than a dedupe check:
@@ -89,7 +75,7 @@ The ranker loads recent `podcast_episodes.stories` from Postgres when `COCOINDEX
 
 ## STEP 2 — GENERATE SCRIPT
 
-Load `ranked-stories.json` (pre-ranked by CocoIndex trending topic analysis and recent-episode dedupe). If that file is missing, fall back to `stories.json` and rank by **AI/startup relevance** yourself, but manually avoid stories used in recent episodes.
+Load `ranked-stories.json` (pre-ranked by CocoIndex trending topic analysis and recent-episode dedupe). If that file or `cocoindex-proof.json` is missing, or the proof is not `ranking_mode=topic-index`, stop instead of publishing fallback content.
 
 Select top 4 non-duplicate stories from the ranked list, ordered by `combined_score` descending.
 
@@ -144,7 +130,7 @@ Send MP3 to Whisper server:
 ```bash
 WHISPER_CONNECT_HOST="${WHISPER_CONNECT_HOST:-whisper.tail099001.ts.net}"
 curl --connect-to "whisper.transformers.lan:443:${WHISPER_CONNECT_HOST}:443" \
-  -s "${WHISPER_URL:-https://whisper.transformers.lan/v1/audio/transcriptions}" \
+  -fsS "$WHISPER_URL" \
   -F "file=@$PODCAST_DIR/gurus-tech-bytes-$TODAY.mp3" \
   -F "response_format=verbose_json" \
   -F "language=en" \
@@ -188,20 +174,20 @@ This uploads the MP3 to Cloudinary (using env vars), generates the episode markd
 
 Validate: exits 0 and output includes `audioUrl`.
 
-If it fails → log but continue to Step 6.5.
+If it fails, inspect the publisher log and artifacts to determine whether upload/write/commit partially succeeded. Do not continue to a database upsert with an empty audio URL.
 
 ---
 
 ## STEP 6.5 — RECORD EPISODE IN DB
 
-Upsert the episode into Supabase so future runs know this day is done. Use the Cloudinary `audioUrl` from Step 6 (or empty string if publish failed):
+After a successful publish with a verified Cloudinary `audioUrl`, upsert the episode into Supabase so future runs know this day is done:
 ```bash
-python3 << 'PYEOF'
+"$PY" << 'PYEOF'
 import psycopg, json, os
 dsn = os.environ["COCOINDEX_DATABASE_URL"]
 with open(os.environ["PODCAST_DIR"] + "/selected-stories.json") as f:
     stories = json.dumps(json.load(f))
-audio_url = os.environ.get("AUDIO_URL", "")
+audio_url = os.environ["AUDIO_URL"]
 with psycopg.connect(dsn) as conn:
     with conn.cursor() as cur:
         cur.execute("""
@@ -218,7 +204,7 @@ print("DB upsert: OK")
 PYEOF
 ```
 
-Set `AUDIO_URL` from the publish output in Step 6 before reaching this step. If publish failed, leave it unset.
+Set `AUDIO_URL` from the successful publish output before reaching this step. If publishing failed or the URL is unavailable, stop and recover publishing first.
 
 ---
 
