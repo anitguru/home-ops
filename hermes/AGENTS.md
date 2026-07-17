@@ -59,6 +59,7 @@ When creating or modifying LXC/VM/service docs, upsert the associated Proxmox UI
 - Prefer dedicated APIs/MCPs/CLIs over browser automation.
 - Use `cocoindex-code` for semantic vault discovery; use exact file reads before quoting or patching.
 - Use local flat files for precise vault edits when needed.
+- For all Hermes SSH, Git signing, Git push, cron, and background-process work, use the local Orionpax key at `~/.ssh/id_ed25519_orionpax` with `IdentityAgent=none` and `IdentitiesOnly=yes`; unattended SSH should also use `BatchMode=yes`. Never depend on the 1Password SSH agent.
 - Never reintroduce MetaMCP; use dedicated MCP servers.
 
 ## DNS note
