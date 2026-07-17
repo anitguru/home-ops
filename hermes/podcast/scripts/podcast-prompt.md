@@ -2,7 +2,7 @@
 
 You are an automation agent. Execute all steps **sequentially and exactly**. Fail loudly if any step fails.
 
-Environment variables available: `PODCAST_DIR`, `SITE_DIR`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `TELEGRAM_BOT_TOKEN`, `G_ACCESS_TOKEN`, `COCOINDEX_DATABASE_URL`, `TTS_URL`, `TTS_VOICE`, `TTS_LOUDNORM`.
+Environment variables available: `PODCAST_DIR`, `SITE_DIR`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `COCOINDEX_DATABASE_URL`, `TTS_URL`, `TTS_VOICE`, `TTS_LOUDNORM`, `WHISPER_URL`. Credential variables are loaded from SOPS by the outer cron prompt; never source a plaintext env file.
 
 ---
 
@@ -219,21 +219,9 @@ Set `AUDIO_URL` from the publish output in Step 6 before reaching this step. If 
 
 ---
 
-## STEP 7 — TELEGRAM NOTIFICATION
+## STEP 7 — HERMES DELIVERY
 
-Send audio + SRT:
-```bash
-curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendAudio" \
-  -F "chat_id=8100669692" \
-  -F "audio=@$PODCAST_DIR/gurus-tech-bytes-$TODAY.mp3" \
-  -F "caption=Guru's Tech Bytes Ep. $EPISODE_NUM — $TODAY" \
-  | python3 -c "import json,sys; r=json.load(sys.stdin); print('Telegram audio:', 'OK' if r.get('ok') else r)"
-
-curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
-  -F "chat_id=8100669692" \
-  -F "document=@$PODCAST_DIR/gurus-tech-bytes-$TODAY.srt" \
-  | python3 -c "import json,sys; r=json.load(sys.stdin); print('Telegram SRT:', 'OK' if r.get('ok') else r)"
-```
+Do not call Telegram directly or load a bot token. The Hermes cron owns `deliver=origin`. Include the MP3 and SRT as separate `MEDIA:/absolute/path` lines in the final response so the gateway delivers them.
 
 ---
 
@@ -246,4 +234,4 @@ Return a summary:
 - Audio file path and size
 - SRT path
 - Publish status (Cloudinary URL if successful)
-- Telegram status
+- Hermes delivery paths for MP3 and SRT

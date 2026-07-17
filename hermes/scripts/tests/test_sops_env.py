@@ -45,6 +45,38 @@ def test_social_engage_mapping_omits_tavily():
     assert env["PG_DSN"] == "postgres/DSN"
 
 
+def test_podcast_mapping_uses_expected_sops_vendor_keys():
+    calls: list[tuple[str, str]] = []
+
+    def fake_reader(vendor: str, key: str) -> str:
+        calls.append((vendor, key))
+        return f"value-for-{vendor}-{key}"
+
+    env = sops_env.collect_env("podcast", reader=fake_reader)
+
+    assert env == {
+        "CLOUDINARY_CLOUD_NAME": "value-for-cloudinary-CLOUD_NAME",
+        "CLOUDINARY_API_KEY": "value-for-cloudinary-API_KEY",
+        "CLOUDINARY_API_SECRET": "value-for-cloudinary-API_SECRET",
+        "COCOINDEX_DATABASE_URL": "value-for-supabase-PG_DSN",
+        "TTS_URL": "value-for-podcast-TTS_URL",
+        "TTS_VOICE": "value-for-podcast-TTS_VOICE",
+        "TTS_LOUDNORM": "value-for-podcast-TTS_LOUDNORM",
+        "WHISPER_URL": "value-for-podcast-WHISPER_URL",
+    }
+    assert calls == [
+        ("cloudinary", "CLOUD_NAME"),
+        ("cloudinary", "API_KEY"),
+        ("cloudinary", "API_SECRET"),
+        ("supabase", "PG_DSN"),
+        ("podcast", "TTS_URL"),
+        ("podcast", "TTS_VOICE"),
+        ("podcast", "TTS_LOUDNORM"),
+        ("podcast", "WHISPER_URL"),
+    ]
+    assert "TELEGRAM_BOT_TOKEN" not in env
+
+
 def test_render_exports_shell_quotes_values_without_printing_labels_as_values():
     rendered = sops_env.render_exports({"TOKEN": "has spaces and 'quotes'"})
 

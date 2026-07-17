@@ -39,6 +39,16 @@ PURPOSES: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("X_ACCESS_TOKEN_SECRET", "x", "ACCESS_TOKEN_SECRET"),
         ("PG_DSN", "postgres", "DSN"),
     ),
+    "podcast": (
+        ("CLOUDINARY_CLOUD_NAME", "cloudinary", "CLOUD_NAME"),
+        ("CLOUDINARY_API_KEY", "cloudinary", "API_KEY"),
+        ("CLOUDINARY_API_SECRET", "cloudinary", "API_SECRET"),
+        ("COCOINDEX_DATABASE_URL", "supabase", "PG_DSN"),
+        ("TTS_URL", "podcast", "TTS_URL"),
+        ("TTS_VOICE", "podcast", "TTS_VOICE"),
+        ("TTS_LOUDNORM", "podcast", "TTS_LOUDNORM"),
+        ("WHISPER_URL", "podcast", "WHISPER_URL"),
+    ),
 }
 
 

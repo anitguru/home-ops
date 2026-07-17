@@ -34,7 +34,7 @@ The watcher helper `hermes/scripts/share-latest-podcast-audio.sh` is intentional
 ```mermaid
 flowchart TD
     Cron["Hermes cron<br/>0 6 * * * America/New_York"] --> Producer["LLM-driven producer/publisher<br/>workdir: home-ops/hermes/podcast"]
-    Producer --> Env["Source ~/.hermes/secrets/podcast.env<br/>map SUPABASE_PG_DSN to COCOINDEX_DATABASE_URL if needed"]
+    Producer --> Env["Load purpose=podcast from SOPS+age<br/>via hermes/scripts/sops_env.py"]
     Env --> Fetch["morning-briefing.sh<br/>fetch current HN stories"]
     Fetch --> Rank["cocoindex_rank.py<br/>rank topics + mark recent duplicates"]
     Rank --> Proof{"Ranking proof present?"}
@@ -53,20 +53,20 @@ flowchart TD
 
 ## Required secrets and environment
 
-Do not commit or paste secret values. The production cron should source `~/.hermes/secrets/podcast.env` if present.
+Do not commit or paste secret values. The production cron loads credentials from the canonical local SOPS+age store at `~/.claude/secrets.sops.yaml` through `hermes/scripts/sops_env.py --purpose podcast`. The plaintext `~/.hermes/secrets/podcast.env` path is retired and must not be recreated.
 
 Expected variables include:
 
 - `CLOUDINARY_CLOUD_NAME`
 - `CLOUDINARY_API_KEY`
 - `CLOUDINARY_API_SECRET`
-- `TELEGRAM_BOT_TOKEN`
-- `G_ACCESS_TOKEN`
 - `COCOINDEX_DATABASE_URL`
-- `SUPABASE_PG_DSN` as fallback input that may be mapped to `COCOINDEX_DATABASE_URL`
 - `TTS_URL` defaulting to `https://chatterbox.transformers.lan/v1/audio/speech`
 - `TTS_VOICE` defaulting to `peter-griffin.wav`
 - `TTS_LOUDNORM` defaulting to `I=-16:TP=-1.5:LRA=11`
+- `WHISPER_URL`
+
+The loader maps those environment names from SOPS vendors `cloudinary`, `supabase`, and `podcast`. Telegram delivery is handled by Hermes `deliver=origin`, so the producer does not receive a Telegram bot token.
 
 Use the repo venv when available:
 
@@ -89,13 +89,13 @@ mkdir -p "$PODCAST_DIR"
 
 Then run the workflow from `/Users/sva/Documents/Repos/Github/home-ops/hermes/podcast`:
 
-1. Source environment if available:
+1. Load the podcast environment from SOPS and fail if any required key is missing:
    ```bash
-   [ -f ~/.hermes/secrets/podcast.env ] && set -a && . ~/.hermes/secrets/podcast.env && set +a
-   if [ -z "${COCOINDEX_DATABASE_URL:-}" ] && [ -n "${SUPABASE_PG_DSN:-}" ]; then
-     export COCOINDEX_DATABASE_URL="$SUPABASE_PG_DSN"
-   fi
+   SOPS_ENV=/Users/sva/Documents/Repos/Github/home-ops/hermes/scripts/sops_env.py
+   "$PY" "$SOPS_ENV" --purpose podcast --check
+   eval "$("$PY" "$SOPS_ENV" --purpose podcast)"
    ```
+   Re-run the same `eval` inside any long-lived/background shell rather than assuming exports from a parent tool call will be inherited.
 2. Fetch current HN stories:
    ```bash
    PODCAST_DIR="$PODCAST_DIR" bash scripts/morning-briefing.sh
