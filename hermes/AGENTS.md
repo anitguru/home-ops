@@ -17,10 +17,11 @@ This folder is the preferred working directory for Hermes sessions on this Mac. 
 When SVA uses these shorthand terms, interpret them consistently:
 
 - `kb`, `knowledge base`, `information vault`, `notes vault`, or `AnITGuru vault` → the Obsidian knowledge base mirrored locally at `/Users/sva/02-Areas/Personal`, with WebDAV on vectorsigma as the source of truth. Use vectorsigma `ccc search` over SSH for semantic discovery; use local exact file reads/patches for grounded edits.
-- `vault`, `HashiCorp vault`, `vault.anit.guru`, or `secrets vault` → the self-hosted HashiCorp Vault KV secrets store exposed through the `vault` MCP. Secrets live under the KV mount named `secret`, e.g. `secret/<name>`. Never print secret values.
+- `secrets`, `credentials`, or `secret store` → the canonical SOPS+age store at `~/.claude/secrets.sops.yaml`, accessed through the `secret` helper according to `40-wiki/services/sops-age-secrets.md`. Never print secret values.
+- `HashiCorp vault`, `vault.anit.guru`, or `vault MCP` → the legacy/superseded HashiCorp service. Inspect it only when explicitly requested; do not use it for normal secret retrieval or add new secrets there.
 - `repo root` / `Repos root` → `/Users/sva/Documents/Repos`; choose `Github/` vs `Gitea/` according to the README/publishing target.
 
-Do not confuse the Obsidian knowledge vault with the HashiCorp secrets vault. If a task needs credentials, check HashiCorp Vault / `secret/...`; if it needs docs/context, check the Obsidian kb.
+Do not confuse the Obsidian knowledge vault with the SOPS+age secret store. If a task needs credentials, follow the documented SOPS process and use the `secret` helper; if it needs docs/context, check the Obsidian kb.
 
 ## Startup rule
 
@@ -59,7 +60,7 @@ When creating or modifying LXC/VM/service docs, upsert the associated Proxmox UI
 - Prefer dedicated APIs/MCPs/CLIs over browser automation.
 - Use `cocoindex-code` for semantic vault discovery; use exact file reads before quoting or patching.
 - Use local flat files for precise vault edits when needed.
-- For all Hermes SSH, Git signing, Git push, cron, and background-process work, use the local Orionpax key at `~/.ssh/id_ed25519_orionpax` with `IdentityAgent=none` and `IdentitiesOnly=yes`; unattended SSH should also use `BatchMode=yes`. Never depend on the 1Password SSH agent.
+- For all Hermes SSH, Git signing, Git push, cron, and background-process work, use the local Orionpax key at `~/.ssh/id_ed25519_orionpax` with `IdentityAgent=none` and `IdentitiesOnly=yes`; unattended SSH should also use `BatchMode=yes`. This key policy is limited to SSH/Git authentication. Retrieve all other secrets through the documented SOPS+age process.
 - Never reintroduce MetaMCP; use dedicated MCP servers.
 
 ## DNS note

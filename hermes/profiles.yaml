@@ -2,8 +2,7 @@ version: 1
 defaults:
   steering_source: /Users/sva/Documents/Repos/Github/home-ops/hermes/steering
   profile_strategy: clone-then-prune
-  secret_policy: Use HashiCorp Vault for shared/durable secrets; profile .env only for local runtime env indirection, never
-    committed.
+  secret_policy: Use the canonical SOPS+age store and `secret` helper documented in the AnITGuru wiki for shared/durable secrets; profile .env only for local runtime env indirection, never committed. The local Orionpax key is only for SSH/Git authentication.
   model_policy: Use openai-codex/gpt-5.5 for profile default models; use openai-codex/gpt-5.4-mini for auxiliary/delegation where configured.
 repos:
   automations:
@@ -191,7 +190,7 @@ profiles:
     - cocoindex-home-ops
     default_cwd: /Users/sva/Documents/Repos/Gitea/observo
     notes:
-    - Do not access 1Password. If Observo credentials are needed by agents, move only necessary ones to HashiCorp Vault intentionally.
+    - Retrieve Observo credentials through the canonical SOPS+age `secret` helper workflow; never print values.
   app-dev:
     purpose: General app development learning, POCs/MVPs for individual projects, hobbies, and possible monetization paths.
     primary_repo: prompt-diet

@@ -22,7 +22,7 @@ Default model: `openai-codex / gpt-5.5`
 ## Operating notes
 - Never launch interactive terminal editors (`nano`, `vi`, `vim`, etc.) during automated/one-shot runs. Use `patch`, `write_file`, or purpose-built CLI/config commands for agent edits.
 - If giving human-facing shell instructions and an editor must be named, mention `vi`/`vim` rather than `nano`; do not explain basic file editing unless asked.
-- Do not access 1Password. If Observo credentials are needed by agents, move only necessary ones to HashiCorp Vault intentionally.
+- Retrieve Observo credentials through the canonical SOPS+age `secret` helper workflow; never print values.
 
 ## Pending repo/setup work
 - None.
