@@ -123,6 +123,7 @@ Generate audio with the segmented Chatterbox wrapper. This avoids long single-re
 TODAY="$TODAY" \
 PODCAST_DIR="$PODCAST_DIR" \
 TTS_URL="${TTS_URL:-https://chatterbox.transformers.lan/v1/audio/speech}" \
+TTS_CONNECT_HOST="${TTS_CONNECT_HOST:-chatterbox.tail099001.ts.net}" \
 TTS_VOICE="${TTS_VOICE:-peter-griffin.wav}" \
 TTS_LOUDNORM="${TTS_LOUDNORM:-I=-16:TP=-1.5:LRA=11}" \
 bash scripts/chatterbox_tts_segments.sh
@@ -141,7 +142,9 @@ If validation fails → STOP.
 
 Send MP3 to Whisper server:
 ```bash
-curl -s https://whisper.transformers.lan/v1/audio/transcriptions \
+WHISPER_CONNECT_HOST="${WHISPER_CONNECT_HOST:-whisper.tail099001.ts.net}"
+curl --connect-to "whisper.transformers.lan:443:${WHISPER_CONNECT_HOST}:443" \
+  -s "${WHISPER_URL:-https://whisper.transformers.lan/v1/audio/transcriptions}" \
   -F "file=@$PODCAST_DIR/gurus-tech-bytes-$TODAY.mp3" \
   -F "response_format=verbose_json" \
   -F "language=en" \

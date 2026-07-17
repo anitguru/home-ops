@@ -5,11 +5,36 @@ TODAY=${TODAY:-$(date +%Y-%m-%d)}
 PODCAST_DIR=${PODCAST_DIR:-/tmp/podcast-$TODAY}
 SCRIPT_PATH=${SCRIPT_PATH:-$PODCAST_DIR/script.txt}
 TTS_URL=${TTS_URL:-https://chatterbox.transformers.lan/v1/audio/speech}
+# Optional Tailscale/MagicDNS transport host. The URL hostname remains the TLS
+# identity because the current service certificate is issued to
+# chatterbox.transformers.lan, not the *.tail099001.ts.net transport name.
+TTS_CONNECT_HOST=${TTS_CONNECT_HOST:-}
 TTS_VOICE=${TTS_VOICE:-peter-griffin.wav}
 TTS_MODEL=${TTS_MODEL:-tts-1}
 TTS_SPEED=${TTS_SPEED:-1.0}
 TTS_LOUDNORM=${TTS_LOUDNORM:-I=-16:TP=-1.5:LRA=11}
 MIN_DURATION_SECONDS=${MIN_DURATION_SECONDS:-60}
+
+CURL_CONNECT_ARGS=()
+if [[ -n "$TTS_CONNECT_HOST" ]]; then
+  TTS_URL_HOST=$(python3 - "$TTS_URL" <<'PY'
+import sys
+from urllib.parse import urlparse
+parsed = urlparse(sys.argv[1])
+if parsed.scheme != "https" or not parsed.hostname:
+    raise SystemExit(f"TTS_CONNECT_HOST requires an https TTS_URL, got: {sys.argv[1]}")
+print(parsed.hostname)
+PY
+)
+  TTS_URL_PORT=$(python3 - "$TTS_URL" <<'PY'
+import sys
+from urllib.parse import urlparse
+parsed = urlparse(sys.argv[1])
+print(parsed.port or 443)
+PY
+)
+  CURL_CONNECT_ARGS=(--connect-to "${TTS_URL_HOST}:${TTS_URL_PORT}:${TTS_CONNECT_HOST}:${TTS_URL_PORT}")
+fi
 
 MP3="$PODCAST_DIR/gurus-tech-bytes-$TODAY.mp3"
 SEGMENTS_DIR="$PODCAST_DIR/segments"
@@ -34,6 +59,9 @@ PY
 
 count=$(find "$SEGMENTS_DIR" -name 'segment-*.txt' | wc -l | tr -d ' ')
 echo "[tts] Generating $count Chatterbox segment(s) via $TTS_URL"
+if [[ -n "$TTS_CONNECT_HOST" ]]; then
+  echo "[tts] Connecting through Tailscale host $TTS_CONNECT_HOST with TLS identity $TTS_URL_HOST"
+fi
 
 : > "$SEGMENTS_DIR/concat.txt"
 for txt in "$SEGMENTS_DIR"/segment-*.txt; do
@@ -53,7 +81,7 @@ payload = {
 pathlib.Path(sys.argv[2]).write_text(json.dumps(payload))
 PY
   echo "[tts] POST $(basename "$mp3")"
-  curl -fsS --retry 2 --retry-all-errors --connect-timeout 30 --max-time 900 \
+  curl "${CURL_CONNECT_ARGS[@]}" -fsS --retry 2 --retry-all-errors --connect-timeout 30 --max-time 900 \
     -X POST "$TTS_URL" \
     -H "Content-Type: application/json" \
     --data-binary "@$json" \

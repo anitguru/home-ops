@@ -61,10 +61,12 @@ Expected variables include:
 - `CLOUDINARY_API_KEY`
 - `CLOUDINARY_API_SECRET`
 - `COCOINDEX_DATABASE_URL`
-- `TTS_URL` defaulting to `https://chatterbox.transformers.lan/v1/audio/speech`
+- `TTS_URL` defaulting to `https://chatterbox.transformers.lan/v1/audio/speech` as the TLS identity
+- `TTS_CONNECT_HOST` set by the cron to `chatterbox.tail099001.ts.net` for off-LAN transport
 - `TTS_VOICE` defaulting to `peter-griffin.wav`
 - `TTS_LOUDNORM` defaulting to `I=-16:TP=-1.5:LRA=11`
-- `WHISPER_URL`
+- `WHISPER_URL` using `whisper.transformers.lan` as the TLS identity
+- `WHISPER_CONNECT_HOST` set by the cron to `whisper.tail099001.ts.net` for off-LAN transport
 
 The loader maps those environment names from SOPS vendors `cloudinary`, `supabase`, and `podcast`. Telegram delivery is handled by Hermes `deliver=origin`, so the producer does not receive a Telegram bot token.
 
@@ -94,8 +96,11 @@ Then run the workflow from `/Users/sva/Documents/Repos/Github/home-ops/hermes/po
    SOPS_ENV=/Users/sva/Documents/Repos/Github/home-ops/hermes/scripts/sops_env.py
    "$PY" "$SOPS_ENV" --purpose podcast --check
    eval "$("$PY" "$SOPS_ENV" --purpose podcast)"
+   tailscale up
+   export TTS_CONNECT_HOST=chatterbox.tail099001.ts.net
+   export WHISPER_CONNECT_HOST=whisper.tail099001.ts.net
    ```
-   Re-run the same `eval` inside any long-lived/background shell rather than assuming exports from a parent tool call will be inherited.
+   Re-run the same `eval` and re-export both transport hosts inside any long-lived/background shell rather than assuming exports from a parent tool call will be inherited. The `*.tail099001.ts.net` names are transport endpoints; keep `TTS_URL` and `WHISPER_URL` on the `*.transformers.lan` certificate identities and use curl `--connect-to` rather than `curl -k`.
 2. Fetch current HN stories:
    ```bash
    PODCAST_DIR="$PODCAST_DIR" bash scripts/morning-briefing.sh
