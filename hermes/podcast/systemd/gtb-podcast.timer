@@ -1,0 +1,9 @@
+[Unit]
+Description=Fire Guru's Tech Bytes at 06:00 America/New_York daily
+
+[Timer]
+OnCalendar=*-*-* 06:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

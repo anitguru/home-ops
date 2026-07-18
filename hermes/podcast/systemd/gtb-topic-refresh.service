@@ -1,0 +1,9 @@
+[Unit]
+OnFailure=gtb-alert@%n.service
+Description=Guru's Tech Bytes — CocoIndex HN topic refresh (pi4, claude -p Sonnet)
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/pi/home-ops/hermes/scripts/run-topic-refresh-pi4.sh --write
+TimeoutStartSec=1200

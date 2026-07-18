@@ -1,0 +1,5 @@
+[Unit]
+Description=Telegram failure alert for %i
+[Service]
+Type=oneshot
+ExecStart=/home/pi/home-ops/hermes/bin/gtb-alert.sh %i

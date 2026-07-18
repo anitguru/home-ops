@@ -1,0 +1,9 @@
+[Unit]
+OnFailure=gtb-alert@%n.service
+Description=Guru's Tech Bytes — daily podcast producer/publisher (pi4)
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/pi/home-ops/hermes/podcast/scripts/run-podcast-pi4.sh
+TimeoutStartSec=2400

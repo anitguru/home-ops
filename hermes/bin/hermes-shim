@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# pi4 shim: translate a hermes_llm one-shot ("hermes [-p prof] chat -q PROMPT
+# --quiet --source X [-m model] ...") into a headless `claude -p` call.
+# Lets home-ops/hermes/scripts/hn_topic_refresh_hermes.py run unmodified on pi4.
+set -euo pipefail
+MODEL="${HERMES_SHIM_MODEL:-claude-sonnet-5}"
+PROMPT=""
+args=("$@")
+for ((i=0; i<${#args[@]}; i++)); do
+  if [ "${args[$i]}" = "-q" ]; then PROMPT="${args[$((i+1))]:-}"; fi
+done
+[ -n "$PROMPT" ] || { echo "hermes-shim: no -q prompt" >&2; exit 2; }
+exec claude -p "$PROMPT" --model "$MODEL"
