@@ -4,9 +4,9 @@ wiki_freshness.py — AnITGuru wiki source freshness verification.
 
 Active scheduled runtime is the default-profile Hermes cron job
 `Wiki freshness check`, launched from the home-ops repo. The weekly live path is
-intentionally deterministic: `--dry-run --no-llm` checks source reachability and
-delivers stdout; it does not call Gitea Actions, runners, Git push/writeback, or
-direct Claude/Anthropic APIs.
+deterministic and follows the backup-first `wiki_repair.py --apply` pass with a
+live `--no-llm` source-reachability audit. It does not call Gitea Actions,
+runners, Git push/writeback, or direct Claude/Anthropic APIs.
 
 Optional LLM drift analysis, when manually enabled, routes through
 home-ops/hermes/scripts/hermes_llm.py so it uses subscription-backed Hermes
@@ -466,7 +466,13 @@ def deep_analysis(page_excerpt: str, url: str, current: str) -> dict:
 # Main loop
 # ---------------------------------------------------------------------------
 
-async def run(dry_run: bool, limit: int | None, client: VaultClient, use_llm: bool = True) -> list[dict]:
+async def run(
+    dry_run: bool,
+    limit: int | None,
+    client: VaultClient,
+    use_llm: bool = True,
+    verbose: bool = True,
+) -> list[dict]:
     pages = client.list_wiki_pages()
     if limit:
         pages = pages[:limit]
@@ -523,12 +529,14 @@ async def run(dry_run: bool, limit: int | None, client: VaultClient, use_llm: bo
                 print(f"  [{name}] dead_url  {status} {url[:70]}")
                 continue
 
-            print(f"  [{name}] live ({status})  ", end="", flush=True)
+            if verbose:
+                print(f"  [{name}] live ({status})  ", end="", flush=True)
 
             if not use_llm:
                 entry["verdict"] = "source_reachable"
                 entry["note"] = "LLM drift analysis disabled"
-                print("source_reachable  (LLM disabled)")
+                if verbose:
+                    print("source_reachable  (LLM disabled)")
                 report.append(entry)
                 continue
 
@@ -538,17 +546,20 @@ async def run(dry_run: bool, limit: int | None, client: VaultClient, use_llm: bo
 
             if not triage.get("drifted"):
                 entry["verdict"] = "ok"
-                print(f"ok  (triage: {triage['reason'][:60]})")
+                if verbose:
+                    print(f"ok  (triage: {triage['reason'][:60]})")
                 report.append(entry)
                 continue
 
-            print("DRIFT flagged  ", end="", flush=True)
+            if verbose:
+                print("DRIFT flagged  ", end="", flush=True)
 
             deep = deep_analysis(page["content"], url, snippet)
             entry["deep_analysis"]      = deep
             entry["verdict"]           = deep["verdict"]
             entry["confidence_action"] = deep["confidence_action"]
-            print(f"{deep['verdict']}  {deep['summary'][:70]}")
+            if verbose:
+                print(f"{deep['verdict']}  {deep['summary'][:70]}")
             report.append(entry)
 
     counts = {}
@@ -590,6 +601,7 @@ def main():
     parser.add_argument("--no-dry-run", dest="dry_run", action="store_false")
     parser.add_argument("--limit",  type=int,  default=None)
     parser.add_argument("--vault",  default=None, help="Vault root path (local mode)")
+    parser.add_argument("--quiet", action="store_true", help="Suppress per-page success lines")
     parser.add_argument(
         "--no-llm",
         dest="use_llm",
@@ -600,7 +612,15 @@ def main():
     args = parser.parse_args()
 
     client = make_client(args.vault)
-    asyncio.run(run(args.dry_run, args.limit, client, use_llm=args.use_llm))
+    asyncio.run(
+        run(
+            args.dry_run,
+            args.limit,
+            client,
+            use_llm=args.use_llm,
+            verbose=not args.quiet,
+        )
+    )
 
 
 if __name__ == "__main__":

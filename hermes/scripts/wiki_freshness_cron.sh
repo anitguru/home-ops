@@ -29,23 +29,26 @@ export VAULT_ROOT="${VAULT_ROOT:-/Users/sva/02-Areas/Personal}"
 export OBSIDIAN_MCP_VAULT="${OBSIDIAN_MCP_VAULT:-personal}"
 
 if [[ "${1:-}" == "--check" ]]; then
-  "$PYTHON" -m py_compile wiki_freshness.py "$HOME_OPS_HERMES_SCRIPTS/hermes_llm.py"
+  "$PYTHON" -m py_compile wiki_freshness.py wiki_repair.py "$HOME_OPS_HERMES_SCRIPTS/hermes_llm.py"
   "$PYTHON" - <<'PY'
 import httpx
 print(f"httpx ok ({httpx.__version__})")
 PY
   "$PYTHON" wiki_freshness.py --help >/dev/null
-  "$PYTHON" wiki_freshness.py --dry-run --no-llm --limit 1
+  "$PYTHON" wiki_repair.py --vault "$VAULT_ROOT"
+  "$PYTHON" wiki_freshness.py --dry-run --no-llm --quiet --limit 1
   echo "wiki_freshness_cron check ok"
   exit 0
 fi
 
-# Weekly scheduled path stays deterministic: dry-run + no LLM unless a human
-# explicitly passes different CLI flags to this wrapper.
+# Weekly scheduled path stays deterministic and backup-first. It applies only
+# unambiguous schema/index/path repairs, then performs a live no-LLM source URL
+# audit. Ambiguous moves and destination collisions fail safe and are reported.
 if [[ "$#" -eq 0 ]]; then
-  set -- --dry-run --no-llm
+  "$PYTHON" wiki_repair.py --vault "$VAULT_ROOT" --apply
+  "$PYTHON" wiki_freshness.py --vault "$VAULT_ROOT" --no-dry-run --no-llm --quiet
+else
+  "$PYTHON" wiki_freshness.py "$@"
 fi
 
-"$PYTHON" wiki_freshness.py "$@"
-
-echo "home-ops wiki-freshness run complete (Hermes cron only; no Gitea Actions, runners, Git push/writeback, or direct provider calls)"
+echo "home-ops wiki maintenance/freshness run complete (backup-first deterministic repairs; no Gitea Actions, runners, Git push/writeback, or direct provider calls)"
