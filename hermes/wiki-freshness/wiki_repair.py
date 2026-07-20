@@ -69,8 +69,18 @@ def frontmatter_value(text: str, key: str) -> str | None:
     match = _frontmatter_match(text)
     if not match:
         return None
-    found = re.search(rf"^{re.escape(key)}\s*:\s*([^#\n]*)", match.group(1), re.MULTILINE)
-    return found.group(1).strip().strip('"').strip("'") if found else None
+    found = re.search(rf"^{re.escape(key)}\s*:\s*(.*?)\s*$", match.group(1), re.MULTILINE)
+    if not found:
+        return None
+    raw = found.group(1).strip()
+    if raw.startswith('"') and raw.endswith('"'):
+        try:
+            return str(json.loads(raw))
+        except json.JSONDecodeError:
+            return raw[1:-1]
+    if raw.startswith("'") and raw.endswith("'"):
+        return raw[1:-1].replace("''", "'")
+    return re.split(r"\s+#", raw, maxsplit=1)[0].strip()
 
 
 def _title_from_text(path: Path, text: str) -> str:
@@ -139,6 +149,25 @@ def _set_frontmatter_value(lines: list[str], key: str, value: str) -> None:
     lines.append(f"{key}: {value}")
 
 
+def _yaml_string(value: str) -> str:
+    """Encode a string as a JSON-quoted scalar, which is valid YAML."""
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _has_symlink_component(path: Path, root: Path) -> bool:
+    """Return True when path or any component below root is a symlink."""
+    try:
+        rel = path.relative_to(root)
+    except ValueError:
+        return True
+    current = root
+    for part in rel.parts:
+        current = current / part
+        if current.is_symlink():
+            return True
+    return False
+
+
 def _ensure_frontmatter(path: Path, text: str, inferred_type: str, today: date) -> str:
     match = _frontmatter_match(text)
     title = _title_from_text(path, text)
@@ -154,7 +183,7 @@ def _ensure_frontmatter(path: Path, text: str, inferred_type: str, today: date) 
 
     changed = match is None
     if frontmatter_value(text, "title") is None:
-        _set_frontmatter_value(lines, "title", title)
+        _set_frontmatter_value(lines, "title", _yaml_string(title))
         changed = True
     if frontmatter_value(text, "created") is None:
         _set_frontmatter_value(lines, "created", today_text)
@@ -162,7 +191,7 @@ def _ensure_frontmatter(path: Path, text: str, inferred_type: str, today: date) 
 
     if old_type != inferred_type:
         if old_type and old_type not in TYPE_TO_FOLDER:
-            _set_frontmatter_value(lines, "legacy_type", old_type)
+            _set_frontmatter_value(lines, "legacy_type", _yaml_string(old_type))
         _set_frontmatter_value(lines, "type", inferred_type)
         changed = True
 
@@ -218,6 +247,11 @@ class BackupSession:
     def copy(self, path: Path) -> None:
         if path in self._seen or not path.exists():
             return
+        if _has_symlink_component(path, self.vault_root):
+            raise RuntimeError(f"refusing to back up through a symlink: {path}")
+        resolved = path.resolve()
+        if resolved != self.vault_root and self.vault_root not in resolved.parents:
+            raise RuntimeError(f"backup source escapes vault: {path}")
         rel = path.relative_to(self.vault_root)
         target = self.path / "vault" / rel
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -249,6 +283,8 @@ def repair_vault(
     wiki = vault_root / "40-wiki"
     if not wiki.is_dir():
         raise FileNotFoundError(f"40-wiki directory not found under {vault_root}")
+    if wiki.is_symlink() or wiki.resolve().parent != vault_root:
+        raise RuntimeError(f"refusing symlinked or escaped 40-wiki root: {wiki}")
     today = today or date.today()
 
     planned: list[dict[str, Any]] = []
@@ -257,9 +293,18 @@ def repair_vault(
     records: list[dict[str, Any]] = []
     backup = BackupSession(vault_root, backup_root) if apply else None
 
+    # These are shared mutation targets. Reject symlinks before touching any
+    # page so a crafted index/log cannot turn a later write into an escape.
+    for protected in (wiki / "index.md", wiki / "log.md"):
+        if _has_symlink_component(protected, wiki):
+            raise RuntimeError(f"refusing symlinked wiki control file: {protected}")
+
     for source in sorted(wiki.rglob("*.md")):
         rel = source.relative_to(wiki)
         if source.name in SKIP_FILES or rel.parts[0] == "raw":
+            continue
+        if _has_symlink_component(source, wiki):
+            blocked.append({"kind": "symlink", "path": rel.as_posix()})
             continue
         text = source.read_text(encoding="utf-8", errors="replace")
 
@@ -271,7 +316,13 @@ def repair_vault(
                 "to": destination.relative_to(wiki).as_posix(),
             }
             planned.append(action)
-            if destination.exists():
+            if _has_symlink_component(destination, wiki):
+                blocked.append({
+                    "kind": "symlink_destination",
+                    "path": rel.as_posix(),
+                    "to": destination.relative_to(wiki).as_posix(),
+                })
+            elif destination.exists():
                 blocked.append({
                     "kind": "collision",
                     "path": rel.as_posix(),
@@ -297,6 +348,17 @@ def repair_vault(
             })
             continue
 
+        expected_folder = TYPE_TO_FOLDER[inferred_type]
+        filename = f"{_slugify(source.stem)}.md"
+        destination = wiki / expected_folder / filename
+        if destination != source and _has_symlink_component(destination, wiki):
+            blocked.append({
+                "kind": "symlink_destination",
+                "path": rel.as_posix(),
+                "to": destination.relative_to(wiki).as_posix(),
+            })
+            continue
+
         repaired_text = _ensure_required_frontmatter(source, text, inferred_type, today)
         if repaired_text != text:
             action = {"kind": "frontmatter", "path": rel.as_posix(), "type": inferred_type}
@@ -308,9 +370,6 @@ def repair_vault(
                 applied.append(action)
                 text = repaired_text
 
-        expected_folder = TYPE_TO_FOLDER[inferred_type]
-        filename = f"{_slugify(source.stem)}.md"
-        destination = wiki / expected_folder / filename
         final_path = source
         move_action: dict[str, Any] | None = None
         if destination != source:
@@ -369,7 +428,7 @@ def repair_vault(
             for action in [a for a in planned if a["kind"] in {"index_add", "index_header"}]:
                 applied.append(action)
 
-    if apply and applied:
+    if apply and (applied or blocked):
         assert backup is not None
         log_path = wiki / "log.md"
         backup.copy(log_path)

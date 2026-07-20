@@ -97,7 +97,7 @@ def test_apply_repairs_frontmatter_index_log_and_creates_backup(tmp_path):
 
     repaired = page.read_text(encoding="utf-8")
     assert "type: runbook" in repaired
-    assert "title: Example Runbook" in repaired
+    assert wr.frontmatter_value(repaired, "title") == "Example Runbook"
     assert "confidence: medium" in repaired
     index = (vault / "40-wiki/index.md").read_text(encoding="utf-8")
     assert "[[example-runbook]]" in index
@@ -173,4 +173,92 @@ def test_invalid_type_is_normalized_from_unambiguous_current_folder(tmp_path):
 
     repaired = page.read_text(encoding="utf-8")
     assert "type: runbook" in repaired
-    assert "legacy_type: tombstone" in repaired
+    assert wr.frontmatter_value(repaired, "legacy_type") == "tombstone"
+
+
+def test_symlinked_source_is_blocked_and_outside_target_is_unchanged(tmp_path: Path):
+    vault = make_vault(tmp_path)
+    outside = tmp_path / "outside.md"
+    original = "# Project #1\n"
+    outside.write_text(original, encoding="utf-8")
+    link = vault / "40-wiki/runbooks/linked.md"
+    link.symlink_to(outside)
+
+    result = wr.repair_vault(vault, apply=True, today=date(2026, 7, 20))
+
+    assert outside.read_text(encoding="utf-8") == original
+    assert link.is_symlink()
+    assert any(item["kind"] == "symlink" for item in result["blocked"])
+
+
+def test_symlinked_wiki_root_is_rejected(tmp_path: Path):
+    outside = tmp_path / "outside-wiki"
+    outside.mkdir()
+    (outside / "runbooks").mkdir()
+    page = outside / "runbooks/external.md"
+    original = "# External\n"
+    page.write_text(original, encoding="utf-8")
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    (vault / "40-wiki").symlink_to(outside, target_is_directory=True)
+
+    try:
+        wr.repair_vault(vault, apply=True, today=date(2026, 7, 20))
+    except RuntimeError as exc:
+        assert "40-wiki root" in str(exc)
+    else:
+        raise AssertionError("symlinked 40-wiki root was not rejected")
+    assert page.read_text(encoding="utf-8") == original
+
+
+def test_symlinked_destination_directory_is_blocked(tmp_path: Path):
+    vault = make_vault(tmp_path)
+    outside = tmp_path / "outside-services"
+    outside.mkdir()
+    services = vault / "40-wiki/services"
+    services.rmdir()
+    services.symlink_to(outside, target_is_directory=True)
+    page = vault / "40-wiki/runbooks/wrong-place.md"
+    original = (
+        "---\ntitle: Wrong Place\ncreated: 2026-07-01\nupdated: 2026-07-01\n"
+        "type: service\ntags: [service]\nsources: []\nconfidence: high\ncontested: false\n---\n"
+        "# Wrong Place\n\nA service page.\n"
+    )
+    page.write_text(original, encoding="utf-8")
+
+    result = wr.repair_vault(vault, apply=True, today=date(2026, 7, 20))
+
+    assert page.read_text(encoding="utf-8") == original
+    assert not (outside / "wrong-place.md").exists()
+    assert any(item["kind"] == "symlink_destination" for item in result["blocked"])
+
+
+def test_generated_title_is_yaml_safe(tmp_path: Path):
+    vault = make_vault(tmp_path)
+    page = vault / "40-wiki/runbooks/project-1.md"
+    page.write_text("# Project #1\n\nSafe title repair.\n", encoding="utf-8")
+
+    wr.repair_vault(vault, apply=True, today=date(2026, 7, 20))
+
+    repaired = page.read_text(encoding="utf-8")
+    assert 'title: "Project #1"' in repaired
+    assert wr.frontmatter_value(repaired, "title") == "Project #1"
+
+
+def test_backup_preserves_original_before_rewrite_and_move(tmp_path: Path):
+    vault = make_vault(tmp_path)
+    page = vault / "40-wiki/runbooks/misplaced-service.md"
+    original = "---\ntitle: Misplaced Service\ntype: service\n---\n# Misplaced Service\n"
+    page.write_text(original, encoding="utf-8")
+    backup_root = tmp_path / "backups"
+
+    result = wr.repair_vault(
+        vault,
+        apply=True,
+        backup_root=backup_root,
+        today=date(2026, 7, 20),
+    )
+
+    backup = Path(result["backup"]) / "vault/40-wiki/runbooks/misplaced-service.md"
+    assert backup.read_text(encoding="utf-8") == original
+    assert (vault / "40-wiki/services/misplaced-service.md").exists()

@@ -49,6 +49,24 @@ if str(HOME_OPS_HERMES_SCRIPTS) not in sys.path:
 
 SKIP_STEMS = {"README", "SCHEMA", "index", "log", "freshness-report"}
 
+
+def _validate_relative_path(value: str | Path) -> Path:
+    """Return a normalized relative path or reject traversal/absolute input."""
+    rel = Path(value)
+    if rel.is_absolute() or not rel.parts or any(part in {"", ".", ".."} for part in rel.parts):
+        raise ValueError(f"expected a safe relative path, got {value!r}")
+    return rel
+
+
+def _resolve_within(base: Path, value: str | Path) -> Path:
+    """Resolve value below base, rejecting traversal and symlink escapes."""
+    rel = _validate_relative_path(value)
+    resolved_base = base.resolve()
+    candidate = (resolved_base / rel).resolve()
+    if candidate != resolved_base and resolved_base not in candidate.parents:
+        raise ValueError(f"path escapes {resolved_base}: {value!r}")
+    return candidate
+
 # ---------------------------------------------------------------------------
 # Vault client abstraction
 # ---------------------------------------------------------------------------
@@ -66,12 +84,12 @@ class VaultClient:
 
 class LocalVaultClient(VaultClient):
     def __init__(self, root: Path):
-        self.root = root
+        self.root = root.resolve()
         # The current AnITGuru vault stores maintained pages and raw captures
         # under 40-wiki/. Keep legacy wiki/ support for older fixtures/vaults.
-        current_wiki = root / "40-wiki"
-        self.wiki_dir = current_wiki if current_wiki.is_dir() else root / "wiki"
-        self.wiki_prefix = self.wiki_dir.relative_to(root).as_posix()
+        current_wiki = _resolve_within(self.root, "40-wiki")
+        self.wiki_dir = current_wiki if current_wiki.is_dir() else _resolve_within(self.root, "wiki")
+        self.wiki_prefix = self.wiki_dir.relative_to(self.root).as_posix()
         self.log_file = self.wiki_dir / "log.md"
 
     def list_wiki_pages(self) -> list[str]:
@@ -79,32 +97,43 @@ class LocalVaultClient(VaultClient):
         for path in self.wiki_dir.rglob("*.md"):
             if path.stem in SKIP_STEMS:
                 continue
-            text = path.read_text(encoding="utf-8", errors="replace")
+            if path.is_symlink():
+                continue
+            rel = path.relative_to(self.wiki_dir)
+            try:
+                safe_path = _resolve_within(self.wiki_dir, rel)
+            except ValueError:
+                continue
+            text = safe_path.read_text(encoding="utf-8", errors="replace")
             # Legacy pages link to _raw files through **Sources**. Current
             # 40-wiki/raw captures carry canonical URLs in frontmatter.
             if "**Sources**:" not in text and not extract_declared_source_url(text):
                 continue
-            pages.append(path.relative_to(self.wiki_dir).as_posix())
+            pages.append(rel.as_posix())
         return sorted(pages)
 
     def read_wiki_page(self, name: str) -> str:
-        rel = Path(name)
-        path = self.wiki_dir / (rel if rel.suffix == ".md" else rel.with_suffix(".md"))
+        rel = _validate_relative_path(name)
+        rel = rel if rel.suffix == ".md" else rel.with_suffix(".md")
+        path = _resolve_within(self.wiki_dir, rel)
         return path.read_text(encoding="utf-8", errors="replace")
 
     def read_raw_file(self, rel_path: str) -> str | None:
-        rel = Path(rel_path.lstrip("/"))
-        candidates = [self.root / rel, self.wiki_dir / rel]
+        rel = _validate_relative_path(rel_path)
+        candidates = [_resolve_within(self.root, rel), _resolve_within(self.wiki_dir, rel)]
         parts = rel.parts
         if parts and parts[0] == "_raw":
-            candidates.append(self.wiki_dir / "raw" / Path(*parts[1:]))
+            candidates.append(_resolve_within(self.wiki_dir, Path("raw", *parts[1:])))
         for path in candidates:
             if path.is_file():
                 return path.read_text(encoding="utf-8", errors="replace")
         return None
 
     def append_log(self, content: str) -> None:
-        with open(self.log_file, "a", encoding="utf-8") as f:
+        path = _resolve_within(self.wiki_dir, "log.md")
+        if self.log_file.is_symlink():
+            raise ValueError("refusing to append through a symlinked wiki log")
+        with open(path, "a", encoding="utf-8") as f:
             f.write(content)
 
 
@@ -211,11 +240,14 @@ class ObsidianMCPClient(VaultClient):
         return sorted(stems)
 
     def read_wiki_page(self, name: str) -> str:
-        return str(self._tool("read_file", {"vault": self.vault, "path": f"wiki/{name}.md"}))
+        rel = _validate_relative_path(name)
+        rel = rel if rel.suffix == ".md" else rel.with_suffix(".md")
+        return str(self._tool("read_file", {"vault": self.vault, "path": f"wiki/{rel.as_posix()}"}))
 
     def read_raw_file(self, rel_path: str) -> str | None:
+        rel = _validate_relative_path(rel_path)
         try:
-            return str(self._tool("read_file", {"vault": self.vault, "path": rel_path.lstrip("/")}))
+            return str(self._tool("read_file", {"vault": self.vault, "path": rel.as_posix()}))
         except Exception:
             return None
 
@@ -272,7 +304,7 @@ def extract_declared_source_url(text: str) -> str | None:
     if not m:
         return None
     fm = m.group(1)
-    for key in ("url", "source"):
+    for key in ("url", "source_url", "source"):
         for line in fm.splitlines():
             if re.match(rf"^{key}\s*:", line):
                 url = line.partition(":")[2].strip().strip('"').strip("'")

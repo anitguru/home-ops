@@ -2,6 +2,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -31,6 +33,16 @@ Body https://example.com/body
 """
 
     assert wf.extract_source_url(text) == "https://example.com/frontmatter"
+
+
+def test_extract_source_url_accepts_schema_source_url():
+    text = """---
+source_url: https://example.com/schema-field
+---
+Body
+"""
+
+    assert wf.extract_source_url(text) == "https://example.com/schema-field"
 
 
 def test_extract_source_url_falls_back_to_first_body_url():
@@ -88,6 +100,37 @@ def test_current_40_wiki_layout_recurses_and_reads_direct_source_frontmatter(tmp
     assert report["source_count"] == 1
     assert report["pages"][0]["path"] == "40-wiki/raw/docs/example.md"
     assert report["sources"][0]["url"] == "https://example.com/current"
+
+
+def test_local_client_rejects_wiki_path_traversal(tmp_path):
+    (tmp_path / "40-wiki").mkdir()
+    (tmp_path / "secret.md").write_text("outside", encoding="utf-8")
+    client = wf.LocalVaultClient(tmp_path)
+
+    with pytest.raises(ValueError, match="relative path"):
+        client.read_wiki_page("../../secret")
+
+
+def test_local_client_rejects_raw_path_traversal(tmp_path):
+    (tmp_path / "40-wiki").mkdir()
+    (tmp_path / "secret.md").write_text("outside", encoding="utf-8")
+    client = wf.LocalVaultClient(tmp_path)
+
+    with pytest.raises(ValueError, match="relative path"):
+        client.read_raw_file("../../secret.md")
+
+
+def test_local_client_rejects_symlink_escape(tmp_path):
+    wiki = tmp_path / "40-wiki"
+    wiki.mkdir()
+    outside = tmp_path / "outside.md"
+    outside.write_text("outside", encoding="utf-8")
+    (wiki / "linked.md").symlink_to(outside)
+    client = wf.LocalVaultClient(tmp_path)
+
+    with pytest.raises(ValueError, match="escapes"):
+        client.read_wiki_page("linked.md")
+    assert client.list_wiki_pages() == []
 
 
 def test_render_markdown_report_includes_counts_and_statuses():

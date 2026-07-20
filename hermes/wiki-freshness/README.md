@@ -22,6 +22,11 @@ The old Gitea schedule (`17 9 * * 1` UTC / Monday 09:17 UTC) is retired. The exi
 6. Appends every repair to `40-wiki/log.md`.
 7. Inventories source-backed Markdown, performs deterministic HTTP reachability checks, and appends attention items in live mode.
 
+All local paths are containment-checked. Traversal, symlinked pages/control files,
+and symlinked destination folders fail closed, and generated string frontmatter
+is YAML-quoted. Source discovery accepts the schema fields `url`, `source_url`,
+and `source`.
+
 ## Vault access
 
 Default local mode uses:
