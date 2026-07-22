@@ -17,8 +17,10 @@ The exact Bunny DNS `A` record overrides the public wildcard/front-door record a
 - Ollama's original `http://<mac>:11434` listener is unchanged.
 - Caddy binds only to `10.0.10.210:11435`.
 - The Bunny API key remains in the SOPS store and is loaded by `~/.local/bin/secret bunny API_KEY` when the LaunchAgent starts.
-- No API key is committed to this repository or written to the LaunchAgent plist.
-- This adds transport encryption, not Ollama application authentication. The existing Ollama listener is already reachable on the LAN.
+- The HTTPS Bearer token remains under `ollama.M5_TLS_API_KEY` in SOPS and is loaded only when the LaunchAgent starts.
+- No API key is committed to this repository or written to the LaunchAgent plist. Caddy removes the `Authorization` header before proxying to Ollama.
+- This adds transport encryption and Bearer-token authentication on port `11435`. The existing unauthenticated Ollama listener on port `11434` is unchanged.
+- The PR60X currently permits the work Mac to reach both `11434` and `11435`; therefore `11434` remains an intentional authentication bypass until that router rule is narrowed to TLS-only.
 
 ## Pinned build
 
@@ -52,8 +54,11 @@ The LaunchAgent is:
 
 ```bash
 dig +short A ollama-lan.anit.guru @1.1.1.1
-curl -fsS https://ollama-lan.anit.guru:11435/api/version
-curl -fsS https://ollama-lan.anit.guru:11435/v1/models
+curl -sS -o /dev/null -w '%{http_code}\n' https://ollama-lan.anit.guru:11435/api/version # expect 401
+M5_TLS_API_KEY="$(~/.local/bin/secret ollama M5_TLS_API_KEY)"
+curl -fsS -H "Authorization: Bearer $M5_TLS_API_KEY" https://ollama-lan.anit.guru:11435/api/version
+curl -fsS -H "Authorization: Bearer $M5_TLS_API_KEY" https://ollama-lan.anit.guru:11435/v1/models
+unset M5_TLS_API_KEY
 launchctl print gui/$UID/com.anitguru.ollama-tls
 ```
 
@@ -62,6 +67,9 @@ Expected client base URL:
 ```text
 https://ollama-lan.anit.guru:11435/v1
 ```
+
+Configure the client API-key field with the value from `ollama.M5_TLS_API_KEY`.
+OpenAI-compatible clients send it as `Authorization: Bearer <key>`.
 
 If a managed work VPN filters public DNS responses containing private addresses, add this hosts entry on that client:
 

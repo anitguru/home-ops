@@ -14,7 +14,14 @@ https://ollama-lan.anit.guru:11435 {
 		resolvers 1.1.1.1 8.8.8.8
 	}
 
+	# Require an OpenAI-compatible API key on the HTTPS endpoint. The direct
+	# Ollama listener on port 11434 remains unchanged.
+	@unauthorized not header Authorization "Bearer {$M5_TLS_API_KEY}"
+	respond @unauthorized "Unauthorized" 401
+
 	reverse_proxy 127.0.0.1:11434 {
+		# Authenticate at Caddy and do not forward the credential to Ollama.
+		header_up -Authorization
 		# Ollama is strict about unexpected vanity Host headers in some paths.
 		header_up Host 127.0.0.1:11434
 	}

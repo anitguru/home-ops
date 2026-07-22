@@ -17,10 +17,15 @@ if [[ ! -r "$CONFIG" ]]; then
   exit 1
 fi
 
-# Load the Bunny API key from SOPS only at process start. The key is never
-# written into the Caddyfile, LaunchAgent plist, or repository.
+# Load the DNS and M5 endpoint keys from SOPS only at process start. Neither
+# key is written into the Caddyfile, LaunchAgent plist, or repository.
 BUNNY_API_KEY="$($SECRET_HELPER bunny API_KEY)"
-export BUNNY_API_KEY
+M5_TLS_API_KEY="$($SECRET_HELPER ollama M5_TLS_API_KEY)"
+[[ -n "$BUNNY_API_KEY" && -n "$M5_TLS_API_KEY" ]] || {
+  echo "required Caddy secrets are empty" >&2
+  exit 1
+}
+export BUNNY_API_KEY M5_TLS_API_KEY
 
 # Isolate Caddy's ACME account, certificates, and state from other services.
 export HOME="$RUNTIME_DIR/home"

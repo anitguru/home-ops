@@ -51,6 +51,7 @@ fi
 
 "$CADDY" list-modules --packages | /usr/bin/grep -q '^dns.providers.bunny'
 BUNNY_API_KEY="$($REAL_HOME/.local/bin/secret bunny API_KEY)" \
+M5_TLS_API_KEY="$($REAL_HOME/.local/bin/secret ollama M5_TLS_API_KEY)" \
   "$CADDY" validate --config "$SERVICE_DIR/Caddyfile" --adapter caddyfile
 
 # Deploy only after the source configuration has validated successfully.
