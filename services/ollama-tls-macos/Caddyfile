@@ -1,0 +1,21 @@
+{
+	admin off
+	auto_https disable_redirects
+	email me@anit.guru
+}
+
+https://ollama-lan.anit.guru:11435 {
+	# Bind only to this Mac's LAN address. The existing Ollama HTTP listener on
+	# port 11434 remains unchanged.
+	bind 10.0.10.210
+
+	tls {
+		dns bunny {env.BUNNY_API_KEY}
+		resolvers 1.1.1.1 8.8.8.8
+	}
+
+	reverse_proxy 127.0.0.1:11434 {
+		# Ollama is strict about unexpected vanity Host headers in some paths.
+		header_up Host 127.0.0.1:11434
+	}
+}
