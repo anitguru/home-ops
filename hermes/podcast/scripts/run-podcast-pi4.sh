@@ -16,7 +16,11 @@ PY="$HOME_OPS/.venv/bin/python"
 SECRET=/home/pi/.local/bin/secret
 CHAT_ID=8100669692
 DRY_RUN="${DRY_RUN:-0}"
-export SCRIPT_MODEL="${SCRIPT_MODEL:-claude-opus-4-8}"
+# --- script LLM: swap provider/model here. FALLBACK = set these back to
+#     claude / claude-opus-4-8 (or run with SCRIPT_PROVIDER=claude override). ---
+export SCRIPT_PROVIDER="${SCRIPT_PROVIDER:-ollama}"        # claude | ollama
+export SCRIPT_MODEL="${SCRIPT_MODEL:-glm-5.2}"             # claude-opus-4-8 | glm-5.2
+export OLLAMA_CLOUD_API_KEY="${OLLAMA_CLOUD_API_KEY:-$($SECRET ollama CLOUD_API_KEY)}"
 
 TODAY=$(date +%F)
 DAY_NAME=$(date +%A)

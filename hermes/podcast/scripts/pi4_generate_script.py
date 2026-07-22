@@ -82,12 +82,51 @@ def validate(text: str) -> list[str]:
     return errs
 
 
-def gen(prompt: str, model: str) -> str:
+OLLAMA_CLOUD_URL = "https://ollama.com/v1/chat/completions"
+
+
+def _ollama_key() -> str:
+    k = os.environ.get("OLLAMA_CLOUD_API_KEY")
+    if k:
+        return k.strip()
+    r = subprocess.run(["secret", "ollama", "CLOUD_API_KEY"],
+                       capture_output=True, text=True, timeout=30)
+    if r.returncode != 0:
+        raise RuntimeError(f"secret ollama CLOUD_API_KEY failed: {r.stderr.strip()[:200]}")
+    return r.stdout.strip()
+
+
+def gen_claude(prompt: str, model: str) -> str:
     r = subprocess.run(["claude", "-p", prompt, "--model", model],
                        capture_output=True, text=True, timeout=300)
     if r.returncode != 0:
         raise RuntimeError(f"claude -p exited {r.returncode}: {r.stderr.strip()[:300]}")
     return r.stdout.strip()
+
+
+def gen_ollama(prompt: str, model: str) -> str:
+    import urllib.request
+    body = json.dumps({
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "stream": False,
+    }).encode()
+    req = urllib.request.Request(OLLAMA_CLOUD_URL, data=body, headers={
+        "Authorization": f"Bearer {_ollama_key()}",
+        "Content-Type": "application/json",
+    })
+    with urllib.request.urlopen(req, timeout=300) as resp:
+        data = json.loads(resp.read())
+    return data["choices"][0]["message"]["content"].strip()
+
+
+def gen(prompt: str, model: str) -> str:
+    # Provider switch: SCRIPT_PROVIDER=claude (default) | ollama.
+    # Fallback = flip SCRIPT_PROVIDER/SCRIPT_MODEL back to claude in the runner.
+    provider = os.environ.get("SCRIPT_PROVIDER", "claude").lower()
+    if provider == "ollama":
+        return gen_ollama(prompt, model)
+    return gen_claude(prompt, model)
 
 
 def main() -> int:
