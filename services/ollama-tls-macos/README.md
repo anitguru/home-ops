@@ -20,7 +20,7 @@ The exact Bunny DNS `A` record overrides the public wildcard/front-door record a
 - The HTTPS Bearer token remains under `ollama.M5_TLS_API_KEY` in SOPS and is loaded only when the LaunchAgent starts.
 - No API key is committed to this repository or written to the LaunchAgent plist. Caddy removes the `Authorization` header before proxying to Ollama.
 - This adds transport encryption and Bearer-token authentication on port `11435`. The existing unauthenticated Ollama listener on port `11434` is unchanged.
-- The PR60X currently permits the work Mac to reach both `11434` and `11435`; therefore `11434` remains an intentional authentication bypass until that router rule is narrowed to TLS-only.
+- The PR60X rule for work Mac `10.0.60.205` permits only TCP `11435`; direct `11434` is not exposed through that inter-VLAN rule. Local apps continue using `127.0.0.1:11434`.
 
 ## Pinned build
 
