@@ -190,9 +190,30 @@ def candidates(cfg: dict[str, Any]) -> list[Path]:
     return sorted(found, key=lambda item: item.stat().st_mtime)
 
 
-def run(config_path: Path, max_items: int | None = None) -> int:
+def run(
+    config_path: Path,
+    max_items: int | None = None,
+    source_root: Path | None = None,
+    include_opaque_ids: bool = False,
+) -> int:
     cfg = load_config(config_path)
     local = cfg.get("local_naming", {})
+    if source_root is not None:
+        root = source_root.expanduser().resolve()
+        cfg["allow_roots"] = [
+            {
+                "path": str(root),
+                "clean_root": False,
+                "move_directories": False,
+                "rename_in_place_only": True,
+            }
+        ]
+        local["rename_in_place_only"] = True
+    if include_opaque_ids:
+        patterns = local.setdefault("generic_name_patterns", [])
+        opaque_pattern = r"^[A-Za-z0-9_-]{8,24}$"
+        if opaque_pattern not in patterns:
+            patterns.append(opaque_pattern)
     limit = max_items if max_items is not None else int(local.get("max_items", 12))
     stamp = now_stamp()
     proposal_dir = Path(cfg["proposal_dir"]).expanduser()
@@ -234,23 +255,32 @@ def run(config_path: Path, max_items: int | None = None) -> int:
             handle.write(json.dumps(row, sort_keys=True) + "\n")
 
     threshold = float(cfg.get("proposal_confidence_threshold", 0.92))
-    accepted = sum(
-        1
-        for row in rows
-        if (
-            row["destination_key"] == "resource:review"
-            and bool(local.get("auto_apply_review", False))
-            and float(row["name_confidence"])
-            >= float(local.get("review_name_confidence_threshold", 0.90))
-            and float(row["destination_confidence"])
-            >= float(local.get("review_destination_confidence_threshold", 0.75))
+    if local.get("rename_in_place_only"):
+        accepted = sum(
+            float(row["name_confidence"])
+            >= float(local.get("rename_name_confidence_threshold", 0.50))
+            for row in rows
         )
-        or (
-            row["destination_key"] != "resource:review"
-            and float(row["name_confidence"]) >= threshold
-            and float(row["destination_confidence"]) >= threshold
+    else:
+        accepted = sum(
+            1
+            for row in rows
+            if (
+                (
+                    row["destination_key"] == "resource:review"
+                    and bool(local.get("auto_apply_review", False))
+                    and float(row["name_confidence"])
+                    >= float(local.get("review_name_confidence_threshold", 0.90))
+                    and float(row["destination_confidence"])
+                    >= float(local.get("review_destination_confidence_threshold", 0.75))
+                )
+                or (
+                    row["destination_key"] != "resource:review"
+                    and float(row["name_confidence"]) >= threshold
+                    and float(row["destination_confidence"]) >= threshold
+                )
+            )
         )
-    )
     review = len(rows) - accepted
     lines = [
         f"# Local PARA naming prep — {stamp}",
@@ -296,8 +326,19 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default=str(CONFIG_PATH))
     parser.add_argument("--max-items", type=int)
+    parser.add_argument("--root", type=Path, help="scan only immediate children of this root")
+    parser.add_argument(
+        "--include-opaque-ids",
+        action="store_true",
+        help="treat short social/CDN-style opaque image IDs as generic names",
+    )
     args = parser.parse_args()
-    return run(Path(args.config).expanduser(), args.max_items)
+    return run(
+        Path(args.config).expanduser(),
+        args.max_items,
+        args.root,
+        args.include_opaque_ids,
+    )
 
 
 if __name__ == "__main__":

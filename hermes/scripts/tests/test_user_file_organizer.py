@@ -201,6 +201,36 @@ def test_changed_file_proposal_is_rejected(tmp_path: Path):
     assert ufo.validate_proposal(src, proposal, cfg) is None
 
 
+def test_validated_name_can_be_used_for_in_place_review_rename(tmp_path: Path):
+    cfg = base_cfg(tmp_path)
+    src = Path(cfg["user_home"]) / "Desktop" / "HMeT1hYWIAAGtHA.jpg"
+    write_old(src, b"image")
+    proposal = {
+        "source": str(src),
+        "sha256": ufo.sha256(src),
+        "size": src.stat().st_size,
+        "mtime": src.stat().st_mtime,
+        "name_confidence": 0.95,
+        "destination_confidence": 0.2,
+        "destination_key": "resource:review",
+        "suggested_name": "woman-braiding-hair-with-book.jpg",
+    }
+    assert ufo.validated_proposal_name(src, proposal, 0.5) == (
+        "woman-braiding-hair-with-book.jpg"
+    )
+
+
+def test_in_place_action_cannot_escape_source_directory(tmp_path: Path):
+    cfg = base_cfg(tmp_path)
+    src = Path(cfg["user_home"]) / "Desktop" / "opaque.jpg"
+    write_old(src, b"image")
+    safe = src.with_name("descriptive.jpg")
+    assert ufo.apply_action(src, safe, True, cfg, allow_in_place=True) == safe
+    escaped = Path(cfg["user_home"]) / "Downloads" / "escaped.jpg"
+    with pytest.raises(ValueError, match="escaped source root"):
+        ufo.apply_action(src, escaped, True, cfg, allow_in_place=True)
+
+
 def test_allowlisted_project_proposal_routes_to_incoming(tmp_path: Path):
     cfg = base_cfg(tmp_path)
     src = Path(cfg["user_home"]) / "Desktop" / "Screenshot 1.png"
@@ -295,3 +325,37 @@ def test_main_dry_run_writes_manifest_without_moving(
     summary = json.loads(capsys.readouterr().out)
     assert summary["counts"]["planned"] == 1
     assert Path(summary["manifest"]).exists()
+
+
+def test_rename_root_applies_fingerprinted_name_in_place(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    cfg = base_cfg(tmp_path)
+    cfg["local_naming"]["rename_name_confidence_threshold"] = 0.5
+    stash = Path(cfg["user_home"]) / "Pictures" / "stash"
+    src = stash / "HMeT1hYWIAAGtHA.jpg"
+    write_old(src, b"image")
+    proposal_dir = Path(cfg["proposal_dir"])
+    proposal_dir.mkdir(parents=True)
+    proposal = {
+        "source": str(src),
+        "sha256": ufo.sha256(src),
+        "size": src.stat().st_size,
+        "mtime": src.stat().st_mtime,
+        "name_confidence": 0.6,
+        "destination_confidence": 0.0,
+        "destination_key": "resource:review",
+        "suggested_name": "woman-braiding-hair-with-book.jpg",
+    }
+    (proposal_dir / "proposal.jsonl").write_text(json.dumps(proposal) + "\n")
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps(cfg))
+
+    rc = ufo.run(config_path=config_path, mode="apply", rename_root=stash)
+
+    assert rc == 0
+    assert not src.exists()
+    assert (stash / "woman-braiding-hair-with-book.jpg").exists()
+    summary = json.loads(capsys.readouterr().out)
+    assert summary["counts"]["renamed"] == 1
+    assert summary["counts"]["moved"] == 0

@@ -239,7 +239,11 @@ def proposal_destination(key: str, cfg: dict[str, Any]) -> Path | None:
     return None
 
 
-def validate_proposal(path: Path, proposal: dict[str, Any], cfg: dict[str, Any]) -> Path | None:
+def validated_proposal_name(
+    path: Path,
+    proposal: dict[str, Any],
+    min_name_confidence: float = 0.0,
+) -> str | None:
     try:
         stat = path.stat()
         if int(proposal.get("size", -1)) != stat.st_size:
@@ -247,6 +251,19 @@ def validate_proposal(path: Path, proposal: dict[str, Any], cfg: dict[str, Any])
         if abs(float(proposal.get("mtime", -1)) - stat.st_mtime) > 0.001:
             return None
         if path.is_file() and proposal.get("sha256") != sha256(path):
+            return None
+        name_confidence = float(proposal.get("name_confidence", proposal.get("confidence", 0)))
+        if name_confidence < min_name_confidence:
+            return None
+        return sanitize_suggested_name(str(proposal.get("suggested_name", "")), path)
+    except (OSError, TypeError, ValueError):
+        return None
+
+
+def validate_proposal(path: Path, proposal: dict[str, Any], cfg: dict[str, Any]) -> Path | None:
+    try:
+        name = validated_proposal_name(path, proposal)
+        if not name:
             return None
         key = str(proposal.get("destination_key", ""))
         naming = cfg.get("local_naming", {})
@@ -267,7 +284,6 @@ def validate_proposal(path: Path, proposal: dict[str, Any], cfg: dict[str, Any])
             threshold = float(cfg.get("proposal_confidence_threshold", 0.92))
             if name_confidence < threshold or destination_confidence < threshold:
                 return None
-        name = sanitize_suggested_name(str(proposal.get("suggested_name", "")), path)
         base = proposal_destination(key, cfg)
         if not name or base is None:
             return None
@@ -314,10 +330,19 @@ def iter_candidates(root_cfg: dict[str, Any]):
         yield item
 
 
-def apply_action(src: Path, dst: Path, dry_run: bool, cfg: dict[str, Any]) -> Path:
+def apply_action(
+    src: Path,
+    dst: Path,
+    dry_run: bool,
+    cfg: dict[str, Any],
+    allow_in_place: bool = False,
+) -> Path:
     if not source_is_allowed(src, cfg):
         raise ValueError(f"source escaped allowlist: {src}")
-    if not destination_is_allowed(dst, cfg):
+    if allow_in_place:
+        if src.parent.resolve() != dst.parent.resolve() or not source_is_allowed(dst, cfg):
+            raise ValueError(f"in-place rename escaped source root: {dst}")
+    elif not destination_is_allowed(dst, cfg):
         raise ValueError(f"destination escaped allowlist: {dst}")
     final = collision_safe(dst)
     if not dry_run:
@@ -346,7 +371,7 @@ def write_artifacts(
     lines.extend(f"- {key}: {value}" for key, value in counts.items())
     lines.extend(["", "## Actions", ""])
     for row in rows:
-        if row.get("action") in {"move", "trash", "report", "blocked", "error"}:
+        if row.get("action") in {"move", "rename", "trash", "report", "blocked", "error"}:
             lines.append(
                 f"- {row.get('action')} `{row.get('source')}` → "
                 f"`{row.get('destination', '')}` ({row.get('reason', row.get('error', ''))})"
@@ -356,8 +381,22 @@ def write_artifacts(
     return manifest_path, report_path
 
 
-def run(config_path: Path = CONFIG_PATH, mode: str | None = None) -> int:
+def run(
+    config_path: Path = CONFIG_PATH,
+    mode: str | None = None,
+    rename_root: Path | None = None,
+) -> int:
     cfg = load_config(config_path)
+    if rename_root is not None:
+        root = rename_root.expanduser().resolve()
+        cfg["allow_roots"] = [
+            {
+                "path": str(root),
+                "clean_root": False,
+                "move_directories": False,
+                "rename_in_place_only": True,
+            }
+        ]
     selected_mode = mode or cfg.get("mode", "dry-run")
     dry_run = selected_mode != "apply"
     stamp = now_stamp()
@@ -366,6 +405,7 @@ def run(config_path: Path = CONFIG_PATH, mode: str | None = None) -> int:
         "ignored": 0,
         "planned": 0,
         "moved": 0,
+        "renamed": 0,
         "trashed": 0,
         "reported": 0,
         "blocked": 0,
@@ -398,8 +438,26 @@ def run(config_path: Path = CONFIG_PATH, mode: str | None = None) -> int:
                 stat = path.stat()
                 fingerprint = sha256(path) if path.is_file() else None
                 proposal = proposals.get(str(path))
-                proposed_destination = validate_proposal(path, proposal, cfg) if proposal else None
-                action, destination, reason = deterministic_classify(path, root_cfg, cfg)
+                if root_cfg.get("rename_in_place_only"):
+                    threshold = float(
+                        cfg.get("local_naming", {}).get("rename_name_confidence_threshold", 0.50)
+                    )
+                    proposed_name = (
+                        validated_proposal_name(path, proposal, threshold) if proposal else None
+                    )
+                    if proposed_name:
+                        action, destination, reason = (
+                            "rename",
+                            path.with_name(proposed_name),
+                            "validated-local-image-name",
+                        )
+                        counts["proposal_used"] += 1
+                    else:
+                        action, destination, reason = "report", None, "no-valid-rename-proposal"
+                    proposed_destination = None
+                else:
+                    proposed_destination = validate_proposal(path, proposal, cfg) if proposal else None
+                    action, destination, reason = deterministic_classify(path, root_cfg, cfg)
                 generic_reasons = {
                     "screenshots",
                     "images",
@@ -410,7 +468,11 @@ def run(config_path: Path = CONFIG_PATH, mode: str | None = None) -> int:
                     "fallback-clean-root",
                     "unmatched",
                 }
-                if proposed_destination is not None and action != "trash":
+                if (
+                    not root_cfg.get("rename_in_place_only")
+                    and proposed_destination is not None
+                    and action != "trash"
+                ):
                     if action == "move" and destination is not None and reason not in generic_reasons:
                         destination = destination.parent / proposed_destination.name
                         reason = f"{reason}+validated-local-name"
@@ -432,15 +494,26 @@ def run(config_path: Path = CONFIG_PATH, mode: str | None = None) -> int:
                         "dry_run": dry_run,
                     }
                 )
-                if action in {"move", "trash"} and destination is not None:
+                if action in {"move", "rename", "trash"} and destination is not None:
                     if action_count >= max_actions:
                         counts["blocked"] += 1
                         record.update({"action": "blocked", "reason": f"action-cap-{max_actions}"})
                     else:
-                        final = apply_action(path, destination, dry_run, cfg)
+                        final = apply_action(
+                            path,
+                            destination,
+                            dry_run,
+                            cfg,
+                            allow_in_place=action == "rename",
+                        )
                         action_count += 1
                         counts["planned"] += 1
-                        counts["moved" if action == "move" else "trashed"] += 1
+                        count_key = {
+                            "move": "moved",
+                            "rename": "renamed",
+                            "trash": "trashed",
+                        }[action]
+                        counts[count_key] += 1
                         record["destination"] = str(final)
                 else:
                     counts["reported"] += 1
@@ -467,9 +540,14 @@ def main() -> int:
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--dry-run", action="store_true", help="plan only")
     modes.add_argument("--apply", action="store_true", help="apply bounded validated actions")
+    parser.add_argument(
+        "--rename-root",
+        type=Path,
+        help="rename validated proposal files in place within this immediate-child root",
+    )
     args = parser.parse_args()
     mode = "dry-run" if args.dry_run else ("apply" if args.apply else None)
-    return run(Path(args.config).expanduser(), mode)
+    return run(Path(args.config).expanduser(), mode, args.rename_root)
 
 
 if __name__ == "__main__":

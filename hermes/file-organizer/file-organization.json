@@ -92,6 +92,7 @@
     "auto_apply_review": false,
     "review_name_confidence_threshold": 0.9,
     "review_destination_confidence_threshold": 0.75,
+    "rename_name_confidence_threshold": 0.5,
     "extensions": ["png", "jpg", "jpeg", "webp"],
     "generic_name_patterns": [
       "^Screenshot ", "^Screen Shot ", "^IMG_[0-9]+", "^Image ",
