@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Daily user-file organizer for Ace.
+"""Bounded PARA-aware root-level file maintenance for SVA's Mac.
 
-Scope is intentionally narrow: root-level files only in configured user folders.
-Never touches system locations, hidden files, subfolder contents, git repos, or fresh files.
-Writes JSONL manifest and Markdown report for audit/rollback.
+A local model may write proposals, but this script alone owns mutations. Every
+proposal is revalidated against source fingerprints, confidence, filename, and
+destination allowlists before use. Ambiguous files follow deterministic rules
+into 03-Resources/File Intake. Nothing is permanently deleted.
 """
 from __future__ import annotations
 
@@ -11,20 +12,22 @@ import argparse
 import datetime as dt
 import hashlib
 import json
-import os
+import re
 import shutil
-import sys
 from pathlib import Path
 from typing import Any
 
-CONFIG_PATH = Path("/Users/sva/File Inbox/file-organization.json")
-USER_HOME = Path("/Users/sva").resolve()
-TRASH = USER_HOME / ".Trash"
+CONFIG_PATH = Path(__file__).resolve().parents[1] / "file-organizer" / "file-organization.json"
 
 
 def load_config(path: Path) -> dict[str, Any]:
-    with path.open("r", encoding="utf-8") as f:
-        return json.load(f)
+    with path.open("r", encoding="utf-8") as handle:
+        cfg = json.load(handle)
+    required = {"user_home", "manifest_dir", "report_dir", "allow_roots", "rules", "para"}
+    missing = sorted(required - set(cfg))
+    if missing:
+        raise ValueError(f"missing config keys: {', '.join(missing)}")
+    return cfg
 
 
 def now_stamp() -> str:
@@ -32,18 +35,18 @@ def now_stamp() -> str:
 
 
 def sha256(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def is_under(path: Path, root: Path) -> bool:
     try:
         path.resolve().relative_to(root.resolve())
         return True
-    except ValueError:
+    except (ValueError, OSError):
         return False
 
 
@@ -51,13 +54,12 @@ def collision_safe(dest: Path) -> Path:
     if not dest.exists():
         return dest
     stem, suffix = dest.stem, dest.suffix
-    parent = dest.parent
-    i = 1
+    index = 1
     while True:
-        candidate = parent / f"{stem} ({i}){suffix}"
+        candidate = dest.parent / f"{stem} ({index}){suffix}"
         if not candidate.exists():
             return candidate
-        i += 1
+        index += 1
 
 
 def file_ext(path: Path) -> str:
@@ -71,165 +73,403 @@ def fresh(path: Path, min_age_minutes: int) -> bool:
     return age_seconds < min_age_minutes * 60
 
 
-def should_skip(path: Path, cfg: dict[str, Any], root_cfg: dict[str, Any] | None = None) -> tuple[bool, str]:
+def user_home(cfg: dict[str, Any]) -> Path:
+    return Path(cfg["user_home"]).expanduser().resolve()
+
+
+def trash_root(cfg: dict[str, Any]) -> Path:
+    return user_home(cfg) / ".Trash"
+
+
+def allowed_source_roots(cfg: dict[str, Any]) -> list[Path]:
+    return [Path(root["path"]).expanduser().resolve() for root in cfg.get("allow_roots", [])]
+
+
+def allowed_destination_roots(cfg: dict[str, Any]) -> list[Path]:
+    para = cfg.get("para", {})
+    roots = [Path(path).expanduser().resolve() for path in para.get("resource_destinations", {}).values()]
+    for item in para.get("allowed_projects", {}).values():
+        roots.append(Path(item["path"]).expanduser().resolve())
+    for item in para.get("allowed_areas", {}).values():
+        path = item["path"] if isinstance(item, dict) else item
+        roots.append(Path(path).expanduser().resolve())
+    roots.append(trash_root(cfg).resolve())
+    return roots
+
+
+def source_is_allowed(path: Path, cfg: dict[str, Any]) -> bool:
+    resolved = path.resolve()
+    return any(is_under(resolved, root) for root in allowed_source_roots(cfg))
+
+
+def destination_is_allowed(path: Path, cfg: dict[str, Any]) -> bool:
+    resolved_parent = path.parent.resolve()
+    return any(resolved_parent == root or is_under(resolved_parent, root) for root in allowed_destination_roots(cfg))
+
+
+def should_skip(
+    path: Path, cfg: dict[str, Any], root_cfg: dict[str, Any] | None = None
+) -> tuple[bool, str]:
     name = path.name
     if name in set(cfg.get("never_touch_names", [])):
         return True, "never-touch-name"
     if name.startswith("."):
         return True, "hidden-dotfile"
-    resolved = path.resolve()
-    if not is_under(resolved, USER_HOME):
+    try:
+        resolved = path.resolve(strict=True)
+    except OSError:
+        return True, "unresolvable-source"
+    if not is_under(resolved, user_home(cfg)):
         return True, "outside-user-home"
-    for p in cfg.get("never_touch_paths", []):
-        never = Path(p).expanduser()
-        if resolved == never.resolve() or is_under(resolved, never):
-            return True, f"never-touch-path:{never}"
+    if not source_is_allowed(resolved, cfg):
+        return True, "outside-allowed-source-roots"
+    for raw in cfg.get("never_touch_paths", []):
+        protected = Path(raw).expanduser()
+        try:
+            protected_resolved = protected.resolve()
+        except OSError:
+            protected_resolved = protected.absolute()
+        if resolved == protected_resolved or is_under(resolved, protected_resolved):
+            return True, f"never-touch-path:{protected}"
+    if path.is_symlink():
+        return True, "symlink"
     if path.is_dir():
         if (path / ".git").exists():
             return True, "git-repo"
-        # Root-level directories are only moved for roots that explicitly request it
-        # (Desktop: yes; Documents/Pictures/Movies/Downloads: no by default).
         if file_ext(path) != "app" and not (root_cfg or {}).get("move_directories", False):
             return True, "directory"
     return False, ""
 
 
-def match_rule(path: Path, root: Path, cfg: dict[str, Any]) -> dict[str, Any] | None:
+def rule_applies_to_root(rule: dict[str, Any], path: Path) -> bool:
+    roots = [Path(raw).expanduser().resolve() for raw in rule.get("roots", [])]
+    return not roots or any(is_under(path.resolve(), root) for root in roots)
+
+
+def match_rule(path: Path, cfg: dict[str, Any]) -> dict[str, Any] | None:
     ext = file_ext(path)
     name = path.name
     for rule in cfg.get("rules", []):
-        only_under = rule.get("only_under")
-        if only_under and not is_under(path, Path(only_under)):
+        if not rule_applies_to_root(rule, path):
             continue
-        exts = set(e.lower().lstrip(".") for e in rule.get("extensions", []))
+        kinds = set(rule.get("kinds", []))
+        kind = "directory" if path.is_dir() else "file"
+        if kinds and kind not in kinds:
+            continue
+        extensions = {item.lower().lstrip(".") for item in rule.get("extensions", [])}
         prefixes = tuple(rule.get("filename_prefixes", []))
-        ext_ok = not exts or ext in exts
+        patterns = tuple(rule.get("filename_patterns", []))
+        ext_ok = not extensions or ext in extensions
         prefix_ok = not prefixes or name.startswith(prefixes)
-        if ext_ok and prefix_ok:
+        pattern_ok = not patterns or any(re.search(pattern, name, re.IGNORECASE) for pattern in patterns)
+        if ext_ok and prefix_ok and pattern_ok:
             return rule
     return None
 
 
-def classify(path: Path, root_cfg: dict[str, Any], cfg: dict[str, Any]) -> tuple[str, Path | None, str]:
-    rule = match_rule(path, Path(root_cfg["path"]), cfg)
+def resource_destination(key: str, cfg: dict[str, Any]) -> Path | None:
+    raw = cfg.get("para", {}).get("resource_destinations", {}).get(key)
+    return Path(raw).expanduser() if raw else None
+
+
+def deterministic_classify(
+    path: Path, root_cfg: dict[str, Any], cfg: dict[str, Any]
+) -> tuple[str, Path | None, str]:
+    rule = match_rule(path, cfg)
     if rule:
         if rule.get("action") == "trash":
-            return "trash", TRASH / path.name, rule["name"]
-        return "move", Path(rule["destination"]) / path.name, rule["name"]
+            return "trash", trash_root(cfg) / path.name, rule["name"]
+        key = rule.get("destination_key")
+        destination = (
+            proposal_destination(str(key), cfg)
+            if key and ":" in str(key)
+            else resource_destination(str(key), cfg)
+        )
+        if not key:
+            destination = Path(rule["destination"]).expanduser()
+        if destination is None:
+            return "report", None, f"missing-destination:{key}"
+        return "move", destination / path.name, rule["name"]
+    if path.is_dir():
+        return "report", None, "unmatched-directory"
     if root_cfg.get("clean_root"):
-        return "move", Path(root_cfg["fallback"]) / path.name, "fallback-clean-root"
+        key = root_cfg.get("fallback_key")
+        destination = resource_destination(key, cfg) if key else None
+        if destination:
+            return "move", destination / path.name, "fallback-clean-root"
     return "report", None, "unmatched"
+
+
+def sanitize_suggested_name(raw: str, original: Path) -> str | None:
+    raw = Path(str(raw)).name.strip()
+    if not raw or raw in {".", ".."} or raw.startswith("."):
+        return None
+    original_suffix = original.suffix.lower()
+    supplied_suffix = Path(raw).suffix.lower()
+    stem = Path(raw).stem if supplied_suffix else raw
+    stem = stem.lower()
+    stem = re.sub(r"[^a-z0-9]+", "-", stem).strip("-")
+    stem = re.sub(r"-{2,}", "-", stem)
+    if len(stem) < 4 or len(stem) > 100:
+        return None
+    suffix = original_suffix or supplied_suffix
+    if supplied_suffix and original_suffix and supplied_suffix != original_suffix:
+        return None
+    return f"{stem}{suffix}"
+
+
+def proposal_destination(key: str, cfg: dict[str, Any]) -> Path | None:
+    if key.startswith("resource:"):
+        return resource_destination(key.split(":", 1)[1], cfg)
+    if key.startswith("project:"):
+        project_key = key.split(":", 1)[1]
+        project = cfg.get("para", {}).get("allowed_projects", {}).get(project_key)
+        if not project:
+            return None
+        root = Path(project["path"]).expanduser()
+        return root / project.get("incoming_subdir", "Incoming")
+    if key.startswith("area:"):
+        area_key = key.split(":", 1)[1]
+        area = cfg.get("para", {}).get("allowed_areas", {}).get(area_key)
+        if not area:
+            return None
+        if isinstance(area, dict):
+            return Path(area["path"]).expanduser() / area.get("incoming_subdir", "Incoming")
+        return Path(area).expanduser() / "Incoming"
+    return None
+
+
+def validate_proposal(path: Path, proposal: dict[str, Any], cfg: dict[str, Any]) -> Path | None:
+    try:
+        stat = path.stat()
+        if int(proposal.get("size", -1)) != stat.st_size:
+            return None
+        if abs(float(proposal.get("mtime", -1)) - stat.st_mtime) > 0.001:
+            return None
+        if path.is_file() and proposal.get("sha256") != sha256(path):
+            return None
+        key = str(proposal.get("destination_key", ""))
+        naming = cfg.get("local_naming", {})
+        name_confidence = float(proposal.get("name_confidence", proposal.get("confidence", 0)))
+        destination_confidence = float(
+            proposal.get("destination_confidence", proposal.get("confidence", 0))
+        )
+        if key == "resource:review":
+            if not bool(naming.get("auto_apply_review", False)):
+                return None
+            if name_confidence < float(naming.get("review_name_confidence_threshold", 0.90)):
+                return None
+            if destination_confidence < float(
+                naming.get("review_destination_confidence_threshold", 0.75)
+            ):
+                return None
+        else:
+            threshold = float(cfg.get("proposal_confidence_threshold", 0.92))
+            if name_confidence < threshold or destination_confidence < threshold:
+                return None
+        name = sanitize_suggested_name(str(proposal.get("suggested_name", "")), path)
+        base = proposal_destination(key, cfg)
+        if not name or base is None:
+            return None
+        destination = base / name
+        if not destination_is_allowed(destination, cfg):
+            return None
+        return destination
+    except (OSError, TypeError, ValueError):
+        return None
+
+
+def load_latest_proposals(cfg: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    proposal_dir = Path(cfg.get("proposal_dir", "")).expanduser()
+    if not proposal_dir.exists():
+        return {}
+    files = sorted(proposal_dir.glob("*.jsonl"), key=lambda path: path.stat().st_mtime, reverse=True)
+    if not files:
+        return {}
+    newest = files[0]
+    max_age = float(cfg.get("proposal_max_age_hours", 24)) * 3600
+    if dt.datetime.now().timestamp() - newest.stat().st_mtime > max_age:
+        return {}
+    proposals: dict[str, dict[str, Any]] = {}
+    for line in newest.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        source = row.get("source")
+        if source:
+            proposals[str(Path(source).expanduser())] = row
+    return proposals
 
 
 def iter_candidates(root_cfg: dict[str, Any]):
     root = Path(root_cfg["path"]).expanduser()
-    if not root.exists():
+    if not root.exists() or not root.is_dir():
         return
     for item in root.iterdir():
+        if root_cfg.get("loose_files_only") and not item.is_file():
+            continue
         yield item
 
 
-def apply_action(src: Path, dst: Path, dry_run: bool) -> Path:
-    dst = collision_safe(dst)
+def apply_action(src: Path, dst: Path, dry_run: bool, cfg: dict[str, Any]) -> Path:
+    if not source_is_allowed(src, cfg):
+        raise ValueError(f"source escaped allowlist: {src}")
+    if not destination_is_allowed(dst, cfg):
+        raise ValueError(f"destination escaped allowlist: {dst}")
+    final = collision_safe(dst)
     if not dry_run:
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(src), str(dst))
-    return dst
+        final.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(src), str(final))
+    return final
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--config", default=str(CONFIG_PATH))
-    ap.add_argument("--dry-run", action="store_true", help="Report only; overrides config mode")
-    ap.add_argument("--apply", action="store_true", help="Apply; overrides config mode")
-    args = ap.parse_args()
-
-    cfg = load_config(Path(args.config))
-    mode = cfg.get("mode", "dry-run")
-    if args.dry_run:
-        mode = "dry-run"
-    if args.apply:
-        mode = "apply"
-    dry_run = mode != "apply"
-
-    stamp = now_stamp()
-    manifest_dir = Path(cfg["manifest_dir"])
-    report_dir = Path(cfg["report_dir"])
+def write_artifacts(
+    stamp: str,
+    mode: str,
+    counts: dict[str, int],
+    rows: list[dict[str, Any]],
+    cfg: dict[str, Any],
+) -> tuple[Path, Path]:
+    manifest_dir = Path(cfg["manifest_dir"]).expanduser()
+    report_dir = Path(cfg["report_dir"]).expanduser()
     manifest_dir.mkdir(parents=True, exist_ok=True)
     report_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = manifest_dir / f"{stamp}.jsonl"
     report_path = report_dir / f"{stamp}.md"
+    with manifest_path.open("w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, sort_keys=True) + "\n")
+    lines = [f"# PARA file maintenance — {stamp}", "", f"Mode: `{mode}`", "", "## Counts", ""]
+    lines.extend(f"- {key}: {value}" for key, value in counts.items())
+    lines.extend(["", "## Actions", ""])
+    for row in rows:
+        if row.get("action") in {"move", "trash", "report", "blocked", "error"}:
+            lines.append(
+                f"- {row.get('action')} `{row.get('source')}` → "
+                f"`{row.get('destination', '')}` ({row.get('reason', row.get('error', ''))})"
+            )
+    lines.extend(["", f"Manifest: `{manifest_path}`", ""])
+    report_path.write_text("\n".join(lines), encoding="utf-8")
+    return manifest_path, report_path
 
-    counts = {"scanned": 0, "ignored": 0, "moved": 0, "trashed": 0, "reported": 0, "errors": 0}
+
+def run(config_path: Path = CONFIG_PATH, mode: str | None = None) -> int:
+    cfg = load_config(config_path)
+    selected_mode = mode or cfg.get("mode", "dry-run")
+    dry_run = selected_mode != "apply"
+    stamp = now_stamp()
+    counts = {
+        "scanned": 0,
+        "ignored": 0,
+        "planned": 0,
+        "moved": 0,
+        "trashed": 0,
+        "reported": 0,
+        "blocked": 0,
+        "proposal_used": 0,
+        "errors": 0,
+    }
     rows: list[dict[str, Any]] = []
+    proposals = load_latest_proposals(cfg)
     min_age = int(cfg.get("min_age_minutes", 60))
+    max_actions = int(cfg.get("max_auto_actions", 40))
+    action_count = 0
 
     for root_cfg in cfg.get("allow_roots", []):
         for path in iter_candidates(root_cfg) or []:
             counts["scanned"] += 1
-            rec: dict[str, Any] = {"source": str(path), "root": root_cfg["path"], "time": stamp}
+            record: dict[str, Any] = {"source": str(path), "root": root_cfg["path"], "time": stamp}
             try:
                 skip, reason = should_skip(path, cfg, root_cfg)
                 if skip:
                     counts["ignored"] += 1
-                    rec.update({"action": "ignore", "reason": reason})
-                    rows.append(rec)
+                    record.update({"action": "ignore", "reason": reason})
+                    rows.append(record)
                     continue
                 if fresh(path, min_age):
                     counts["ignored"] += 1
-                    rec.update({"action": "ignore", "reason": f"fresh-under-{min_age}m"})
-                    rows.append(rec)
+                    record.update({"action": "ignore", "reason": f"fresh-under-{min_age}m"})
+                    rows.append(record)
                     continue
 
-                action, dest, reason = classify(path, root_cfg, cfg)
-                rec.update({
-                    "action": action,
-                    "reason": reason,
-                    "size": path.stat().st_size if path.is_file() else None,
-                    "mtime": path.stat().st_mtime,
-                    "sha256": sha256(path) if path.is_file() else None,
-                })
-                if action == "move" and dest:
-                    final = apply_action(path, dest, dry_run)
-                    counts["moved"] += 1
-                    rec.update({"destination": str(final), "dry_run": dry_run})
-                elif action == "trash" and dest:
-                    final = apply_action(path, dest, dry_run)
-                    counts["trashed"] += 1
-                    rec.update({"destination": str(final), "dry_run": dry_run})
+                stat = path.stat()
+                fingerprint = sha256(path) if path.is_file() else None
+                proposal = proposals.get(str(path))
+                proposed_destination = validate_proposal(path, proposal, cfg) if proposal else None
+                action, destination, reason = deterministic_classify(path, root_cfg, cfg)
+                generic_reasons = {
+                    "screenshots",
+                    "images",
+                    "documents",
+                    "archives",
+                    "media",
+                    "code-config-snippets",
+                    "fallback-clean-root",
+                    "unmatched",
+                }
+                if proposed_destination is not None and action != "trash":
+                    if action == "move" and destination is not None and reason not in generic_reasons:
+                        destination = destination.parent / proposed_destination.name
+                        reason = f"{reason}+validated-local-name"
+                    else:
+                        action, destination, reason = (
+                            "move",
+                            proposed_destination,
+                            "validated-local-model-proposal",
+                        )
+                    counts["proposal_used"] += 1
+
+                record.update(
+                    {
+                        "action": action,
+                        "reason": reason,
+                        "size": stat.st_size if path.is_file() else None,
+                        "mtime": stat.st_mtime,
+                        "sha256": fingerprint,
+                        "dry_run": dry_run,
+                    }
+                )
+                if action in {"move", "trash"} and destination is not None:
+                    if action_count >= max_actions:
+                        counts["blocked"] += 1
+                        record.update({"action": "blocked", "reason": f"action-cap-{max_actions}"})
+                    else:
+                        final = apply_action(path, destination, dry_run, cfg)
+                        action_count += 1
+                        counts["planned"] += 1
+                        counts["moved" if action == "move" else "trashed"] += 1
+                        record["destination"] = str(final)
                 else:
                     counts["reported"] += 1
-                    rec.update({"dry_run": dry_run})
-                rows.append(rec)
-            except Exception as e:
+                rows.append(record)
+            except Exception as exc:  # continue to produce a complete audit manifest
                 counts["errors"] += 1
-                rec.update({"action": "error", "error": repr(e)})
-                rows.append(rec)
+                record.update({"action": "error", "error": repr(exc)})
+                rows.append(record)
 
-    with manifest_path.open("w", encoding="utf-8") as f:
-        for row in rows:
-            f.write(json.dumps(row, sort_keys=True) + "\n")
-
-    report_lines = [
-        f"# User file organization report — {stamp}",
-        "",
-        f"Mode: `{mode}`",
-        "",
-        "## Counts",
-        "",
-    ]
-    for k, v in counts.items():
-        report_lines.append(f"- {k}: {v}")
-    report_lines += ["", "## Actions", ""]
-    for row in rows:
-        if row.get("action") in {"move", "trash", "report", "error"}:
-            report_lines.append(f"- {row.get('action')} `{row.get('source')}` → `{row.get('destination', '')}` ({row.get('reason', row.get('error', ''))})")
-    report_lines += ["", f"Manifest: `{manifest_path}`", ""]
-    report_path.write_text("\n".join(report_lines), encoding="utf-8")
-
-    summary = {"mode": mode, "counts": counts, "manifest": str(manifest_path), "report": str(report_path)}
+    manifest_path, report_path = write_artifacts(stamp, selected_mode, counts, rows, cfg)
+    summary = {
+        "mode": selected_mode,
+        "counts": counts,
+        "manifest": str(manifest_path),
+        "report": str(report_path),
+    }
     print(json.dumps(summary, indent=2, sort_keys=True))
     return 1 if counts["errors"] else 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", default=str(CONFIG_PATH))
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--dry-run", action="store_true", help="plan only")
+    modes.add_argument("--apply", action="store_true", help="apply bounded validated actions")
+    args = parser.parse_args()
+    mode = "dry-run" if args.dry_run else ("apply" if args.apply else None)
+    return run(Path(args.config).expanduser(), mode)
 
 
 if __name__ == "__main__":

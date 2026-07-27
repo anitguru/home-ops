@@ -1,0 +1,127 @@
+{
+  "mode": "dry-run",
+  "user_home": "/Users/sva",
+  "min_age_minutes": 60,
+  "max_auto_actions": 40,
+  "manifest_dir": "/Users/sva/File Inbox/manifests",
+  "report_dir": "/Users/sva/File Inbox/reports",
+  "proposal_dir": "/Users/sva/File Inbox/proposals",
+  "proposal_max_age_hours": 24,
+  "proposal_confidence_threshold": 0.92,
+  "never_touch_names": [
+    "Applications", "Desktop", "Documents", "Downloads", "Library", "Movies",
+    "Music", "Pictures", "Public", "Repos", "Agents", "Obsidian", "File Inbox",
+    "01-Projects", "02-Areas", "03-Resources", "04-Archives", "Old Mac Pull",
+    "node_modules", "venv", ".venv", ".DS_Store", ".localized", "dotfiles"
+  ],
+  "never_touch_paths": [
+    "/Users/sva/01-Projects",
+    "/Users/sva/02-Areas",
+    "/Users/sva/02-Areas/personal",
+    "/Users/sva/02-Areas/personal copy",
+    "/Users/sva/03-Resources",
+    "/Users/sva/04-Archives",
+    "/Users/sva/Documents/Obsidian",
+    "/Users/sva/.hermes",
+    "/Users/sva/dotfiles",
+    "/Users/sva/Library",
+    "/Users/sva/Applications"
+  ],
+  "para": {
+    "resource_destinations": {
+      "screenshots": "/Users/sva/03-Resources/File Intake/Screenshots",
+      "images": "/Users/sva/03-Resources/File Intake/Images",
+      "documents": "/Users/sva/03-Resources/File Intake/Documents",
+      "archives": "/Users/sva/03-Resources/File Intake/Archives",
+      "media": "/Users/sva/03-Resources/File Intake/Media",
+      "code": "/Users/sva/03-Resources/File Intake/Code and Config",
+      "downloads": "/Users/sva/03-Resources/File Intake/Downloads",
+      "desktop": "/Users/sva/03-Resources/File Intake/Desktop",
+      "review": "/Users/sva/03-Resources/File Intake/Needs Review"
+    },
+    "allowed_projects": {
+      "mission-control": {
+        "path": "/Users/sva/01-Projects/mission-control",
+        "incoming_subdir": "Incoming",
+        "keywords": ["mission control", "mc.tv.lan", "analytics panel"]
+      },
+      "anit-guru": {
+        "path": "/Users/sva/01-Projects/anit.guru",
+        "incoming_subdir": "Incoming",
+        "keywords": ["AnITGuru", "Guru's Tech Bytes", "guru concept", "guru wallpaper"]
+      },
+      "wayfinder": {
+        "path": "/Users/sva/01-Projects/wayfinder.page",
+        "incoming_subdir": "Incoming",
+        "keywords": ["Wayfinder", "wayfinder.page", "Wayfinder watermark"]
+      },
+      "home-ops": {
+        "path": "/Users/sva/01-Projects/home-ops",
+        "incoming_subdir": "Incoming",
+        "keywords": ["home-ops automation", "Hermes homelab automation"]
+      }
+    },
+    "allowed_areas": {
+      "work-meetings": {
+        "path": "/Users/sva/02-Areas/Work",
+        "incoming_subdir": "File Intake/Meetings",
+        "keywords": ["customer calls", "meeting recordings", "transcripts", "participants"]
+      },
+      "work-documents": {
+        "path": "/Users/sva/02-Areas/Work",
+        "incoming_subdir": "File Intake/Documents and Data",
+        "keywords": ["customer data", "SIEM POC", "security assessment", "work documents"]
+      },
+      "home-lab-assets": {
+        "path": "/Users/sva/02-Areas/Home Lab",
+        "incoming_subdir": "File Intake/Assets",
+        "keywords": ["network hardware", "access points", "Ruckus R770", "Netgear", "device labels"]
+      },
+      "home-lab-config": {
+        "path": "/Users/sva/02-Areas/Home Lab",
+        "incoming_subdir": "File Intake/Config and Firmware",
+        "keywords": ["firmware", "certificates", "homelab configuration", "network configuration"]
+      }
+    }
+  },
+  "local_naming": {
+    "model": "qwen3.6:35b-a3b",
+    "endpoint": "http://127.0.0.1:11434",
+    "max_items": 12,
+    "max_file_bytes": 12582912,
+    "auto_apply_review": false,
+    "review_name_confidence_threshold": 0.9,
+    "review_destination_confidence_threshold": 0.75,
+    "extensions": ["png", "jpg", "jpeg", "webp"],
+    "generic_name_patterns": [
+      "^Screenshot ", "^Screen Shot ", "^IMG_[0-9]+", "^Image ",
+      "^image[-_ ]?[0-9]*", "^pic$", "^[0-9a-f]{8}-[0-9a-f-]{20,}"
+    ]
+  },
+  "allow_roots": [
+    {"path": "/Users/sva/Desktop", "clean_root": true, "move_directories": false, "fallback_key": "desktop"},
+    {"path": "/Users/sva/Downloads", "clean_root": true, "move_directories": true, "fallback_key": "downloads"},
+    {"path": "/Users/sva/Documents", "clean_root": false, "move_directories": false},
+    {"path": "/Users/sva/Movies", "clean_root": false, "move_directories": false},
+    {"path": "/Users/sva/Pictures", "clean_root": false, "move_directories": false},
+    {"path": "/Users/sva", "clean_root": false, "move_directories": false, "loose_files_only": true}
+  ],
+  "rules": [
+    {"name": "trash-download-installers", "roots": ["/Users/sva/Downloads"], "kinds": ["file"], "extensions": ["dmg", "pkg", "mpkg", "app", "iso", "msi", "exe"], "action": "trash"},
+    {"name": "work-transcript-directories", "roots": ["/Users/sva/Downloads"], "kinds": ["directory"], "filename_patterns": ["(acg|dot[ -]?foods|mortenson|olin|rey[ -]?rey|proton dealership).*(transcript|transcription)"], "action": "move", "destination_key": "area:work-meetings"},
+    {"name": "home-lab-config-directories", "roots": ["/Users/sva/Downloads"], "kinds": ["directory"], "filename_patterns": ["^teletraan1-cert$"], "action": "move", "destination_key": "area:home-lab-config"},
+    {"name": "wayfinder-agile-business-hero", "roots": ["/Users/sva/Downloads"], "kinds": ["file"], "filename_patterns": ["^agile-business-hero\\.(png|jpe?g|webp)$"], "action": "move", "destination_key": "project:wayfinder"},
+    {"name": "wayfinder-project-assets", "kinds": ["file"], "filename_patterns": ["wayfinder"], "action": "move", "destination_key": "project:wayfinder"},
+    {"name": "anit-guru-project-assets", "kinds": ["file"], "filename_patterns": ["^guru[-_]"], "action": "move", "destination_key": "project:anit-guru"},
+    {"name": "home-lab-assets", "kinds": ["file"], "filename_patterns": ["netgear|ruckus|r770"], "extensions": ["png", "jpg", "jpeg", "heic"], "action": "move", "destination_key": "area:home-lab-assets"},
+    {"name": "home-lab-config", "roots": ["/Users/sva/Downloads"], "kinds": ["file"], "filename_patterns": ["transformers-root-ca|teletraan1|^R770_"], "action": "move", "destination_key": "area:home-lab-config"},
+    {"name": "work-meeting-media", "roots": ["/Users/sva/Downloads"], "kinds": ["file"], "filename_patterns": ["acg|dot[ -]?foods|mortenson|olin|rey[ -]?rey|proton dealership"], "extensions": ["mov", "mp4", "m4v", "avi", "mkv", "mp3", "wav", "aiff", "flac"], "action": "move", "destination_key": "area:work-meetings"},
+    {"name": "work-documents-and-data", "roots": ["/Users/sva/Downloads"], "kinds": ["file"], "filename_patterns": ["ohio-cai|batch_dpsk|raccoon_dpsk|customer_ca|transcript"], "extensions": ["pdf", "doc", "docx", "rtf", "txt", "md", "csv", "xls", "xlsx", "ppt", "pptx", "xml"], "action": "move", "destination_key": "area:work-documents"},
+    {"name": "screenshots", "kinds": ["file"], "filename_prefixes": ["Screenshot ", "Screen Shot "], "extensions": ["png", "jpg", "jpeg"], "action": "move", "destination_key": "screenshots"},
+    {"name": "images", "kinds": ["file"], "extensions": ["png", "jpg", "jpeg", "gif", "webp", "heic", "tif", "tiff", "svg"], "action": "move", "destination_key": "images"},
+    {"name": "documents", "kinds": ["file"], "extensions": ["pdf", "doc", "docx", "rtf", "txt", "md", "csv", "xls", "xlsx", "ppt", "pptx", "xml"], "action": "move", "destination_key": "documents"},
+    {"name": "archives", "kinds": ["file"], "extensions": ["zip", "tar", "gz", "tgz", "bz2", "xz", "7z", "rar"], "action": "move", "destination_key": "archives"},
+    {"name": "media", "kinds": ["file"], "extensions": ["mov", "mp4", "m4v", "avi", "mkv", "mp3", "wav", "aiff", "flac"], "action": "move", "destination_key": "media"},
+    {"name": "code-config-snippets", "kinds": ["file"], "extensions": ["py", "js", "ts", "json", "yaml", "yml", "toml", "sh", "sql", "html", "css", "crt", "pem", "bl7"], "action": "move", "destination_key": "code"}
+  ]
+}
