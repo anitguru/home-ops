@@ -111,6 +111,28 @@ def test_apply_repairs_frontmatter_index_log_and_creates_backup(tmp_path):
     assert any(p.name == "manifest.json" for p in backup_root.rglob("manifest.json"))
 
 
+def test_repairs_updated_when_it_is_the_only_missing_required_key(tmp_path):
+    vault = make_vault(tmp_path)
+    page = vault / "40-wiki/runbooks/example-runbook.md"
+    page.write_text(
+        "---\ntitle: Example Runbook\ncreated: 2026-07-01\ntype: runbook\n"
+        "tags: [runbook]\nsources: []\nconfidence: high\ncontested: false\n---\n"
+        "# Example Runbook\n",
+        encoding="utf-8",
+    )
+
+    result = wr.repair_vault(
+        vault,
+        apply=True,
+        backup_root=tmp_path / "backups",
+        today=date(2026, 7, 20),
+    )
+
+    repaired = page.read_text(encoding="utf-8")
+    assert "updated: 2026-07-20" in repaired
+    assert any(a["kind"] == "frontmatter" for a in result["applied"])
+
+
 def test_explicit_type_moves_page_to_matching_folder(tmp_path):
     vault = make_vault(tmp_path)
     src = vault / "40-wiki/runbooks/example-service.md"

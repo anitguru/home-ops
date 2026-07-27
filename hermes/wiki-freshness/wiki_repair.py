@@ -188,6 +188,9 @@ def _ensure_frontmatter(path: Path, text: str, inferred_type: str, today: date) 
     if frontmatter_value(text, "created") is None:
         _set_frontmatter_value(lines, "created", today_text)
         changed = True
+    if frontmatter_value(text, "updated") is None:
+        _set_frontmatter_value(lines, "updated", today_text)
+        changed = True
 
     if old_type != inferred_type:
         if old_type and old_type not in TYPE_TO_FOLDER:
