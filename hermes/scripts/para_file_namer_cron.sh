@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="/Users/sva/01-Projects/home-ops"
 CONFIG="$ROOT/hermes/file-organizer/file-organization.json"
-LOCKDIR="/tmp/hermes-para-file-namer.lock"
+LOCKDIR="/tmp/hermes-para-file-pipeline.lock"
 
 if ! mkdir "$LOCKDIR" 2>/dev/null; then
   exit 0

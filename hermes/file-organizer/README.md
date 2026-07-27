@@ -29,3 +29,5 @@ Apply only after inspecting the newest proposal, manifest, and report:
 ```bash
 python3 hermes/scripts/user_file_organizer.py --config hermes/file-organizer/file-organization.json --apply
 ```
+
+Cron runs local Qwen prep at 03:00 and deterministic maintenance at 05:00. Both wrappers acquire the same atomic `/tmp/hermes-para-file-pipeline.lock`; if prep is still running, maintenance exits silently and cannot consume a partially generated proposal or mutate files concurrently.

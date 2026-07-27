@@ -49,7 +49,8 @@
 
 - Keep the existing default-profile organizer job ID.
 - Convert it to a no-agent repo-backed launcher at 05:00.
-- Add a separate no-agent local naming-prep job before maintenance.
+- Add a separate no-agent local naming-prep job at 03:00, two hours before 05:00 maintenance.
+- Use one atomic shared pipeline lock in both wrappers so maintenance exits safely rather than overlapping a still-running local vision pass.
 - Keep healthy no-op and report-only runs silent; report real actions or errors to SVA's personal channel.
 
 ## Task 7: Verify and ship
