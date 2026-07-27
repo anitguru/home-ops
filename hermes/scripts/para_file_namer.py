@@ -12,6 +12,7 @@ import base64
 import datetime as dt
 import json
 import re
+import stat as stat_module
 import time
 import urllib.error
 import urllib.request
@@ -25,6 +26,7 @@ from user_file_organizer import (
     iter_candidates,
     load_config,
     now_stamp,
+    proposal_confidence_threshold,
     sha256,
     should_skip,
 )
@@ -111,6 +113,8 @@ PARA decision rules:
 - area means an ongoing responsibility and must exactly match an allowlisted area below; it does not require an active task or deadline.
 - Choose area:home-lab-assets for clearly visible owned/operated network hardware, access-point labels, or device inventory evidence.
 - Choose area:work-meetings for clearly work-related meeting participant panels, recordings, or call evidence; use resource:review when the meeting could be personal.
+- A participant panel is clearly work-related when any tile shows an employer, company, customer, security vendor, corporate bot, or notetaker label. In that case you MUST choose area:work-meetings rather than resource:review.
+- Include clearly visible company or product names in the filename when they distinguish the meeting; do not name private individuals from labels alone.
 - resource is the safe default for reusable reference material and unmatched screenshots/images.
 - project:mission-control is allowed only when the image clearly shows SVA's Mission Control dashboard or its analytics panel.
 - If uncertain, choose resource:review and lower destination_confidence.
@@ -150,7 +154,8 @@ def ollama_classify(path: Path, cfg: dict[str, Any]) -> tuple[dict[str, Any], fl
     )
     started = time.monotonic()
     try:
-        with urllib.request.urlopen(request, timeout=300) as response:
+        timeout = float(local.get("request_timeout_seconds", 120))
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             body = json.load(response)
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")[:1000]
@@ -178,12 +183,19 @@ def candidates(cfg: dict[str, Any]) -> list[Path]:
     for root_cfg in cfg.get("allow_roots", []):
         for path in iter_candidates(root_cfg) or []:
             try:
+                # Cheap lexical checks must happen before resolve/stat-heavy policy
+                # validation. In particular, never follow root-level symlinks or
+                # inspect unrelated directories while looking for generic images.
+                if file_ext(path) not in extensions or not is_generic_name(path, patterns):
+                    continue
+                stat = path.lstat()
+                if not stat_module.S_ISREG(stat.st_mode):
+                    continue
+                age_seconds = dt.datetime.now().timestamp() - stat.st_mtime
+                if age_seconds < min_age * 60 or stat.st_size > max_bytes:
+                    continue
                 skip, _ = should_skip(path, cfg, root_cfg)
-                if skip or not path.is_file() or fresh(path, min_age):
-                    continue
-                if file_ext(path) not in extensions or path.stat().st_size > max_bytes:
-                    continue
-                if is_generic_name(path, patterns):
+                if not skip:
                     found.append(path)
             except OSError:
                 continue
@@ -198,6 +210,8 @@ def run(
 ) -> int:
     cfg = load_config(config_path)
     local = cfg.get("local_naming", {})
+    started = time.monotonic()
+    max_run_seconds = float(local.get("max_run_seconds", 1200))
     if source_root is not None:
         root = source_root.expanduser().resolve()
         cfg["allow_roots"] = [
@@ -211,7 +225,7 @@ def run(
         local["rename_in_place_only"] = True
     if include_opaque_ids:
         patterns = local.setdefault("generic_name_patterns", [])
-        opaque_pattern = r"^[A-Za-z0-9_-]{8,24}$"
+        opaque_pattern = r"(?-i:^(?=(?:.*[A-Z]){2})[A-Za-z0-9_-]{8,24}$)"
         if opaque_pattern not in patterns:
             patterns.append(opaque_pattern)
     limit = max_items if max_items is not None else int(local.get("max_items", 12))
@@ -222,39 +236,47 @@ def run(
     report_dir.mkdir(parents=True, exist_ok=True)
     proposal_path = proposal_dir / f"{stamp}.jsonl"
     report_path = report_dir / f"{stamp}-local-naming.md"
+    proposal_path.touch()
     rows: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
+    deadline_reached = False
+    processed = 0
 
     selected = candidates(cfg)[:limit]
-    for path in selected:
-        try:
-            stat = path.stat()
-            result, elapsed = ollama_classify(path, cfg)
-            row = {
-                "source": str(path),
-                "size": stat.st_size,
-                "mtime": stat.st_mtime,
-                "sha256": sha256(path),
-                "suggested_name": result["suggested_name"],
-                "destination_key": result["destination_key"],
-                "name_confidence": result["name_confidence"],
-                "destination_confidence": result["destination_confidence"],
-                "confidence": min(result["name_confidence"], result["destination_confidence"]),
-                "summary": result["summary"],
-                "reason": result["reason"],
-                "model": result["model"],
-                "latency_seconds": round(elapsed, 3),
-                "time": stamp,
-            }
-            rows.append(row)
-        except Exception as exc:
-            errors.append({"source": str(path), "error": repr(exc)})
+    with proposal_path.open("a", encoding="utf-8", buffering=1) as handle:
+        for path in selected:
+            if time.monotonic() - started >= max_run_seconds:
+                deadline_reached = True
+                break
+            try:
+                stat = path.stat()
+                result, elapsed = ollama_classify(path, cfg)
+                row = {
+                    "source": str(path),
+                    "size": stat.st_size,
+                    "mtime": stat.st_mtime,
+                    "sha256": sha256(path),
+                    "suggested_name": result["suggested_name"],
+                    "destination_key": result["destination_key"],
+                    "name_confidence": result["name_confidence"],
+                    "destination_confidence": result["destination_confidence"],
+                    "confidence": min(result["name_confidence"], result["destination_confidence"]),
+                    "summary": result["summary"],
+                    "reason": result["reason"],
+                    "model": result["model"],
+                    "latency_seconds": round(elapsed, 3),
+                    "time": stamp,
+                }
+                rows.append(row)
+                handle.write(json.dumps(row, sort_keys=True) + "\n")
+                handle.flush()
+            except Exception as exc:
+                errors.append({"source": str(path), "error": repr(exc)})
+            finally:
+                processed += 1
 
-    with proposal_path.open("w", encoding="utf-8") as handle:
-        for row in rows:
-            handle.write(json.dumps(row, sort_keys=True) + "\n")
+    deferred = len(selected) - processed
 
-    threshold = float(cfg.get("proposal_confidence_threshold", 0.92))
     if local.get("rename_in_place_only"):
         accepted = sum(
             float(row["name_confidence"])
@@ -276,8 +298,10 @@ def run(
                 )
                 or (
                     row["destination_key"] != "resource:review"
-                    and float(row["name_confidence"]) >= threshold
-                    and float(row["destination_confidence"]) >= threshold
+                    and float(row["name_confidence"])
+                    >= float(local.get("proposal_name_confidence_threshold", 0.90))
+                    and float(row["destination_confidence"])
+                    >= proposal_confidence_threshold(row["destination_key"], cfg)
                 )
             )
         )
@@ -292,6 +316,7 @@ def run(
         f"- above confidence threshold: {accepted}",
         f"- needs review / below threshold: {review}",
         f"- errors: {len(errors)}",
+        f"- deferred by runtime budget: {deferred}",
         "",
         "## Proposals",
         "",
@@ -315,6 +340,8 @@ def run(
         "accepted": accepted,
         "needs_review": review,
         "errors": len(errors),
+        "deferred": deferred,
+        "deadline_reached": deadline_reached,
         "proposal_manifest": str(proposal_path),
         "report": str(report_path),
     }

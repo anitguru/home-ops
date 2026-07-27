@@ -218,6 +218,15 @@ def sanitize_suggested_name(raw: str, original: Path) -> str | None:
     return f"{stem}{suffix}"
 
 
+def needs_local_name(path: Path, cfg: dict[str, Any]) -> bool:
+    naming = cfg.get("local_naming", {})
+    extensions = {str(item).lower().lstrip(".") for item in naming.get("extensions", [])}
+    patterns = naming.get("generic_name_patterns", [])
+    return file_ext(path) in extensions and any(
+        re.search(str(pattern), path.stem, re.IGNORECASE) for pattern in patterns
+    )
+
+
 def proposal_destination(key: str, cfg: dict[str, Any]) -> Path | None:
     if key.startswith("resource:"):
         return resource_destination(key.split(":", 1)[1], cfg)
@@ -237,6 +246,12 @@ def proposal_destination(key: str, cfg: dict[str, Any]) -> Path | None:
             return Path(area["path"]).expanduser() / area.get("incoming_subdir", "Incoming")
         return Path(area).expanduser() / "Incoming"
     return None
+
+
+def proposal_confidence_threshold(key: str, cfg: dict[str, Any]) -> float:
+    kind = key.split(":", 1)[0]
+    thresholds = cfg.get("proposal_confidence_thresholds", {})
+    return float(thresholds.get(kind, cfg.get("proposal_confidence_threshold", 0.92)))
 
 
 def validated_proposal_name(
@@ -281,8 +296,14 @@ def validate_proposal(path: Path, proposal: dict[str, Any], cfg: dict[str, Any])
             ):
                 return None
         else:
-            threshold = float(cfg.get("proposal_confidence_threshold", 0.92))
-            if name_confidence < threshold or destination_confidence < threshold:
+            destination_threshold = proposal_confidence_threshold(key, cfg)
+            name_threshold = float(
+                naming.get("proposal_name_confidence_threshold", 0.90)
+            )
+            if (
+                name_confidence < name_threshold
+                or destination_confidence < destination_threshold
+            ):
                 return None
         base = proposal_destination(key, cfg)
         if not name or base is None:
@@ -302,21 +323,22 @@ def load_latest_proposals(cfg: dict[str, Any]) -> dict[str, dict[str, Any]]:
     files = sorted(proposal_dir.glob("*.jsonl"), key=lambda path: path.stat().st_mtime, reverse=True)
     if not files:
         return {}
-    newest = files[0]
     max_age = float(cfg.get("proposal_max_age_hours", 24)) * 3600
-    if dt.datetime.now().timestamp() - newest.stat().st_mtime > max_age:
-        return {}
     proposals: dict[str, dict[str, Any]] = {}
-    for line in newest.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
+    now = dt.datetime.now().timestamp()
+    for proposal_file in files:
+        if now - proposal_file.stat().st_mtime > max_age:
             continue
-        try:
-            row = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        source = row.get("source")
-        if source:
-            proposals[str(Path(source).expanduser())] = row
+        for line in proposal_file.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            source = row.get("source")
+            if source:
+                proposals.setdefault(str(Path(source).expanduser()), row)
     return proposals
 
 
@@ -438,6 +460,7 @@ def run(
                 stat = path.stat()
                 fingerprint = sha256(path) if path.is_file() else None
                 proposal = proposals.get(str(path))
+                proposed_name = None
                 if root_cfg.get("rename_in_place_only"):
                     threshold = float(
                         cfg.get("local_naming", {}).get("rename_name_confidence_threshold", 0.50)
@@ -456,6 +479,16 @@ def run(
                         action, destination, reason = "report", None, "no-valid-rename-proposal"
                     proposed_destination = None
                 else:
+                    name_threshold = float(
+                        cfg.get("local_naming", {}).get(
+                            "proposal_name_confidence_threshold", 0.90
+                        )
+                    )
+                    proposed_name = (
+                        validated_proposal_name(path, proposal, name_threshold)
+                        if proposal
+                        else None
+                    )
                     proposed_destination = validate_proposal(path, proposal, cfg) if proposal else None
                     action, destination, reason = deterministic_classify(path, root_cfg, cfg)
                 generic_reasons = {
@@ -483,6 +516,29 @@ def run(
                             "validated-local-model-proposal",
                         )
                     counts["proposal_used"] += 1
+                elif (
+                    not root_cfg.get("rename_in_place_only")
+                    and proposed_name is not None
+                    and action == "move"
+                    and destination is not None
+                ):
+                    # A conservative/review placement must not override the
+                    # deterministic route, but its independently validated
+                    # descriptive filename can still improve the move.
+                    destination = destination.parent / proposed_name
+                    reason = f"{reason}+validated-local-name"
+                    counts["proposal_used"] += 1
+                elif (
+                    not root_cfg.get("rename_in_place_only")
+                    and path.is_file()
+                    and action == "move"
+                    and needs_local_name(path, cfg)
+                ):
+                    action, destination, reason = (
+                        "report",
+                        None,
+                        "awaiting-local-name-proposal",
+                    )
 
                 record.update(
                     {

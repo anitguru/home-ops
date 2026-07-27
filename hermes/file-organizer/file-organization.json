@@ -8,6 +8,11 @@
   "proposal_dir": "/Users/sva/File Inbox/proposals",
   "proposal_max_age_hours": 24,
   "proposal_confidence_threshold": 0.92,
+  "proposal_confidence_thresholds": {
+    "area": 0.85,
+    "project": 0.92,
+    "resource": 0.92
+  },
   "never_touch_names": [
     "Applications", "Desktop", "Documents", "Downloads", "Library", "Movies",
     "Music", "Pictures", "Public", "Repos", "Agents", "Obsidian", "File Inbox",
@@ -88,15 +93,19 @@
     "model": "qwen3.6:35b-a3b",
     "endpoint": "http://127.0.0.1:11434",
     "max_items": 12,
+    "max_run_seconds": 1200,
+    "request_timeout_seconds": 120,
     "max_file_bytes": 12582912,
     "auto_apply_review": false,
     "review_name_confidence_threshold": 0.9,
     "review_destination_confidence_threshold": 0.75,
+    "proposal_name_confidence_threshold": 0.9,
     "rename_name_confidence_threshold": 0.5,
     "extensions": ["png", "jpg", "jpeg", "webp"],
     "generic_name_patterns": [
       "^Screenshot ", "^Screen Shot ", "^IMG_[0-9]+", "^Image ",
-      "^image[-_ ]?[0-9]*", "^pic$", "^[0-9a-f]{8}-[0-9a-f-]{20,}"
+      "^image[-_ ]?[0-9]*", "^pic$", "^[0-9a-f]{8}-[0-9a-f-]{20,}",
+      "(?-i:^(?=(?:.*[A-Z]){2})[A-Za-z0-9_-]{8,24}$)"
     ]
   },
   "allow_roots": [

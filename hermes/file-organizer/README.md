@@ -2,8 +2,8 @@
 
 This automation has two stages:
 
-1. `para_file_namer.py` calls local Ollama for supported, old, root-level, generic-named images and writes fingerprinted proposals under `~/File Inbox/proposals/`. It never moves files.
-2. `user_file_organizer.py` performs deterministic maintenance. It accepts only fresh high-confidence proposals whose source fingerprint still matches and whose destination is allowlisted. Exact project/area rules win over model placement; a validated model name can still be reused. Ambiguous `resource:review` proposals are report-only by default (`auto_apply_review: false`) because model self-confidence is not proof against hallucinated names. Generic material falls back to `~/03-Resources/File Intake/`.
+1. `para_file_namer.py` calls local Ollama for supported, old, root-level, generic-named images and writes fingerprinted proposals incrementally under `~/File Inbox/proposals/`. It never moves files. Discovery filters names/extensions and uses `lstat` before resolving policy paths, each request is bounded, and an internal runtime budget ends cleanly before Hermes's outer cron timeout.
+2. `user_file_organizer.py` performs deterministic maintenance. It merges recent proposal batches and accepts only proposals whose source fingerprint still matches, whose filename confidence passes the naming threshold, and whose destination confidence/allowlist pass the destination policy. Exact project/area rules win over model placement; a validated model name can still be reused. Ambiguous `resource:review` proposals are report-only by default (`auto_apply_review: false`) because model self-confidence is not proof against hallucinated names. Generic images without a valid local name wait for a later naming batch instead of being moved with opaque names; other generic material falls back to `~/03-Resources/File Intake/`.
 
 Safety boundaries:
 
@@ -19,7 +19,7 @@ Safety boundaries:
 Manual verification:
 
 ```bash
-python3 -m pytest hermes/scripts/tests/test_user_file_organizer.py -q
+python3 -m pytest hermes/scripts/tests/test_user_file_organizer.py hermes/scripts/tests/test_para_file_namer.py hermes/scripts/tests/test_para_pipeline_lock.py -q
 python3 hermes/scripts/para_file_namer.py --config hermes/file-organizer/file-organization.json
 python3 hermes/scripts/user_file_organizer.py --config hermes/file-organizer/file-organization.json --dry-run
 ```
@@ -30,7 +30,7 @@ Apply only after inspecting the newest proposal, manifest, and report:
 python3 hermes/scripts/user_file_organizer.py --config hermes/file-organizer/file-organization.json --apply
 ```
 
-Cron runs local Qwen prep at 03:00 and deterministic maintenance at 05:00. Both wrappers acquire the same atomic `/tmp/hermes-para-file-pipeline.lock`; if prep is still running, maintenance exits silently and cannot consume a partially generated proposal or mutate files concurrently.
+Cron runs local Qwen prep at 03:00 and deterministic maintenance at 05:00. Both wrappers use the same owner-PID lock at `/tmp/hermes-para-file-pipeline.lock`; a live owner is never displaced, while dead/stale legacy locks are reclaimed. The wrapper tracks and terminates its child on timeout/signal, removes temporary capture output, and releases the lock, preventing both the old orphaned-worker failure and later silent no-op maintenance.
 
 ## Opt-in image renaming in place
 

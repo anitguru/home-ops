@@ -184,6 +184,42 @@ def test_review_proposal_is_not_auto_applied_by_default(tmp_path: Path):
     assert ufo.validate_proposal(src, proposal, cfg) is None
 
 
+def test_review_proposal_name_can_improve_deterministic_destination(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    cfg = base_cfg(tmp_path)
+    cfg["local_naming"]["proposal_name_confidence_threshold"] = 0.90
+    src = Path(cfg["user_home"]) / "Desktop" / "Screenshot 1.png"
+    write_old(src, b"image")
+    proposal_dir = Path(cfg["proposal_dir"])
+    proposal_dir.mkdir(parents=True)
+    proposal = {
+        "source": str(src),
+        "sha256": ufo.sha256(src),
+        "size": src.stat().st_size,
+        "mtime": src.stat().st_mtime,
+        "name_confidence": 0.95,
+        "destination_confidence": 0.2,
+        "destination_key": "resource:review",
+        "suggested_name": "2026-07-27-useful-dashboard.png",
+    }
+    (proposal_dir / "proposal.jsonl").write_text(json.dumps(proposal) + "\n")
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps(cfg))
+
+    rc = ufo.run(config_path=config_path, mode="dry-run")
+    summary = json.loads(capsys.readouterr().out)
+    manifest = [json.loads(line) for line in Path(summary["manifest"]).read_text().splitlines()]
+    action = next(row for row in manifest if row["source"] == str(src))
+
+    assert rc == 0
+    assert action["destination"].endswith(
+        "File Intake/Screenshots/2026-07-27-useful-dashboard.png"
+    )
+    assert action["reason"] == "screenshots+validated-local-name"
+    assert summary["counts"]["proposal_used"] == 1
+
+
 def test_changed_file_proposal_is_rejected(tmp_path: Path):
     cfg = base_cfg(tmp_path)
     src = Path(cfg["user_home"]) / "Desktop" / "Screenshot 1.png"
@@ -254,6 +290,38 @@ def test_allowlisted_project_proposal_routes_to_incoming(tmp_path: Path):
     )
 
 
+def test_allowlisted_area_uses_calibrated_confidence_threshold(tmp_path: Path):
+    cfg = base_cfg(tmp_path)
+    cfg["proposal_confidence_thresholds"] = {
+        "area": 0.85,
+        "project": 0.92,
+        "resource": 0.92,
+    }
+    src = Path(cfg["user_home"]) / "Desktop" / "Screenshot 1.png"
+    write_old(src, b"image")
+    proposal = {
+        "source": str(src),
+        "sha256": ufo.sha256(src),
+        "size": src.stat().st_size,
+        "mtime": src.stat().st_mtime,
+        "name_confidence": 0.90,
+        "destination_confidence": 0.85,
+        "destination_key": "area:work-meetings",
+        "suggested_name": "2026-07-27-sentinelone-meeting-participants.png",
+    }
+
+    result = ufo.validate_proposal(src, proposal, cfg)
+
+    assert result == (
+        Path(cfg["user_home"])
+        / "02-Areas"
+        / "Work"
+        / "File Intake"
+        / "Meetings"
+        / "2026-07-27-sentinelone-meeting-participants.png"
+    )
+
+
 def test_unallowlisted_area_proposal_is_rejected(tmp_path: Path):
     cfg = base_cfg(tmp_path)
     src = Path(cfg["user_home"]) / "Desktop" / "Screenshot 1.png"
@@ -268,6 +336,51 @@ def test_unallowlisted_area_proposal_is_rejected(tmp_path: Path):
         "suggested_name": "private.png",
     }
     assert ufo.validate_proposal(src, proposal, cfg) is None
+
+
+def test_recent_proposal_batches_are_merged_newest_first(tmp_path: Path):
+    cfg = base_cfg(tmp_path)
+    proposal_dir = Path(cfg["proposal_dir"])
+    proposal_dir.mkdir(parents=True)
+    first = {"source": "/tmp/first.png", "suggested_name": "first.png"}
+    second_old = {"source": "/tmp/second.png", "suggested_name": "old.png"}
+    second_new = {"source": "/tmp/second.png", "suggested_name": "new.png"}
+    older = proposal_dir / "2026-07-27_010000.jsonl"
+    newer = proposal_dir / "2026-07-27_020000.jsonl"
+    older.write_text(json.dumps(first) + "\n" + json.dumps(second_old) + "\n")
+    newer.write_text(json.dumps(second_new) + "\n")
+    os.utime(older, (time.time() - 60, time.time() - 60))
+
+    proposals = ufo.load_latest_proposals(cfg)
+
+    assert proposals["/tmp/first.png"]["suggested_name"] == "first.png"
+    assert proposals["/tmp/second.png"]["suggested_name"] == "new.png"
+
+
+def test_generic_image_without_proposal_waits_for_local_naming(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    cfg = base_cfg(tmp_path)
+    cfg["local_naming"].update(
+        {
+            "extensions": ["png", "jpg"],
+            "generic_name_patterns": ["^Screenshot ", "^[A-Za-z0-9_-]{8,24}$"],
+        }
+    )
+    src = Path(cfg["user_home"]) / "Desktop" / "HOOhnL2aYAAZpNS.jpg"
+    write_old(src, b"image")
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps(cfg))
+
+    rc = ufo.run(config_path=config_path, mode="dry-run")
+    summary = json.loads(capsys.readouterr().out)
+    manifest = [json.loads(line) for line in Path(summary["manifest"]).read_text().splitlines()]
+    action = next(row for row in manifest if row["source"] == str(src))
+
+    assert rc == 0
+    assert action["action"] == "report"
+    assert action["reason"] == "awaiting-local-name-proposal"
+    assert "destination" not in action
 
 
 def test_collision_safe_preserves_existing(tmp_path: Path):

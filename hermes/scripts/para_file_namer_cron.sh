@@ -3,17 +3,18 @@ set -euo pipefail
 
 ROOT="/Users/sva/01-Projects/home-ops"
 CONFIG="$ROOT/hermes/file-organizer/file-organization.json"
-LOCKDIR="/tmp/hermes-para-file-pipeline.lock"
+source "$ROOT/hermes/scripts/para_pipeline_lock.sh"
 
-if ! mkdir "$LOCKDIR" 2>/dev/null; then
+if ! acquire_para_pipeline_lock; then
   exit 0
 fi
-trap 'rmdir "$LOCKDIR" 2>/dev/null || true' EXIT
 
-if ! OUTPUT=$(python3 "$ROOT/hermes/scripts/para_file_namer.py" --config "$CONFIG" 2>&1); then
+if ! run_para_pipeline_command python3 "$ROOT/hermes/scripts/para_file_namer.py" --config "$CONFIG"; then
+  OUTPUT="$HERMES_PARA_OUTPUT"
   printf 'Hermes: local PARA naming prep failed.\n%s\n' "$OUTPUT"
   exit 1
 fi
+OUTPUT="$HERMES_PARA_OUTPUT"
 
 ERRORS=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("errors", 1))' <<<"$OUTPUT" 2>/dev/null || printf '1')
 if [[ "$ERRORS" != "0" ]]; then
