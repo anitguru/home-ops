@@ -372,6 +372,25 @@ def test_personal_photography_area_accepts_safe_generic_name_at_085(tmp_path: Pa
     )
 
 
+def test_personal_photo_name_override_does_not_lower_work_area_threshold(tmp_path: Path):
+    cfg = base_cfg(tmp_path)
+    cfg["proposal_confidence_thresholds"] = {"area": 0.85}
+    src = Path(cfg["user_home"]) / "Desktop" / "work-meeting.jpeg"
+    write_old(src, b"image")
+    proposal = {
+        "source": str(src),
+        "sha256": ufo.sha256(src),
+        "size": src.stat().st_size,
+        "mtime": src.stat().st_mtime,
+        "name_confidence": 0.85,
+        "destination_confidence": 0.9,
+        "destination_key": "area:work-meetings",
+        "suggested_name": "2026-07-29-work-meeting.jpeg",
+    }
+
+    assert ufo.validate_proposal(src, proposal, cfg) is None
+
+
 def test_unallowlisted_area_proposal_is_rejected(tmp_path: Path):
     cfg = base_cfg(tmp_path)
     src = Path(cfg["user_home"]) / "Desktop" / "Screenshot 1.png"

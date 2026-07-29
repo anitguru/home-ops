@@ -77,7 +77,7 @@ https://ollama-lan.anit.guru:11435/v1
 ```
 
 Configure the client API-key field with the value from `ollama.M5_TLS_API_KEY`.
-OpenAI-compatible clients send it as `Authorization: Bearer <key>`.
+OpenAI-compatible clients send it as `Authorization: Bearer $M5_TLS_API_KEY`.
 
 If a managed work VPN filters public DNS responses containing private addresses, add this hosts entry on that client:
 
