@@ -5,9 +5,13 @@
 }
 
 https://ollama-lan.anit.guru:11435 {
-	# Bind only to this Mac's LAN address. The existing Ollama HTTP listener on
-	# port 11434 remains unchanged.
-	bind 10.0.10.210
+	# Listen across interface changes so either the Wi-Fi or Ethernet address can
+	# serve TLS. The source ACL below limits network clients to the work laptop's
+	# two reserved VLAN 60 addresses; loopback remains available for health checks.
+	bind 0.0.0.0
+
+	@disallowed_source not remote_ip 127.0.0.1 10.0.60.205 10.0.60.207
+	respond @disallowed_source "Forbidden" 403
 
 	tls {
 		dns bunny {env.BUNNY_API_KEY}

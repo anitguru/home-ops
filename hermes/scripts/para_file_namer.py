@@ -109,6 +109,7 @@ Naming rules:
 - Prefix the name with {source_date(path)} when it is a screenshot, dated diagram, receipt, or event capture.
 - Describe the visible subject, app, diagram, person/event, or purpose; never use generic words alone such as screenshot, image, pic, or file.
 - Do not invent names, companies, projects, or sensitive facts that are not visible.
+- For people, use generic visible descriptors such as woman, man, person, or group; do not infer identity from a face.
 - Keep the stem at most 100 characters.
 
 PARA decision rules:
@@ -117,6 +118,7 @@ PARA decision rules:
 - Choose area:home-lab-assets for clearly visible owned/operated network hardware, access-point labels, or device inventory evidence.
 - Choose area:work-meetings for clearly work-related meeting participant panels, recordings, or call evidence; use resource:review when the meeting could be personal.
 - A participant panel is clearly work-related when any tile shows an employer, company, customer, security vendor, corporate bot, or notetaker label. In that case you MUST choose area:work-meetings rather than resource:review.
+- Choose area:personal-photography-appreciation for personal portraits, selfies, fashion/editorial photography, or aesthetically appreciated photos with no work, project, or home-lab evidence. You MUST use this area for otherwise ambiguous personal photography; do not choose resource:review merely because aesthetic or editorial intent is not explicit.
 - Include clearly visible company or product names in the filename when they distinguish the meeting; do not name private individuals from labels alone.
 - resource is the safe default for reusable reference material and unmatched screenshots/images.
 - project:mission-control is allowed only when the image clearly shows SVA's Mission Control dashboard or its analytics panel.

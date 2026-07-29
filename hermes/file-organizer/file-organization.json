@@ -91,6 +91,11 @@
         "path": "/Users/sva/02-Areas/Home Lab",
         "incoming_subdir": "File Intake/Config and Firmware",
         "keywords": ["firmware", "certificates", "homelab configuration", "network configuration"]
+      },
+      "personal-photography-appreciation": {
+        "path": "/Users/sva/02-Areas/Personal",
+        "incoming_subdir": "File Intake/Art/Photography Appreciation",
+        "keywords": ["personal photography", "portraits", "fashion photography", "photography appreciation", "visual art"]
       }
     }
   },
@@ -105,6 +110,9 @@
     "review_name_confidence_threshold": 0.9,
     "review_destination_confidence_threshold": 0.75,
     "proposal_name_confidence_threshold": 0.9,
+    "proposal_name_confidence_thresholds": {
+      "area:personal-photography-appreciation": 0.8
+    },
     "rename_name_confidence_threshold": 0.5,
     "extensions": ["png", "jpg", "jpeg", "webp"],
     "generic_name_patterns": [

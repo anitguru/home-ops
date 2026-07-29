@@ -37,6 +37,10 @@ def base_cfg(tmp_path: Path) -> dict:
         "local_naming": {
             "review_name_confidence_threshold": 0.9,
             "review_destination_confidence_threshold": 0.75,
+            "proposal_name_confidence_threshold": 0.9,
+            "proposal_name_confidence_thresholds": {
+                "area:personal-photography-appreciation": 0.8,
+            },
         },
         "never_touch_names": ["01-Projects", "02-Areas", "03-Resources"],
         "never_touch_paths": [
@@ -60,6 +64,10 @@ def base_cfg(tmp_path: Path) -> dict:
                 "work-meetings": {
                     "path": str(home / "02-Areas" / "Work"),
                     "incoming_subdir": "File Intake/Meetings",
+                },
+                "personal-photography-appreciation": {
+                    "path": str(home / "02-Areas" / "Personal"),
+                    "incoming_subdir": "File Intake/Art/Photography Appreciation",
                 }
             },
         },
@@ -328,6 +336,39 @@ def test_allowlisted_area_uses_calibrated_confidence_threshold(tmp_path: Path):
         / "File Intake"
         / "Meetings"
         / "2026-07-27-sentinelone-meeting-participants.png"
+    )
+
+
+def test_personal_photography_area_accepts_safe_generic_name_at_085(tmp_path: Path):
+    cfg = base_cfg(tmp_path)
+    cfg["proposal_confidence_thresholds"] = {"area": 0.85}
+    assert ufo.proposal_name_confidence_threshold(
+        "area:personal-photography-appreciation", cfg
+    ) == 0.8
+    assert ufo.proposal_name_confidence_threshold("area:work-meetings", cfg) == 0.9
+    src = Path(cfg["user_home"]) / "Desktop" / "HNqsmNZWUAAUfOq.jpeg"
+    write_old(src, b"image")
+    proposal = {
+        "source": str(src),
+        "sha256": ufo.sha256(src),
+        "size": src.stat().st_size,
+        "mtime": src.stat().st_mtime,
+        "name_confidence": 0.85,
+        "destination_confidence": 0.9,
+        "destination_key": "area:personal-photography-appreciation",
+        "suggested_name": "2026-07-29-woman-selfie-interior.jpeg",
+    }
+
+    result = ufo.validate_proposal(src, proposal, cfg)
+
+    assert result == (
+        Path(cfg["user_home"])
+        / "02-Areas"
+        / "Personal"
+        / "File Intake"
+        / "Art"
+        / "Photography Appreciation"
+        / "2026-07-29-woman-selfie-interior.jpeg"
     )
 
 

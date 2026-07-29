@@ -256,6 +256,12 @@ def proposal_confidence_threshold(key: str, cfg: dict[str, Any]) -> float:
     return float(thresholds.get(kind, cfg.get("proposal_confidence_threshold", 0.92)))
 
 
+def proposal_name_confidence_threshold(key: str, cfg: dict[str, Any]) -> float:
+    naming = cfg.get("local_naming", {})
+    thresholds = naming.get("proposal_name_confidence_thresholds", {})
+    return float(thresholds.get(key, naming.get("proposal_name_confidence_threshold", 0.90)))
+
+
 def proposal_matches_source(path: Path, proposal: dict[str, Any] | None) -> bool:
     if not proposal:
         return False
@@ -308,9 +314,7 @@ def validate_proposal(path: Path, proposal: dict[str, Any], cfg: dict[str, Any])
                 return None
         else:
             destination_threshold = proposal_confidence_threshold(key, cfg)
-            name_threshold = float(
-                naming.get("proposal_name_confidence_threshold", 0.90)
-            )
+            name_threshold = proposal_name_confidence_threshold(key, cfg)
             if (
                 name_confidence < name_threshold
                 or destination_confidence < destination_threshold

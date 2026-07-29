@@ -5,7 +5,7 @@ Adds a publicly trusted HTTPS endpoint in front of the existing local Ollama lis
 ## Topology
 
 ```text
-ollama-lan.anit.guru:11435 (10.0.10.210, TLS)
+ollama-lan.anit.guru:11435 (10.0.10.210 or 10.0.10.217, TLS)
   -> Caddy LaunchAgent on this Mac
   -> http://127.0.0.1:11434 (Ollama)
 ```
@@ -15,12 +15,19 @@ The exact Bunny DNS `A` record overrides the public wildcard/front-door record a
 ## Security and secrets
 
 - Ollama's original `http://<mac>:11434` listener is unchanged.
-- Caddy binds only to `10.0.10.210:11435`.
+- Caddy listens on IPv4 port `11435` so the service survives Wi-Fi/Ethernet interface changes, then enforces a source ACL allowing only loopback health checks and the work Mac's two reserved VLAN 60 addresses (`10.0.60.205` and `10.0.60.207`). PR60X limits the routed destinations to this Mac's `10.0.10.210` and `10.0.10.217` addresses.
 - The Bunny API key remains in the SOPS store and is loaded by `~/.local/bin/secret bunny API_KEY` when the LaunchAgent starts.
 - The HTTPS Bearer token remains under `ollama.M5_TLS_API_KEY` in SOPS and is loaded only when the LaunchAgent starts.
 - No API key is committed to this repository or written to the LaunchAgent plist. Caddy removes the `Authorization` header before proxying to Ollama.
 - This adds transport encryption and Bearer-token authentication on port `11435`. The existing unauthenticated Ollama listener on port `11434` is unchanged.
-- The PR60X rule for work Mac `10.0.60.205` permits only TCP `11435`; direct `11434` is not exposed through that inter-VLAN rule. Local apps continue using `127.0.0.1:11434`.
+- PR60X rules permit only TCP `11435` from the work Mac's reserved Wi-Fi and Ethernet addresses (`10.0.60.205` and `10.0.60.207`) to this Mac's two VLAN 10 addresses (`10.0.10.210` and `10.0.10.217`). Direct `11434` is not exposed through those inter-VLAN rules. Local apps continue using `127.0.0.1:11434`.
+
+| Work Mac source | M5 destination | Allowed service |
+|---|---|---|
+| `10.0.60.205` (Wi-Fi) | `10.0.10.210` (Wi-Fi) | TCP `11435` |
+| `10.0.60.205` (Wi-Fi) | `10.0.10.217` (Ethernet) | TCP `11435` |
+| `10.0.60.207` (Ethernet) | `10.0.10.210` (Wi-Fi) | TCP `11435` |
+| `10.0.60.207` (Ethernet) | `10.0.10.217` (Ethernet) | TCP `11435` |
 
 ## Pinned build
 
@@ -54,10 +61,11 @@ The LaunchAgent is:
 
 ```bash
 dig +short A ollama-lan.anit.guru @1.1.1.1
-curl -sS -o /dev/null -w '%{http_code}\n' https://ollama-lan.anit.guru:11435/api/version # expect 401
+# Local health checks use loopback because Caddy rejects non-work LAN sources.
+curl -sS --resolve ollama-lan.anit.guru:11435:127.0.0.1 -o /dev/null -w '%{http_code}\n' https://ollama-lan.anit.guru:11435/api/version # expect 401
 M5_TLS_API_KEY="$(~/.local/bin/secret ollama M5_TLS_API_KEY)"
-curl -fsS -H "Authorization: Bearer $M5_TLS_API_KEY" https://ollama-lan.anit.guru:11435/api/version
-curl -fsS -H "Authorization: Bearer $M5_TLS_API_KEY" https://ollama-lan.anit.guru:11435/v1/models
+curl -fsS --resolve ollama-lan.anit.guru:11435:127.0.0.1 -H "Authorization: Bearer $M5_TLS_API_KEY" https://ollama-lan.anit.guru:11435/api/version
+curl -fsS --resolve ollama-lan.anit.guru:11435:127.0.0.1 -H "Authorization: Bearer $M5_TLS_API_KEY" https://ollama-lan.anit.guru:11435/v1/models
 unset M5_TLS_API_KEY
 launchctl print gui/$UID/com.anitguru.ollama-tls
 ```
@@ -75,6 +83,8 @@ If a managed work VPN filters public DNS responses containing private addresses,
 
 ```text
 10.0.10.210 ollama-lan.anit.guru
+# Or, while testing the Ethernet path:
+10.0.10.217 ollama-lan.anit.guru
 ```
 
 The hostname must remain `ollama-lan.anit.guru` so it matches the certificate.
