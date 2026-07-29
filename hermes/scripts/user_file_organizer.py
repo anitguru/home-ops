@@ -214,7 +214,9 @@ def sanitize_suggested_name(raw: str, original: Path) -> str | None:
         return None
     suffix = original_suffix or supplied_suffix
     if supplied_suffix and original_suffix and supplied_suffix != original_suffix:
-        return None
+        if {supplied_suffix, original_suffix} != {".jpg", ".jpeg"}:
+            return None
+        suffix = original_suffix
     return f"{stem}{suffix}"
 
 
@@ -254,18 +256,27 @@ def proposal_confidence_threshold(key: str, cfg: dict[str, Any]) -> float:
     return float(thresholds.get(kind, cfg.get("proposal_confidence_threshold", 0.92)))
 
 
+def proposal_matches_source(path: Path, proposal: dict[str, Any] | None) -> bool:
+    if not proposal:
+        return False
+    try:
+        stat = path.stat()
+        return (
+            int(proposal.get("size", -1)) == stat.st_size
+            and abs(float(proposal.get("mtime", -1)) - stat.st_mtime) <= 0.001
+            and (not path.is_file() or proposal.get("sha256") == sha256(path))
+        )
+    except (OSError, TypeError, ValueError):
+        return False
+
+
 def validated_proposal_name(
     path: Path,
     proposal: dict[str, Any],
     min_name_confidence: float = 0.0,
 ) -> str | None:
     try:
-        stat = path.stat()
-        if int(proposal.get("size", -1)) != stat.st_size:
-            return None
-        if abs(float(proposal.get("mtime", -1)) - stat.st_mtime) > 0.001:
-            return None
-        if path.is_file() and proposal.get("sha256") != sha256(path):
+        if not proposal_matches_source(path, proposal):
             return None
         name_confidence = float(proposal.get("name_confidence", proposal.get("confidence", 0)))
         if name_confidence < min_name_confidence:
@@ -352,6 +363,97 @@ def iter_candidates(root_cfg: dict[str, Any]):
         yield item
 
 
+def dedupe_reference_roots(cfg: dict[str, Any]) -> list[Path]:
+    """Return exact intake leaves that may safely serve as duplicate keepers."""
+    para = cfg.get("para", {})
+    roots = [Path(path).expanduser() for path in para.get("resource_destinations", {}).values()]
+    for item in para.get("allowed_projects", {}).values():
+        if isinstance(item, dict):
+            roots.append(Path(item["path"]).expanduser() / item.get("incoming_subdir", "Incoming"))
+    for item in para.get("allowed_areas", {}).values():
+        if isinstance(item, dict):
+            roots.append(Path(item["path"]).expanduser() / item.get("incoming_subdir", "File Intake"))
+    return roots
+
+
+def exact_duplicate_plan(cfg: dict[str, Any], min_age_minutes: int) -> dict[str, dict[str, str]]:
+    """Return eligible duplicate sources mapped to a deterministic preserved file.
+
+    Files are grouped by size before hashing. Only immediate-child, policy-allowed,
+    old regular source files may be trashed. Existing files in exact allowlisted
+    intake leaves always win as keepers and are never mutated. Among files with
+    the same source/intake status, a descriptive name wins over a generic one;
+    otherwise an original filename wins over a macOS-style `` (N)`` collision copy.
+    """
+    dedupe = cfg.get("deduplication", {})
+    if not dedupe.get("enabled", False):
+        return {}
+    if dedupe.get("algorithm", "sha256") != "sha256" or dedupe.get("action", "trash") != "trash":
+        raise ValueError("deduplication supports only sha256 with Trash action")
+
+    by_size: dict[int, list[tuple[Path, bool]]] = {}
+    seen_paths: set[str] = set()
+    for root_cfg in cfg.get("allow_roots", []):
+        for path in iter_candidates(root_cfg) or []:
+            try:
+                skip, _ = should_skip(path, cfg, root_cfg)
+                if skip or fresh(path, min_age_minutes) or not path.is_file():
+                    continue
+                resolved = str(path.resolve(strict=True))
+                if resolved in seen_paths:
+                    continue
+                seen_paths.add(resolved)
+                by_size.setdefault(path.stat().st_size, []).append((path, True))
+            except OSError:
+                continue
+
+    for root in dedupe_reference_roots(cfg):
+        try:
+            if not root.exists() or not root.is_dir():
+                continue
+            for path in root.iterdir():
+                if path.name.startswith(".") or path.is_symlink() or not path.is_file():
+                    continue
+                resolved = str(path.resolve(strict=True))
+                if resolved in seen_paths:
+                    continue
+                seen_paths.add(resolved)
+                by_size.setdefault(path.stat().st_size, []).append((path, False))
+        except OSError:
+            continue
+
+    duplicate_plan: dict[str, dict[str, str]] = {}
+    for same_size in by_size.values():
+        if len(same_size) < 2:
+            continue
+        by_digest: dict[str, list[tuple[Path, bool]]] = {}
+        for path, is_source in same_size:
+            try:
+                by_digest.setdefault(sha256(path), []).append((path, is_source))
+            except OSError:
+                continue
+        for digest, identical in by_digest.items():
+            if len(identical) < 2:
+                continue
+            canonical, _ = min(
+                identical,
+                key=lambda entry: (
+                    entry[1],
+                    needs_local_name(entry[0], cfg),
+                    bool(re.search(r" \([0-9]+\)$", entry[0].stem)),
+                    entry[0].stat().st_mtime,
+                    str(entry[0]),
+                ),
+            )
+            for duplicate, is_source in identical:
+                if is_source and duplicate != canonical:
+                    duplicate_plan[str(duplicate)] = {
+                        "keeper": str(canonical),
+                        "sha256": digest,
+                    }
+    return duplicate_plan
+
+
 def apply_action(
     src: Path,
     dst: Path,
@@ -432,12 +534,14 @@ def run(
         "reported": 0,
         "blocked": 0,
         "proposal_used": 0,
+        "deduplicated": 0,
         "errors": 0,
     }
     rows: list[dict[str, Any]] = []
     proposals = load_latest_proposals(cfg)
     min_age = int(cfg.get("min_age_minutes", 60))
     max_actions = int(cfg.get("max_auto_actions", 40))
+    duplicate_plan = exact_duplicate_plan(cfg, min_age) if rename_root is None else {}
     action_count = 0
 
     for root_cfg in cfg.get("allow_roots", []):
@@ -459,6 +563,34 @@ def run(
 
                 stat = path.stat()
                 fingerprint = sha256(path) if path.is_file() else None
+                duplicate = duplicate_plan.get(str(path))
+                if duplicate is not None:
+                    if fingerprint != duplicate["sha256"]:
+                        raise ValueError(f"duplicate fingerprint changed during run: {path}")
+                    record.update(
+                        {
+                            "action": "trash",
+                            "reason": "exact-content-duplicate",
+                            "duplicate_of": duplicate["keeper"],
+                            "size": stat.st_size,
+                            "mtime": stat.st_mtime,
+                            "sha256": fingerprint,
+                            "dry_run": dry_run,
+                        }
+                    )
+                    if action_count >= max_actions:
+                        counts["blocked"] += 1
+                        record.update({"action": "blocked", "reason": f"action-cap-{max_actions}"})
+                    else:
+                        final = apply_action(path, trash_root(cfg) / path.name, dry_run, cfg)
+                        action_count += 1
+                        counts["planned"] += 1
+                        counts["trashed"] += 1
+                        counts["deduplicated"] += 1
+                        record["destination"] = str(final)
+                    rows.append(record)
+                    continue
+
                 proposal = proposals.get(str(path))
                 proposed_name = None
                 if root_cfg.get("rename_in_place_only"):

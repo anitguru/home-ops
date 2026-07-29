@@ -256,6 +256,15 @@ def test_validated_name_can_be_used_for_in_place_review_rename(tmp_path: Path):
     )
 
 
+def test_suggested_jpeg_alias_preserves_original_extension():
+    source = Path("opaque.jpeg")
+
+    assert ufo.sanitize_suggested_name("descriptive-photo.jpg", source) == (
+        "descriptive-photo.jpeg"
+    )
+    assert ufo.sanitize_suggested_name("descriptive-photo.png", source) is None
+
+
 def test_in_place_action_cannot_escape_source_directory(tmp_path: Path):
     cfg = base_cfg(tmp_path)
     src = Path(cfg["user_home"]) / "Desktop" / "opaque.jpg"
@@ -381,6 +390,70 @@ def test_generic_image_without_proposal_waits_for_local_naming(
     assert action["action"] == "report"
     assert action["reason"] == "awaiting-local-name-proposal"
     assert "destination" not in action
+
+
+def test_exact_duplicate_is_trashed_while_canonical_file_is_preserved(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    cfg = base_cfg(tmp_path)
+    cfg["deduplication"] = {"enabled": True, "algorithm": "sha256", "action": "trash"}
+    cfg["local_naming"].update(
+        {
+            "extensions": ["jpg"],
+            "generic_name_patterns": [r"^[A-Za-z0-9_-]{8,24}(?: \([0-9]+\))?$"],
+        }
+    )
+    desktop = Path(cfg["user_home"]) / "Desktop"
+    canonical = desktop / "HOSKQ1dakAAJGLh.jpg"
+    duplicate = desktop / "HOSKQ1dakAAJGLh (1).jpg"
+    write_old(canonical, b"same-image")
+    write_old(duplicate, b"same-image")
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps(cfg))
+
+    rc = ufo.run(config_path=config_path, mode="apply")
+    summary = json.loads(capsys.readouterr().out)
+    manifest = [json.loads(line) for line in Path(summary["manifest"]).read_text().splitlines()]
+    duplicate_action = next(row for row in manifest if row["source"] == str(duplicate))
+
+    assert rc == 0
+    assert canonical.exists()
+    assert not duplicate.exists()
+    assert (Path(cfg["user_home"]) / ".Trash" / duplicate.name).exists()
+    assert duplicate_action["action"] == "trash"
+    assert duplicate_action["reason"] == "exact-content-duplicate"
+    assert duplicate_action["duplicate_of"] == str(canonical)
+    assert summary["counts"]["deduplicated"] == 1
+
+
+def test_same_size_different_content_is_not_deduplicated(tmp_path: Path):
+    cfg = base_cfg(tmp_path)
+    cfg["deduplication"] = {"enabled": True, "algorithm": "sha256", "action": "trash"}
+    desktop = Path(cfg["user_home"]) / "Desktop"
+    first = desktop / "first.bin"
+    second = desktop / "second.bin"
+    write_old(first, b"one")
+    write_old(second, b"two")
+
+    assert ufo.exact_duplicate_plan(cfg, min_age_minutes=0) == {}
+    assert first.exists()
+    assert second.exists()
+
+
+def test_existing_intake_file_is_preserved_as_duplicate_keeper(tmp_path: Path):
+    cfg = base_cfg(tmp_path)
+    cfg["deduplication"] = {"enabled": True, "algorithm": "sha256", "action": "trash"}
+    desktop = Path(cfg["user_home"]) / "Desktop"
+    source = desktop / "descriptive-dashboard.png"
+    intake = Path(cfg["para"]["resource_destinations"]["screenshots"])
+    keeper = intake / "Screenshot 42.png"
+    write_old(source, b"same-image")
+    write_old(keeper, b"same-image")
+
+    plan = ufo.exact_duplicate_plan(cfg, min_age_minutes=0)
+
+    assert plan[str(source)]["keeper"] == str(keeper)
+    assert str(keeper) not in plan
 
 
 def test_collision_safe_preserves_existing(tmp_path: Path):

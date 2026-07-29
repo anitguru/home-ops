@@ -60,6 +60,7 @@ def test_repo_opaque_pattern_excludes_normal_lowercase_kebab_names():
     )
     patterns = cfg["local_naming"]["generic_name_patterns"]
     assert pfn.is_generic_name(Path("HOOhnL2aYAAZpNS.jpg"), patterns)
+    assert pfn.is_generic_name(Path("HOOhnL2aYAAZpNS (1).jpg"), patterns)
     assert not pfn.is_generic_name(Path("bong-wide-angle.jpg"), patterns)
 
 
@@ -78,6 +79,41 @@ def test_candidates_skip_symlinks_before_resolving_them(
         return original_resolve(self, *args, **kwargs)
 
     monkeypatch.setattr(Path, "resolve", guarded_resolve)
+    assert pfn.candidates(cfg) == []
+
+
+def test_candidates_skip_exact_duplicate_that_organizer_will_trash(tmp_path: Path):
+    cfg = naming_cfg(tmp_path)
+    cfg["deduplication"] = {"enabled": True, "algorithm": "sha256", "action": "trash"}
+    cfg["local_naming"]["generic_name_patterns"] = [
+        r"^IMG_[0-9]+(?: \([0-9]+\))?$"
+    ]
+    downloads = Path(cfg["allow_roots"][0]["path"])
+    canonical = downloads / "IMG_1234.png"
+    duplicate = downloads / "IMG_1234 (1).png"
+    old_file(canonical, b"same-image")
+    old_file(duplicate, b"same-image")
+
+    assert pfn.candidates(cfg) == [canonical]
+
+
+def test_candidates_skip_fingerprinted_recent_proposal(tmp_path: Path):
+    cfg = naming_cfg(tmp_path)
+    downloads = Path(cfg["allow_roots"][0]["path"])
+    source = downloads / "IMG_4321.png"
+    old_file(source, b"image")
+    proposal_dir = Path(cfg["proposal_dir"])
+    proposal_dir.mkdir(parents=True)
+    proposal = {
+        "source": str(source),
+        "size": source.stat().st_size,
+        "mtime": source.stat().st_mtime,
+        "sha256": pfn.sha256(source),
+        "suggested_name": "descriptive-image.png",
+        "name_confidence": 0.5,
+    }
+    (proposal_dir / "recent.jsonl").write_text(json.dumps(proposal) + "\n")
+
     assert pfn.candidates(cfg) == []
 
 

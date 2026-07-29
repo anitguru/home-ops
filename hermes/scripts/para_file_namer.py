@@ -21,12 +21,15 @@ from typing import Any
 
 from user_file_organizer import (
     CONFIG_PATH,
+    exact_duplicate_plan,
     file_ext,
     fresh,
     iter_candidates,
     load_config,
+    load_latest_proposals,
     now_stamp,
     proposal_confidence_threshold,
+    proposal_matches_source,
     sha256,
     should_skip,
 )
@@ -179,6 +182,12 @@ def candidates(cfg: dict[str, Any]) -> list[Path]:
     patterns = list(local.get("generic_name_patterns", []))
     max_bytes = int(local.get("max_file_bytes", 12 * 1024 * 1024))
     min_age = int(cfg.get("min_age_minutes", 60))
+    duplicate_sources = (
+        set(exact_duplicate_plan(cfg, min_age))
+        if not local.get("rename_in_place_only", False)
+        else set()
+    )
+    recent_proposals = load_latest_proposals(cfg)
     found: list[Path] = []
     for root_cfg in cfg.get("allow_roots", []):
         for path in iter_candidates(root_cfg) or []:
@@ -193,6 +202,10 @@ def candidates(cfg: dict[str, Any]) -> list[Path]:
                     continue
                 age_seconds = dt.datetime.now().timestamp() - stat.st_mtime
                 if age_seconds < min_age * 60 or stat.st_size > max_bytes:
+                    continue
+                if str(path) in duplicate_sources:
+                    continue
+                if proposal_matches_source(path, recent_proposals.get(str(path))):
                     continue
                 skip, _ = should_skip(path, cfg, root_cfg)
                 if not skip:

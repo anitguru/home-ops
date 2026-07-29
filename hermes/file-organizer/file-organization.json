@@ -3,6 +3,11 @@
   "user_home": "/Users/sva",
   "min_age_minutes": 60,
   "max_auto_actions": 40,
+  "deduplication": {
+    "enabled": true,
+    "algorithm": "sha256",
+    "action": "trash"
+  },
   "manifest_dir": "/Users/sva/File Inbox/manifests",
   "report_dir": "/Users/sva/File Inbox/reports",
   "proposal_dir": "/Users/sva/File Inbox/proposals",
@@ -105,7 +110,7 @@
     "generic_name_patterns": [
       "^Screenshot ", "^Screen Shot ", "^IMG_[0-9]+", "^Image ",
       "^image[-_ ]?[0-9]*", "^pic$", "^[0-9a-f]{8}-[0-9a-f-]{20,}",
-      "(?-i:^(?=(?:.*[A-Z]){2})[A-Za-z0-9_-]{8,24}$)"
+      "(?-i:^(?=(?:.*[A-Z]){2})[A-Za-z0-9_-]{8,24}(?: \\([0-9]+\\))?$)"
     ]
   },
   "allow_roots": [
