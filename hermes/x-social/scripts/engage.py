@@ -99,6 +99,34 @@ def save_cursor(since_id: str):
     STATE_FILE.write_text(json.dumps({"since_id": since_id, "updated_at": int(time.time())}))
 
 
+# ── ad-hoc reply detection ────────────────────────────────────────────────────
+
+def fetch_own_replies(client, own_id: str) -> set[str]:
+    """Return the set of tweet IDs our account has already replied to on X.
+
+    This catches ad-hoc replies (manual via the X app, xurl, or any other
+    client) that bypassed the cron's local DB logging, preventing the cron
+    from double-replying to a mention we already answered ourselves.
+    """
+    replied_ids: set[str] = set()
+    try:
+        resp = client.get_users_tweets(
+            id=own_id,
+            max_results=100,
+            tweet_fields=["referenced_tweets", "created_at"],
+            exclude=["retweets"],
+            user_auth=True,
+        )
+        for tweet in (resp.data or []):
+            refs = _value(tweet, "referenced_tweets", None) or []
+            for ref in refs:
+                if _value(ref, "type") == "replied_to":
+                    replied_ids.add(str(_value(ref, "id")))
+    except Exception as exc:
+        print(f"  own-tweets fetch failed (ad-hoc reply check disabled): {exc}", file=sys.stderr)
+    return replied_ids
+
+
 # ── twitter client ────────────────────────────────────────────────────────────
 
 def make_client():
@@ -284,13 +312,15 @@ def process_mentions(
     *,
     top_posts: list[dict[str, Any]] | None = None,
     update_cursor: bool = True,
+    ad_hoc_replied_ids: set[str] | None = None,
 ) -> dict[str, int]:
     newest_id = None
     replies_sent = 0
     likes_sent = 0
     top_posts = top_posts or []
+    ad_hoc_replied_ids = ad_hoc_replied_ids or set()
 
-    print(f"found {len(mentions)} mention(s)")
+    print(f"found {len(mentions)} mention(s), {len(ad_hoc_replied_ids)} ad-hoc reply id(s) on record")
 
     for tweet in mentions:
         tweet_id = _tweet_id(tweet)
@@ -328,6 +358,14 @@ def process_mentions(
             break
         if social_db.interaction_exists(conn, "reply", tweet_id):
             print(f"  already replied to {tweet_id}, skipping")
+            continue
+        if tweet_id in ad_hoc_replied_ids:
+            print(f"  already replied ad-hoc to {tweet_id}, skipping and logging")
+            social_db.log_interaction(
+                conn, "reply", tweet_id, username, f"tweet:{tweet_id} {text[:240]}",
+                "ad-hoc reply (detected on X, not sent by cron)",
+                related_post_pk=related_post_pk, score=score, metadata=metadata,
+            )
             continue
         if score < MIN_REPLY_SCORE:
             print(f"  no reply score={score} reasons={','.join(reasons) or 'none'} @{username}")
@@ -398,7 +436,8 @@ def main() -> int:
 
     mentions = resp.data or []
     users = {u.id: u for u in (resp.includes.get("users") or [])} if resp.includes else {}
-    process_mentions(client, conn, mentions, users, top_posts=top_posts, update_cursor=True)
+    ad_hoc_replied_ids = fetch_own_replies(client, own_id)
+    process_mentions(client, conn, mentions, users, top_posts=top_posts, update_cursor=True, ad_hoc_replied_ids=ad_hoc_replied_ids)
     conn.close()
     return 0
 
