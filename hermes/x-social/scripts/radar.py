@@ -373,35 +373,54 @@ def is_already_posted(email_msg: dict, state: dict, db_conn) -> bool:
 # Tweet drafting
 # ---------------------------------------------------------------------------
 
-POST_TEMPLATE = """You are @anitdotguru — a pragmatic technical operator who builds with AI agents, homelabs, and self-hosted tools. Conversational, never corporate. You share what you learned the hard way.
+THREAD_TEMPLATE = """You are @anitdotguru — a pragmatic technical operator who builds with AI agents, homelabs, and self-hosted tools. Conversational, never corporate. You share what you learned the hard way.
 
-Growth feedback to apply:
-- Be specific and opinionated, not generic.
-- No emojis spam (one max if very fitting).
-- Max one contextual hashtag. No generic #AI/#tech.
+Your task: write a 3-post X thread from this AI news email. Each post must be under 270 chars.
+
+Rules:
+- No emoji spam (one max per post if very fitting).
+- No generic hashtags (#AI/#tech banned). One contextual tag max, only on post 1.
 - No "the future of", "game changer", "worth watching".
-- Include the key fact (model name, what changed) in the first line.
+- Be specific and opinionated. Use builder/operator voice.
+- Do NOT use thread numbering like "1/", "2/", "3/" — X handles threading visually.
 
-Template guardrails:
-- First line: the news headline (model name + what happened).
-- Second section: 1-2 sentences of context (what it is, why it matters to builders).
-- Third section: a practical command or action link if present in the email.
+POST 1 — The News:
+- First line: the headline (model name + what happened).
+- 1-2 sentences of context: what it is, why it matters to builders.
+- Include a practical command or action link if present in the email.
 - End with one contextual hashtag max.
+
+POST 2 — Top 3 Use Cases:
+- Share the top 3 concrete use cases for builders/self-hosters.
+- Format as a short list (one line per use case, use "•" bullets).
+- Be practical and specific — not vague "automation" or "agents".
+- Each use case should be something a builder could actually do this week.
+
+POST 3 — The Question:
+- Ask the audience what they're going to do with it.
+- Be conversational, not engagement-bait. Ask a genuine builder question.
+- End with a question mark.
+
+Separate each post with a line containing only `---POST---`.
 
 Source email:
 Subject: {subject}
 From: {sender}
 Body snippet: {body}
 
-Write one X post under 270 chars. After the post body, on a new line write `HASHTAGS:` with zero or one contextual tag."""
+Write the 3 posts now. Remember: `---POST---` between each. No code fences."""
 
 
-def craft_tweet(email_msg: dict, history: list[dict] | None = None) -> str | None:
-    """Draft a tweet from the email content using Hermes one-shot LLM."""
+def craft_thread(email_msg: dict, history: list[dict] | None = None) -> list[str] | None:
+    """Draft a 3-post X thread from the email content using Hermes one-shot LLM.
+
+    Returns a list of 3 strings (one per tweet), or None on failure.
+    Falls back to a single-post format if LLM is unavailable.
+    """
     if os.getenv("RADAR_USE_LLM", "1").lower() in {"0", "false", "no"}:
-        return craft_tweet_fallback(email_msg)
+        return [craft_tweet_fallback(email_msg)]
 
-    prompt = POST_TEMPLATE.format(
+    prompt = THREAD_TEMPLATE.format(
         subject=email_msg.get("subject", ""),
         sender=email_msg.get("sender", ""),
         body=email_msg.get("content", "")[:700],
@@ -418,25 +437,30 @@ def craft_tweet(email_msg: dict, history: list[dict] | None = None) -> str | Non
         ).strip()
     except Exception as exc:
         print(f"Hermes draft failed: {exc}")
-        return craft_tweet_fallback(email_msg)
+        return [craft_tweet_fallback(email_msg)]
 
-    hashtag_suffix = ""
-    if "\nHASHTAGS:" in raw:
-        body_part, tag_part = raw.rsplit("\nHASHTAGS:", 1)
-        tags = [t for t in tag_part.strip().split() if t.startswith("#")]
-        # Filter generic tags
-        generic = {"#ai", "#tech", "#technology", "#startup", "#startups"}
-        tags = [t for t in tags if t.lower() not in generic]
-        if tags:
-            hashtag_suffix = " " + tags[0]
-        raw = body_part
+    # Parse the ---POST--- delimited sections
+    parts = [p.strip().strip('"').strip("'") for p in raw.split("---POST---")]
+    parts = [p for p in parts if p.strip()]
 
-    body = raw.strip().strip('"').strip("'")
-    body_budget = MAX_LEN - len(hashtag_suffix)
-    if len(body) > body_budget:
-        body = textwrap.shorten(body, width=body_budget, placeholder="…")
+    if len(parts) < 2:
+        # LLM didn't produce a thread — treat as single post
+        print("LLM produced single post instead of thread — using as-is")
+        return [parts[0] if parts else craft_tweet_fallback(email_msg)]
 
-    return f"{body}{hashtag_suffix}"
+    # Enforce 270 char limit per post
+    cleaned = []
+    for i, post in enumerate(parts[:3]):  # max 3 posts
+        budget = MAX_LEN - 10  # leave room for hashtag suffix if needed
+        if len(post) > budget:
+            post = textwrap.shorten(post, width=budget, placeholder="…")
+        cleaned.append(post)
+
+    # Pad to 3 posts if LLM returned only 2
+    while len(cleaned) < 3:
+        cleaned.append("What are you building with this? Reply below 👇")
+
+    return cleaned
 
 
 def craft_tweet_fallback(email_msg: dict) -> str:
@@ -450,17 +474,39 @@ def craft_tweet_fallback(email_msg: dict) -> str:
 # Posting
 # ---------------------------------------------------------------------------
 
-def post_to_x(text: str) -> tuple[str, str]:
-    """Post to X via tweepy. Returns (tweet_url, tweet_id)."""
+def post_to_x(posts: list[str]) -> tuple[str, str]:
+    """Post to X via tweepy. Supports single posts and threads.
+
+    For threads (list with >1 item), each reply is chained via in_reply_to_tweet_id.
+    Returns (root_tweet_url, root_tweet_id).
+    """
     client = tweepy.Client(
         consumer_key=os.environ["X_CONSUMER_KEY"],
         consumer_secret=os.environ["X_CONSUMER_SECRET"],
         access_token=os.environ["X_ACCESS_TOKEN"],
         access_token_secret=os.environ["X_ACCESS_TOKEN_SECRET"],
     )
-    resp = client.create_tweet(text=text)
-    tid = resp.data["id"]
-    return f"https://x.com/anitdotguru/status/{tid}", tid
+
+    # Post the root tweet
+    resp = client.create_tweet(text=posts[0])
+    root_id = resp.data["id"]
+    root_url = f"https://x.com/anitdotguru/status/{root_id}"
+
+    # Post thread replies
+    prev_id = root_id
+    for i, post_text in enumerate(posts[1:], 1):
+        try:
+            resp = client.create_tweet(
+                text=post_text,
+                in_reply_to_tweet_id=prev_id,
+            )
+            prev_id = resp.data["id"]
+            print(f"  Thread post {i+1}: https://x.com/anitdotguru/status/{prev_id}")
+        except Exception as exc:
+            print(f"  Thread post {i+1} failed: {exc}")
+            break
+
+    return root_url, root_id
 
 
 def append_history(entry: dict) -> None:
@@ -543,10 +589,10 @@ def main() -> int:
     print(f"  From: {email_msg.get('sender', '')}")
     print(f"  Source: {email_msg.get('source', '')}")
 
-    # Draft tweet
-    text = craft_tweet(email_msg, history)
-    if not text:
-        print("Failed to draft tweet — skipping")
+    # Draft thread
+    posts = craft_thread(email_msg, history)
+    if not posts:
+        print("Failed to draft thread — skipping")
         state["last_run"] = dt.datetime.now(dt.UTC).isoformat()
         save_state(state)
         if db:
@@ -554,7 +600,9 @@ def main() -> int:
         return 1
 
     method = "llm" if os.getenv("RADAR_USE_LLM", "1").lower() not in {"0", "false", "no"} else "fallback"
-    print(f"\nDrafted [{method}] ({len(text)} chars): {text}")
+    print(f"\nDrafted [{method}] {len(posts)}-post thread:")
+    for i, p in enumerate(posts):
+        print(f"  Post {i+1} ({len(p)} chars): {p[:100]}...")
 
     # Dry run check
     if os.getenv("RADAR_DRY_RUN", "") == "1":
@@ -568,8 +616,8 @@ def main() -> int:
 
     # Post to X
     try:
-        tweet_url, tweet_id = post_to_x(text)
-        print(f"Posted: {tweet_url}")
+        tweet_url, tweet_id = post_to_x(posts)
+        print(f"Posted thread root: {tweet_url}")
     except Exception as exc:
         print(f"X post failed: {exc}")
         state["last_run"] = dt.datetime.now(dt.UTC).isoformat()
@@ -585,7 +633,8 @@ def main() -> int:
         "tweet_url": tweet_url,
         "source_url": email_msg.get("url", ""),
         "source_title": subject,
-        "text": text,
+        "text": posts[0],  # root post text
+        "thread_text": posts,  # full thread
         "method": method,
         "strategy": "email_radar",
         "source_type": email_msg.get("source", ""),
