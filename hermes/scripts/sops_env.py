@@ -39,6 +39,13 @@ PURPOSES: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("X_ACCESS_TOKEN_SECRET", "x", "ACCESS_TOKEN_SECRET"),
         ("PG_DSN", "postgres", "DSN"),
     ),
+    "radar": (
+        ("X_CONSUMER_KEY", "x", "CONSUMER_KEY"),
+        ("X_CONSUMER_SECRET", "x", "CONSUMER_SECRET"),
+        ("X_ACCESS_TOKEN", "x", "ACCESS_TOKEN"),
+        ("X_ACCESS_TOKEN_SECRET", "x", "ACCESS_TOKEN_SECRET"),
+        ("PG_DSN", "postgres", "DSN"),
+    ),
     "podcast": (
         ("CLOUDINARY_CLOUD_NAME", "cloudinary", "CLOUD_NAME"),
         ("CLOUDINARY_API_KEY", "cloudinary", "API_KEY"),
