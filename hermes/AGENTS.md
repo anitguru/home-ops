@@ -39,7 +39,7 @@ The AnITGuru vault is synced Obsidian knowledge, not an ops scripts directory. D
 
 No symlinks should exist between this vault and `~/.hermes` in either direction. Agent steering belongs in Hermes skills/config, not in Obsidian; do not recreate `_agent/`.
 
-Scripts and laptop ops automation should live in a version-controlled repo under `~/Documents/Repos/Github/anitguru/...` once the repo name is chosen. Until then, prefer documenting commands in the wiki over adding loose scripts.
+Scripts and laptop ops automation should live in `~/.hermes/scripts/` as real files (not symlinks). The `~/.hermes/scripts/` directory is the source of truth for cron scripts. Sync changes back to the home-ops repo (`hermes/scripts/`) with `cp` after editing so git stays current. Do not use symlinks from `~/.hermes/scripts/` to the repo — Hermes blocks cron scripts whose resolved path escapes the scripts directory, and symlink chains through `Documents/Repos/Github/home-ops` → `01-Projects/home-ops` trigger that check.
 
 
 ## Documentation taxonomy
