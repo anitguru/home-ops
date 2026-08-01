@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# AI News Radar — scans Apple Mail + Proton Bridge hourly for AI-related email
-# updates, posts to X via tweepy, and logs to the existing Postgres posts table.
+# AI News Radar — scans Apple Mail + Proton Bridge every four hours for strict,
+# high-impact AI news, posts to X, and logs to the existing Postgres posts table.
 
-ROOT="/Users/sva/Documents/Repos/Github/home-ops/hermes/x-social"
-HOME_OPS_HERMES_SCRIPTS="${HOME_OPS_HERMES_SCRIPTS:-/Users/sva/Documents/Repos/Github/home-ops/hermes/scripts}"
+ROOT="/Users/sva/01-Projects/home-ops/hermes/x-social"
+HOME_OPS_HERMES_SCRIPTS="${HOME_OPS_HERMES_SCRIPTS:-/Users/sva/.hermes/scripts}"
 HERMES_PYTHON="${HERMES_PYTHON:-/Users/sva/.hermes/hermes-agent/venv/bin/python3}"
-PYTHON="${PYTHON:-/Users/sva/Documents/Repos/Github/home-ops/.venv/bin/python}"
+PYTHON="${PYTHON:-/Users/sva/01-Projects/home-ops/.venv/bin/python}"
 X_SOCIAL_STATE_DIR="${X_SOCIAL_STATE_DIR:-${HERMES_STATE_DIR:-$HOME/.local/state/home-ops}/x-social}"
 
 cd "$ROOT"
@@ -19,7 +19,7 @@ fi
 
 if [[ ! -x "$PYTHON" ]]; then
   echo "ERROR: expected home-ops venv Python at $PYTHON" >&2
-  echo "Create it with: $HERMES_PYTHON -m venv /Users/sva/Documents/Repos/Github/home-ops/.venv && /Users/sva/Documents/Repos/Github/home-ops/.venv/bin/pip install -r $ROOT/requirements.txt" >&2
+  echo "Create it with: $HERMES_PYTHON -m venv /Users/sva/01-Projects/home-ops/.venv && /Users/sva/01-Projects/home-ops/.venv/bin/pip install -r $ROOT/requirements.txt" >&2
   exit 1
 fi
 
@@ -45,6 +45,7 @@ export X_SOCIAL_STATE_DIR
 export HERMES_AUTOMATION_PROFILE="${HERMES_RADAR_PROFILE:-xposting}"
 export HERMES_AUTOMATION_TOOLSETS="${HERMES_AUTOMATION_TOOLSETS:-terminal}"
 export RADAR_USE_LLM="${RADAR_USE_LLM:-1}"
+export RADAR_TRIAGE_LLM="${RADAR_TRIAGE_LLM:-1}"
 
 "$PYTHON" scripts/radar.py
 

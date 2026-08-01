@@ -65,25 +65,56 @@ STATE_DIR = Path(os.environ.get(
 STATE_FILE = STATE_DIR / "radar_cursor.json"
 HISTORY = state_paths.POSTS_HISTORY
 
-# AI-related keywords to match in email subjects/senders
-AI_KEYWORDS = [
-    "claude", "anthropic", "openai", "gpt", "chatgpt", "ollama", "hermes",
-    "hermes-agent", "pi-agent", "moonshot", "kimi", "mistral", "llama",
-    "gemini", "deepmind", "hugging face", "huggingface", "open model",
-    "open-weight", "open source model", "diffusion", "midjourney",
-    "stability", "stablediffusion", "perplexity", "grok", "xai",
-    "cohere", "ai21", "fal", "replicate", "modal", "together ai",
-    "runpod", "vast.ai", "cursor", "windsurf", "zed", "continue",
-    "mcp", "model context protocol", "agent", "agentic", "rag",
-    "fine-tune", "fine-tuning", "fine tune", "fine tuning", "quantization",
-    "gguf", "ggml", "lora", "qlora", "vllm", "sglang", "tgi",
-    "text-to-speech", "tts", "whisper", "embedding", "reranker",
-    "vector db", "vector database", "pinecone", "qdrant", "weaviate",
-    "milvus", "chroma", "langchain", "llamaindex", "crewai", "autogen",
-    "n8n", "windmill", "dify", "flowise", "fastgpt",
+# High-signal topics. Generic words such as "AI", "agent", "RAG", and vendor
+# names alone are intentionally insufficient. A message must also describe a
+# concrete release, availability change, policy event, outage, or similarly
+# material development.
+HIGH_SIGNAL_TOPICS = [
+    # Models / model labs / open weights
+    "model weights", "open weights", "open-weight", "open weight", "checkpoint",
+    "foundation model", "language model", "multimodal model", "reasoning model",
+    "mixture of experts", "moe model", "parameter model", "model release",
+    "claude", "anthropic", "openai", "gpt-", "chatgpt", "gemini", "deepmind",
+    "grok", "xai", "kimi", "moonshot", "mistral", "llama", "qwen", "deepseek",
+    "phi-", "command r", "cohere", "ai21", "nous research", "nousresearch",
+    # Harnesses / runtimes / inference and local model distribution
+    "agent harness", "coding harness", "coding agent", "agent runtime",
+    "agent framework", "tool-use", "tool use", "model context protocol", "mcp server",
+    "hermes agent", "hermes-agent", "openclaw", "pi-agent", "claude code", "codex cli",
+    "ollama", "ollama cloud", "hugging face", "huggingface", "vllm", "sglang",
+    "gguf", "quantization", "inference engine", "model serving", "local model",
 ]
 
-# Senders/domains that are always interesting (allowlist)
+RELEASE_EVENTS = [
+    "released", "releases", "launches", "launched", "launching", "unveils",
+    "unveiled", "introducing", "announcing", "now available", "available now",
+    "available on", "ships today", "weights available", "open-sourced", "open sourced",
+    "lands on", "rolls out", "rolling out", "is here", "general availability",
+]
+
+CAPACITY_EVENTS = [
+    "capacity", "demand exceeds", "demand outstrips", "not accepting", "waitlist",
+    "sold out", "paused signups", "pauses signups", "quota", "rate limit",
+    "overloaded", "service unavailable", "availability limited",
+]
+
+MAJOR_EVENTS = [
+    "blocked by", "government blocked", "banned", "ban on", "export control",
+    "sanctioned", "prohibited", "restriction", "shut down", "shuts down",
+    "security breach", "data breach", "major outage", "acquired", "acquisition",
+    "merger", "cease and desist", "injunction", "antitrust", "investigation",
+]
+
+PROMOTIONAL_TERMS = [
+    "webinar", "register now", "save your seat", "book a demo", "request a demo",
+    "limited time", "special offer", "sale", "discount", "coupon", "sponsored",
+    "partner offer", "case study", "customer story", "whitepaper", "ebook",
+    "weekly digest", "monthly roundup", "top stories", "newsletter edition",
+    "last chance", "don't miss", "do not miss", "free trial", "upgrade today",
+]
+
+# First-party/credible sender domains. These add confidence but never qualify an
+# email without a high-signal topic and concrete news event.
 AI_SENDER_DOMAINS = [
     "ollama.com", "anthropic.com", "openai.com", "xai.com",
     "mistral.ai", "huggingface.co", "stability.ai", "cohere.com",
@@ -148,30 +179,56 @@ def save_state(state: dict[str, Any]) -> None:
 # Email scanning
 # ---------------------------------------------------------------------------
 
-def is_ai_related(subject: str, sender: str) -> bool:
-    """Check if email is AI-related based on subject/sender.
+def radar_signal(subject: str, sender: str, body: str = "") -> tuple[bool, int, str]:
+    """Return strict deterministic news-candidate status, score, and rationale.
 
-    Uses stricter matching: sender domain allowlist is always trusted,
-    but keyword matches require the keyword to be a word boundary match
-    (not a substring of a larger word) to avoid false positives like
-    'agent' in 'insurance agent' or 'rag' in 'fragrant'.
+    Sender reputation helps rank a candidate but never qualifies it by itself.
+    The email must contain a high-signal topic *and* a concrete event. Generic
+    AI marketing, webinars, roundups, case studies, and company newsletters fail
+    closed unless they also contain an unmistakably major event.
     """
-    text = (subject + " " + sender).lower()
-    # Check sender domain allowlist (trusted senders)
-    for domain in AI_SENDER_DOMAINS:
-        if domain in sender.lower():
-            return True
-    # Check keywords with word-boundary matching for short/common terms
-    SHORT_KEYWORDS = {"agent", "rag", "mcp", "tts", "tgi", "zed", "fal", "n8n", "dify"}
-    for kw in AI_KEYWORDS:
-        if kw in SHORT_KEYWORDS:
-            # Use word boundary for short/common terms
-            if re.search(r'\b' + re.escape(kw) + r'\b', text):
-                return True
-        else:
-            if kw in text:
-                return True
-    return False
+    subject_l = subject.lower().strip()
+    sender_l = sender.lower()
+    body_l = body.lower()[:5000]
+    full_text = f"{subject_l}\n{body_l}"
+
+    topic_hits = [term for term in HIGH_SIGNAL_TOPICS if term in full_text]
+    subject_topics = [term for term in HIGH_SIGNAL_TOPICS if term in subject_l]
+    release_hits = [term for term in RELEASE_EVENTS if term in full_text]
+    capacity_hits = [term for term in CAPACITY_EVENTS if term in full_text]
+    major_hits = [term for term in MAJOR_EVENTS if term in full_text]
+    event_hits = release_hits + capacity_hits + major_hits
+    subject_events = [term for term in RELEASE_EVENTS + CAPACITY_EVENTS + MAJOR_EVENTS if term in subject_l]
+    promo_hits = [term for term in PROMOTIONAL_TERMS if term in subject_l]
+    trusted = any(domain in sender_l for domain in AI_SENDER_DOMAINS)
+
+    if not topic_hits or not event_hits:
+        missing = "topic" if not topic_hits else "concrete event"
+        return False, 0, f"missing high-signal {missing}"
+
+    score = 0
+    score += 3 if subject_topics else 1
+    score += 3 if subject_events else 1
+    score += 4 if major_hits else 0
+    score += 3 if capacity_hits else 0
+    score += 1 if trusted else 0
+    score -= 5 if promo_hits else 0
+
+    # Release announcements need the topic or event in the subject. Major policy,
+    # capacity, security, and availability events may qualify from a terse subject
+    # when the body supplies the model/harness context.
+    subject_grounded = bool(subject_topics or subject_events)
+    accepted = score >= 5 and (subject_grounded or bool(major_hits or capacity_hits))
+    reason = (
+        f"topics={topic_hits[:3]}; events={event_hits[:3]}; "
+        f"trusted={trusted}; promo={promo_hits[:2]}; score={score}"
+    )
+    return accepted, score, reason
+
+
+def is_ai_related(subject: str, sender: str, body: str = "") -> bool:
+    """Compatibility wrapper for the strict radar candidate gate."""
+    return radar_signal(subject, sender, body)[0]
 
 
 def content_hash(text: str) -> str:
@@ -199,7 +256,10 @@ def scan_apple_mail() -> list[dict[str, str]]:
             if not block:
                 continue
             msg = {}
-            lines = block.split("\r\n")
+            # osascript may emit LF or CRLF depending on the message/source.
+            # splitlines() handles both; splitting only on CRLF caused forwarded
+            # emails to collapse into one giant subject with blank sender/body.
+            lines = block.splitlines()
             for line in lines:
                 line = line.strip()
                 if line.startswith("Subject: "):
@@ -213,12 +273,18 @@ def scan_apple_mail() -> list[dict[str, str]]:
                     content_start = block.index("Content: ")
                     msg["content"] = block[content_start + len("Content: "):].strip()
                     break  # Content is the last field, stop parsing lines
-            # Only match on subject + sender (NOT content) to avoid false positives
-            if msg.get("subject") and is_ai_related(msg.get("subject", ""), msg.get("sender", "")):
+            if msg.get("subject") and is_ai_related(
+                msg.get("subject", ""), msg.get("sender", ""), msg.get("content", "")
+            ):
+                accepted, score, reason = radar_signal(
+                    msg.get("subject", ""), msg.get("sender", ""), msg.get("content", "")
+                )
+                msg["radar_score"] = score
+                msg["radar_reason"] = reason
                 msg["source"] = "apple_mail"
                 emails.append(msg)
 
-        print(f"Apple Mail: found {len(emails)} AI-related emails")
+        print(f"Apple Mail: found {len(emails)} strict news candidates")
         return emails
     except subprocess.TimeoutExpired:
         print("Apple Mail osascript timed out")
@@ -327,11 +393,18 @@ print('\\n---EMAIL---\\n'.join(results) if results else 'NO_RESULTS')
                     msg["content"] = line[len("BODY|||"):]
                 elif line.startswith("UID|||"):
                     msg["uid"] = line[len("UID|||"):]
-            if msg.get("subject") and is_ai_related(msg.get("subject", ""), msg.get("sender", "")):
+            if msg.get("subject") and is_ai_related(
+                msg.get("subject", ""), msg.get("sender", ""), msg.get("content", "")
+            ):
+                accepted, score, reason = radar_signal(
+                    msg.get("subject", ""), msg.get("sender", ""), msg.get("content", "")
+                )
+                msg["radar_score"] = score
+                msg["radar_reason"] = reason
                 msg["source"] = "proton"
                 emails.append(msg)
 
-        print(f"Proton: found {len(emails)} AI-related emails")
+        print(f"Proton: found {len(emails)} strict news candidates")
         return emails
     except Exception as exc:
         print(f"Proton scan error: {exc}")
@@ -370,8 +443,115 @@ def is_already_posted(email_msg: dict, state: dict, db_conn) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Tweet drafting
+# Newsworthiness adjudication and tweet drafting
 # ---------------------------------------------------------------------------
+
+NEWSWORTHINESS_TEMPLATE = """You are the strict editor for @anitdotguru's AI news radar.
+
+Decide which email, if any, is genuinely new and important enough to post to X. This is not a general AI newsletter. Be highly selective.
+
+POST only for material developments such as:
+- a new model or major model version, especially open weights/checkpoints;
+- a meaningful agent harness, coding harness, runtime, inference, or local-model distribution release;
+- consequential access/availability/capacity news (for example, a model reaching Ollama Cloud but subscriptions being paused because demand exceeds capacity);
+- major government/legal action, blocking, export controls, shutdowns, security incidents, major outages, or acquisitions affecting AI builders.
+
+REJECT:
+- advertisements, webinars, demos, discounts, case studies, ebooks, sponsored mail, and sales outreach;
+- generic company updates that merely say "AI";
+- weekly digests, roundups, opinion pieces, tutorials, and recycled stories;
+- minor product features or vague announcements with no concrete new event.
+
+Important: first-party announcements and credible direct email reports are sufficient. Do NOT require Hacker News, Reddit, or mainstream coverage. The goal is to catch important news early, before aggregators cover it.
+
+Return ONLY a JSON array with one object per input item:
+{{"id": 0, "score": 0-100, "post": true|false, "event_type": "model|open_weights|harness|availability|policy|security|outage|business|other", "reason": "brief factual reason"}}
+
+Set post=true only at score 80 or above. If none qualify, every item must have post=false.
+
+Candidates:
+{candidates}
+"""
+
+
+def _extract_json_array(raw: str) -> list[dict[str, Any]]:
+    """Extract a JSON array from a strict or fenced LLM response."""
+    cleaned = raw.strip()
+    cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.I)
+    cleaned = re.sub(r"\s*```$", "", cleaned)
+    start, end = cleaned.find("["), cleaned.rfind("]")
+    if start < 0 or end <= start:
+        raise ValueError("no JSON array in triage response")
+    parsed = json.loads(cleaned[start:end + 1])
+    if not isinstance(parsed, list):
+        raise ValueError("triage response was not a list")
+    return [item for item in parsed if isinstance(item, dict)]
+
+
+def rank_newsworthy_candidates(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return only high-confidence news, ordered by editorial importance.
+
+    The LLM evaluates all candidates in one call. Failure is conservative: only
+    deterministic candidates scoring at least 8 survive, so an unavailable LLM
+    cannot turn broad keyword matches into posts.
+    """
+    if not candidates:
+        return []
+
+    compact = []
+    for idx, item in enumerate(candidates[:20]):
+        compact.append({
+            "id": idx,
+            "subject": item.get("subject", ""),
+            "sender": item.get("sender", ""),
+            "body": item.get("content", "")[:1200],
+            "deterministic_score": item.get("radar_score", 0),
+            "deterministic_reason": item.get("radar_reason", ""),
+        })
+
+    use_llm = os.getenv("RADAR_TRIAGE_LLM", "1").lower() not in {"0", "false", "no"}
+    if use_llm:
+        try:
+            raw = run_hermes_prompt(
+                NEWSWORTHINESS_TEMPLATE.format(candidates=json.dumps(compact, indent=2)),
+                provider=os.getenv("RADAR_LLM_PROVIDER") or os.getenv("HERMES_POSTING_PROVIDER"),
+                model=os.getenv("RADAR_LLM_MODEL") or os.getenv("HERMES_POSTING_MODEL"),
+                toolsets=os.getenv("HERMES_AUTOMATION_TOOLSETS", "terminal"),
+                timeout=240,
+                source="radar-triage",
+            ).strip()
+            verdicts = _extract_json_array(raw)
+            qualifying = []
+            for verdict in verdicts:
+                raw_idx = verdict.get("id")
+                if raw_idx is None:
+                    continue
+                try:
+                    idx = int(raw_idx)
+                    score = int(verdict.get("score", 0))
+                except (TypeError, ValueError):
+                    continue
+                if not (0 <= idx < len(candidates)):
+                    continue
+                if verdict.get("post") is True and score >= 80:
+                    item = dict(candidates[idx])
+                    item["news_score"] = score
+                    item["news_reason"] = str(verdict.get("reason", ""))
+                    item["event_type"] = str(verdict.get("event_type", "other"))
+                    qualifying.append(item)
+            return sorted(
+                qualifying,
+                key=lambda item: (item.get("news_score", 0), item.get("radar_score", 0)),
+                reverse=True,
+            )
+        except Exception as exc:
+            print(f"Newsworthiness triage failed; using strict deterministic fallback: {exc}")
+
+    fallback = [dict(item) for item in candidates if int(item.get("radar_score", 0)) >= 8]
+    for item in fallback:
+        item["news_score"] = int(item.get("radar_score", 0)) * 10
+        item["news_reason"] = "strict deterministic fallback"
+    return sorted(fallback, key=lambda item: item.get("radar_score", 0), reverse=True)
 
 THREAD_TEMPLATE = """You are @anitdotguru — a pragmatic technical operator who builds with AI agents, homelabs, and self-hosted tools. Conversational, never corporate. You share what you learned the hard way.
 
@@ -550,10 +730,10 @@ def main() -> int:
     proton_emails = scan_proton()
 
     all_emails = apple_emails + proton_emails
-    print(f"\nTotal AI-related emails found: {len(all_emails)}")
+    print(f"\nTotal strict news candidates found: {len(all_emails)}")
 
     if not all_emails:
-        print("No AI-related emails found — nothing to post")
+        print("No high-signal AI news candidates found — nothing to post")
         state["last_run"] = dt.datetime.now(dt.UTC).isoformat()
         save_state(state)
         if db:
@@ -571,7 +751,7 @@ def main() -> int:
 
     # Filter out already-posted
     new_emails = [e for e in all_emails if not is_already_posted(e, state, db)]
-    print(f"After dedup: {len(new_emails)} new emails to post")
+    print(f"After dedup: {len(new_emails)} unseen candidates")
 
     if not new_emails:
         print("All emails already posted — skipping")
@@ -581,13 +761,28 @@ def main() -> int:
             db.close()
         return 0
 
-    # Limit to 1 post per run to avoid spam
-    email_msg = new_emails[0]
+    # Strict editorial ranking. This intentionally does not require Hacker News
+    # or other aggregator coverage; credible first-party breaking news qualifies.
+    newsworthy = rank_newsworthy_candidates(new_emails)
+    print(f"After newsworthiness triage: {len(newsworthy)} post-worthy candidates")
+    if not newsworthy:
+        print("No candidate met the strict 80/100 editorial threshold — nothing to post")
+        state["last_run"] = dt.datetime.now(dt.UTC).isoformat()
+        save_state(state)
+        if db:
+            db.close()
+        return 0
+
+    # Limit to 1 post per run to avoid spam. Ranking selects the most important,
+    # rather than whichever mailbox happened to be scanned first.
+    email_msg = newsworthy[0]
     subject = email_msg.get("subject", "").strip()
     subj_hash = content_hash(subject)
     print(f"\nSelected: {subject}")
     print(f"  From: {email_msg.get('sender', '')}")
     print(f"  Source: {email_msg.get('source', '')}")
+    print(f"  News score: {email_msg.get('news_score', '')}")
+    print(f"  Why: {email_msg.get('news_reason', '')}")
 
     # Draft thread
     posts = craft_thread(email_msg, history)
@@ -650,7 +845,7 @@ def main() -> int:
     state.setdefault("posted_hashes", []).append(subj_hash)
     save_state(state)
 
-    print(f"\nRadar complete. Posted 1 of {len(new_emails)} new AI emails.")
+    print(f"\nRadar complete. Posted the top-ranked item from {len(newsworthy)} qualifying stories.")
     return 0
 
 
