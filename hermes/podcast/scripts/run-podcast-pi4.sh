@@ -22,11 +22,14 @@ export SCRIPT_PROVIDER="${SCRIPT_PROVIDER:-ollama}"        # claude | ollama
 export SCRIPT_MODEL="${SCRIPT_MODEL:-glm-5.2}"             # claude-opus-4-8 | glm-5.2
 export OLLAMA_CLOUD_API_KEY="${OLLAMA_CLOUD_API_KEY:-$($SECRET ollama CLOUD_API_KEY)}"
 # --- TTS endpoints: chatterbox_tts_segments.sh tries $TTS_URL first, then
-#     $TTS_URL_FALLBACK on failure (fast failover). Default = metroplex CPU only.
-#     To PREFER the rgb 4090 GPU host once its chatterbox is live+verified,
-#     uncomment these two (metroplex stays as the always-there fallback):
-# export TTS_URL="https://rgb.transformers.lan:4123/v1/audio/speech"
-# export TTS_URL_FALLBACK="https://chatterbox.transformers.lan/v1/audio/speech"
+#     $TTS_URL_FALLBACK on failure (fast failover).
+#     PRIMARY = rgb 4090 GPU chatterbox (RTF ~0.15; the service is brought up
+#     05:50-06:45 ET by chatterbox-on/off.timer on rgb, covering the 06:00 run).
+#     FALLBACK = metroplex CPU chatterbox (always-on, LXC137). If rgb is off,
+#     gaming, or stuck at BIOS, the run fails over to metroplex automatically.
+#     To disable rgb, point TTS_URL back at the metroplex URL.
+export TTS_URL="http://rgb.transformers.lan:4123/v1/audio/speech"
+export TTS_URL_FALLBACK="https://chatterbox.transformers.lan/v1/audio/speech"
 
 TODAY=$(date +%F)
 DAY_NAME=$(date +%A)
