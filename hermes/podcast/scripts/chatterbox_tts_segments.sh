@@ -67,6 +67,17 @@ fi
 # blips; this outer loop (with real backoff) survives a longer chatterbox
 # endpoint outage — e.g. a 30-60s restart — that would otherwise fail the episode.
 TTS_MAX_ATTEMPTS=${TTS_MAX_ATTEMPTS:-5}
+# TTS endpoints tried in order: primary ($TTS_URL) first, then optional fallback
+# ($TTS_URL_FALLBACK). A dead/absent primary — e.g. the rgb GPU host powered off
+# — fails fast (connection refused) and the loop rides over to the fallback
+# (metroplex CPU) immediately, so the episode still ships. Leave TTS_URL_FALLBACK
+# empty for single-endpoint behavior.
+TTS_URL_FALLBACK=${TTS_URL_FALLBACK:-}
+TTS_URLS=("$TTS_URL")
+if [[ -n "$TTS_URL_FALLBACK" && "$TTS_URL_FALLBACK" != "$TTS_URL" ]]; then
+  TTS_URLS+=("$TTS_URL_FALLBACK")
+  echo "[tts] primary=$TTS_URL fallback=$TTS_URL_FALLBACK"
+fi
 : > "$SEGMENTS_DIR/concat.txt"
 for txt in "$SEGMENTS_DIR"/segment-*.txt; do
   base=${txt%.txt}
@@ -86,10 +97,13 @@ pathlib.Path(sys.argv[2]).write_text(json.dumps(payload))
 PY
   attempt=1
   while :; do
-    echo "[tts] POST $(basename "$mp3") (attempt $attempt/$TTS_MAX_ATTEMPTS)"
+    idx=$(( attempt - 1 )); (( idx >= ${#TTS_URLS[@]} )) && idx=$(( ${#TTS_URLS[@]} - 1 ))
+    url="${TTS_URLS[$idx]}"
+    cargs=(); [[ "$url" == "$TTS_URL" ]] && cargs=("${CURL_CONNECT_ARGS[@]}")   # Tailscale connect-to only valid for primary
+    echo "[tts] POST $(basename "$mp3") (attempt $attempt/$TTS_MAX_ATTEMPTS via $url)"
     ok=1
-    curl "${CURL_CONNECT_ARGS[@]}" -fsS --retry 2 --retry-all-errors --connect-timeout 30 --max-time 900 \
-      -X POST "$TTS_URL" \
+    curl "${cargs[@]}" -fsS --retry 2 --retry-all-errors --connect-timeout 30 --max-time 900 \
+      -X POST "$url" \
       -H "Content-Type: application/json" \
       --data-binary "@$json" \
       -o "$mp3" || ok=0
@@ -97,15 +111,17 @@ PY
     [[ -f "$mp3" ]] && bytes=$(wc -c < "$mp3" | tr -d ' ')
     if [[ "$ok" = 1 && "$bytes" -ge 5000 ]]; then
       duration=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 "$mp3")
-      echo "[tts] $(basename "$mp3") ${bytes} bytes ${duration}s"
+      echo "[tts] $(basename "$mp3") ${bytes} bytes ${duration}s (via $url)"
       break
     fi
     if [[ "$attempt" -ge "$TTS_MAX_ATTEMPTS" ]]; then
       echo "ERROR: TTS segment failed after $TTS_MAX_ATTEMPTS attempts: $mp3 (curl_ok=$ok bytes=$bytes)" >&2
       exit 3
     fi
-    backoff=$(( attempt * 15 ))
-    echo "[tts] $(basename "$mp3") failed (curl_ok=$ok bytes=$bytes) — retrying in ${backoff}s" >&2
+    # If the next attempt switches to a different endpoint, fail over immediately (no backoff).
+    nidx=$attempt; (( nidx >= ${#TTS_URLS[@]} )) && nidx=$(( ${#TTS_URLS[@]} - 1 ))
+    if [[ "${TTS_URLS[$nidx]}" != "$url" ]]; then backoff=0; else backoff=$(( attempt * 15 )); fi
+    echo "[tts] $(basename "$mp3") failed on $url (curl_ok=$ok bytes=$bytes) — next attempt in ${backoff}s" >&2
     rm -f "$mp3"
     sleep "$backoff"
     attempt=$(( attempt + 1 ))
