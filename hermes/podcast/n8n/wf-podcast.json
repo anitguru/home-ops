@@ -1,0 +1,654 @@
+{
+  "name": "WF-podcast",
+  "nodes": [
+    {
+      "id": "trigger",
+      "name": "Manual Test Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "schedule_trigger",
+      "name": "Schedule Trigger (DISABLED -- cutover only)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        160
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 6,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "disabled": true
+    },
+    {
+      "id": "config",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const now = new Date();\nconst date = now.toISOString().slice(0,10);\nconst dayName = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/New_York' });\nreturn [{ json: {\n  dryRun: true,\n  date,\n  dayName,\n  podcastDir: `/tmp/podcast-${date}`\n} }];\n"
+      }
+    },
+    {
+      "id": "episode_pg",
+      "name": "Episode Number (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COALESCE(\n  (SELECT episode FROM podcast_episodes WHERE date = $1),\n  (SELECT COALESCE(MAX(episode),0)+1 FROM podcast_episodes)\n) AS episode;",
+        "options": {
+          "queryReplacement": "={{ [$json.date] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "fK9icsGZqJ3aJWG3",
+          "name": "Supabase Postgres (podcast)"
+        }
+      }
+    },
+    {
+      "id": "merge_episode",
+      "name": "Merge Episode + Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const cfg = $('Config').first().json;\nconst episode = $input.first().json.episode;\nreturn [{ json: { ...cfg, episode } }];\n"
+      }
+    },
+    {
+      "id": "hn_fetch",
+      "name": "Fetch HN Stories (Algolia)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=20",
+        "options": {}
+      }
+    },
+    {
+      "id": "normalize_stories",
+      "name": "Normalize + Dedupe Stories",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const cfg = $('Merge Episode + Config').first().json;\nconst raw0 = $input.first().json;\nconst hits = raw0.hits || (raw0.body && raw0.body.hits) || [];\nconst seen = new Set();\nconst stories = [];\nfor (const h of hits) {\n  const url = h.url || `https://news.ycombinator.com/item?id=${h.objectID}`;\n  const m = /^https?:\\/\\/([^\\/]+)/i.exec(url);\n  if (!m) continue;\n  const domain = m[1].toLowerCase().replace(/^www\\./, '');\n  if (seen.has(domain)) continue;\n  seen.add(domain);\n  stories.push({\n    id: h.objectID,\n    title: h.title || 'No title',\n    url,\n    hn_url: `https://news.ycombinator.com/item?id=${h.objectID}`,\n    score: h.points || 0,\n    comments: h.num_comments || 0,\n    created_at: h.created_at || ''\n  });\n  if (stories.length >= 10) break;\n}\nif (stories.length < 5) throw new Error(`only ${stories.length} stories (<5)`);\nconst storiesJson = JSON.stringify(stories, null, 2);\nconst metadataJson = JSON.stringify({ episode: cfg.episode, date: cfg.date }, null, 2);\nreturn [{ json: {\n  ...cfg,\n  storiesJson,\n  metadataJson,\n  storiesB64: Buffer.from(storiesJson).toString('base64'),\n  metadataB64: Buffer.from(metadataJson).toString('base64')\n} }];\n"
+      }
+    },
+    {
+      "id": "ssh_write_stories",
+      "name": "SSH: Write stories.json to pi4",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        0
+      ],
+      "parameters": {
+        "authentication": "privateKey",
+        "resource": "command",
+        "command": "=mkdir -p {{ $json.podcastDir }} && echo '{{ $json.storiesB64 }}' | base64 -d > {{ $json.podcastDir }}/stories.json && echo '{{ $json.metadataB64 }}' | base64 -d > {{ $json.podcastDir }}/metadata.json && echo WROTE_OK"
+      },
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "tUgxqrxX7Wdo9hUX",
+          "name": "pi4 (podcast SSH)"
+        }
+      }
+    },
+    {
+      "id": "ssh_rank",
+      "name": "SSH: cocoindex Rank + Proof-Gate",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        0
+      ],
+      "parameters": {
+        "authentication": "privateKey",
+        "resource": "command",
+        "command": "=set -euo pipefail\nexport PATH=\"/home/pi/.local/bin:/usr/local/bin:/usr/bin:/bin\"\nexport TZ=America/New_York\nHOME_OPS=/home/pi/home-ops\nPY=\"$HOME_OPS/.venv/bin/python\"\ncd \"$HOME_OPS/hermes/podcast\"\neval \"$(\"$PY\" \"$HOME_OPS/hermes/scripts/sops_env.py\" --purpose podcast)\"\nunset TTS_CONNECT_HOST WHISPER_CONNECT_HOST\n\"$PY\" scripts/cocoindex_rank.py \"{{ $('Normalize + Dedupe Stories').first().json.podcastDir }}\""
+      },
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "tUgxqrxX7Wdo9hUX",
+          "name": "pi4 (podcast SSH)"
+        }
+      }
+    },
+    {
+      "id": "assert_gate",
+      "name": "Assert Proof-Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        0
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const cfg = $('Normalize + Dedupe Stories').first().json;\nconst out = ($input.first().json.stdout || '') + ($input.first().json.stderr || '');\nif (out.includes('Topic index unavailable')) throw new Error('PROOF-GATE FAIL: Topic index unavailable \u2014 do not publish');\nif (!out.includes('[cocoindex] Top trending:')) throw new Error('PROOF-GATE FAIL: no Top trending proof in rank output');\nif (!/\\[cocoindex\\] Loaded \\d+ recent podcast story keys for dedupe/.test(out)) throw new Error('PROOF-GATE FAIL: no dedupe proof in rank output');\nreturn [{ json: { ...cfg, rankOutput: out } }];\n"
+      }
+    },
+    {
+      "id": "ssh_script",
+      "name": "SSH: Author Script (GLM, fallback)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1980,
+        0
+      ],
+      "parameters": {
+        "authentication": "privateKey",
+        "resource": "command",
+        "command": "=set -euo pipefail\nexport PATH=\"/home/pi/.local/bin:/usr/local/bin:/usr/bin:/bin\"\nexport TZ=America/New_York\nHOME_OPS=/home/pi/home-ops\nPY=\"$HOME_OPS/.venv/bin/python\"\ncd \"$HOME_OPS/hermes/podcast\"\neval \"$(\"$PY\" \"$HOME_OPS/hermes/scripts/sops_env.py\" --purpose podcast)\"\nunset TTS_CONNECT_HOST WHISPER_CONNECT_HOST\n\"$PY\" scripts/pi4_generate_script.py \"{{ $json.podcastDir }}\" \"{{ $json.episode }}\" \"{{ $json.dayName }}\""
+      },
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "tUgxqrxX7Wdo9hUX",
+          "name": "pi4 (podcast SSH)"
+        }
+      }
+    },
+    {
+      "id": "ssh_tts",
+      "name": "SSH: TTS Segments (Chatterbox)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        0
+      ],
+      "parameters": {
+        "authentication": "privateKey",
+        "resource": "command",
+        "command": "=set -euo pipefail\nexport PATH=\"/home/pi/.local/bin:/usr/local/bin:/usr/bin:/bin\"\nexport TZ=America/New_York\nHOME_OPS=/home/pi/home-ops\nPY=\"$HOME_OPS/.venv/bin/python\"\ncd \"$HOME_OPS/hermes/podcast\"\neval \"$(\"$PY\" \"$HOME_OPS/hermes/scripts/sops_env.py\" --purpose podcast)\"\nunset TTS_CONNECT_HOST WHISPER_CONNECT_HOST\nTODAY=\"{{ $('Assert Proof-Gate').first().json.date }}\" PODCAST_DIR=\"{{ $('Assert Proof-Gate').first().json.podcastDir }}\" bash scripts/chatterbox_tts_segments.sh"
+      },
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "tUgxqrxX7Wdo9hUX",
+          "name": "pi4 (podcast SSH)"
+        }
+      }
+    },
+    {
+      "id": "ssh_duration",
+      "name": "SSH: Assert MP3 Duration >60s",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        2420,
+        0
+      ],
+      "parameters": {
+        "authentication": "privateKey",
+        "resource": "command",
+        "command": "=D=\"{{ $('Assert Proof-Gate').first().json.podcastDir }}\"; DATE=\"{{ $('Assert Proof-Gate').first().json.date }}\"; MP3=\"$D/gurus-tech-bytes-$DATE.mp3\"; [ -s \"$MP3\" ] || { echo \"MP3 missing\"; exit 1; }; DUR=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 \"$MP3\"); echo \"DUR=$DUR\"; python3 -c \"import sys; sys.exit(0 if float('$DUR')>60 else 1)\""
+      },
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "tUgxqrxX7Wdo9hUX",
+          "name": "pi4 (podcast SSH)"
+        }
+      }
+    },
+    {
+      "id": "ssh_whisper",
+      "name": "SSH: Whisper Transcription (curl)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        2640,
+        0
+      ],
+      "parameters": {
+        "authentication": "privateKey",
+        "resource": "command",
+        "command": "=set -euo pipefail\nexport PATH=\"/home/pi/.local/bin:/usr/local/bin:/usr/bin:/bin\"\nexport TZ=America/New_York\nHOME_OPS=/home/pi/home-ops\nPY=\"$HOME_OPS/.venv/bin/python\"\ncd \"$HOME_OPS/hermes/podcast\"\neval \"$(\"$PY\" \"$HOME_OPS/hermes/scripts/sops_env.py\" --purpose podcast)\"\nunset TTS_CONNECT_HOST WHISPER_CONNECT_HOST\nD=\"{{ $('Assert Proof-Gate').first().json.podcastDir }}\"; DATE=\"{{ $('Assert Proof-Gate').first().json.date }}\"; MP3=\"$D/gurus-tech-bytes-$DATE.mp3\"; curl -fsS \"$WHISPER_URL\" -F \"file=@$MP3\" -F \"response_format=verbose_json\" -F \"language=en\" --max-time 900 -o \"$D/whisper-raw.json\" && echo WHISPER_OK"
+      },
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "tUgxqrxX7Wdo9hUX",
+          "name": "pi4 (podcast SSH)"
+        }
+      }
+    },
+    {
+      "id": "ssh_srt",
+      "name": "SSH: Build SRT",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        2860,
+        0
+      ],
+      "parameters": {
+        "authentication": "privateKey",
+        "resource": "command",
+        "command": "=set -euo pipefail\nexport PATH=\"/home/pi/.local/bin:/usr/local/bin:/usr/bin:/bin\"\nexport TZ=America/New_York\nHOME_OPS=/home/pi/home-ops\nPY=\"$HOME_OPS/.venv/bin/python\"\ncd \"$HOME_OPS/hermes/podcast\"\neval \"$(\"$PY\" \"$HOME_OPS/hermes/scripts/sops_env.py\" --purpose podcast)\"\nunset TTS_CONNECT_HOST WHISPER_CONNECT_HOST\n\"$PY\" scripts/pi4_build_srt.py \"{{ $('Assert Proof-Gate').first().json.podcastDir }}\" \"{{ $('Assert Proof-Gate').first().json.date }}\" && rm -f \"{{ $('Assert Proof-Gate').first().json.podcastDir }}/whisper-raw.json\" && echo SRT_OK"
+      },
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "tUgxqrxX7Wdo9hUX",
+          "name": "pi4 (podcast SSH)"
+        }
+      }
+    },
+    {
+      "id": "if_dryrun",
+      "name": "dryRun?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3080,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $('Assert Proof-Gate').first().json.dryRun }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "summary",
+      "name": "Build DRY RUN Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3300,
+        -120
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const cfg = $('Assert Proof-Gate').first().json;\nconst stories = JSON.parse($('Normalize + Dedupe Stories').first().json.storiesJson);\nconst titles = stories.map(s => '- ' + s.title).join('\\n');\nconst text = `\ud83d\udfe1 Guru's Tech Bytes DRY RUN (n8n) \u2014 Ep ${cfg.episode} (${cfg.date})\\nNOT published.\\nStories:\\n${titles}`;\nreturn [{ json: { text } }];\n"
+      }
+    },
+    {
+      "id": "tg_summary",
+      "name": "Telegram: DRY RUN Summary",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3520,
+        -120
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "8100669692",
+        "text": "={{ $json.text }}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "oOpvPw9TPukkiYK6",
+          "name": "Guru's Tech Bytes Bot (podcast)"
+        }
+      },
+      "webhookId": "698e9b1a-d16c-470e-a34e-d57ef662966c"
+    },
+    {
+      "id": "ssh_publish",
+      "name": "SSH: Publish (Cloudinary + git)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        3300,
+        120
+      ],
+      "parameters": {
+        "authentication": "privateKey",
+        "resource": "command",
+        "command": "=set -euo pipefail\nexport PATH=\"/home/pi/.local/bin:/usr/local/bin:/usr/bin:/bin\"\nexport TZ=America/New_York\nHOME_OPS=/home/pi/home-ops\nPY=\"$HOME_OPS/.venv/bin/python\"\ncd \"$HOME_OPS/hermes/podcast\"\neval \"$(\"$PY\" \"$HOME_OPS/hermes/scripts/sops_env.py\" --purpose podcast)\"\nunset TTS_CONNECT_HOST WHISPER_CONNECT_HOST\nSITE_DIR=/home/pi/anit.guru; git -C \"$SITE_DIR\" pull --rebase --autostash origin main >/dev/null 2>&1 || true; export CLOUDINARY_CLOUD_NAME CLOUDINARY_API_KEY CLOUDINARY_API_SECRET; D=\"{{ $('Assert Proof-Gate').first().json.podcastDir }}\"; DATE=\"{{ $('Assert Proof-Gate').first().json.date }}\"; (cd \"$SITE_DIR\" && PODCAST_DIR=\"$D\" node scripts/publish-episode.mjs \"$DATE\" \"$D/selected-stories.json\")"
+      },
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "tUgxqrxX7Wdo9hUX",
+          "name": "pi4 (podcast SSH)"
+        }
+      }
+    },
+    {
+      "id": "parse_publish",
+      "name": "Parse audioUrl",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3520,
+        120
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const out = $input.first().json.stdout || '';\nlet audioUrl = '';\nfor (const line of out.split('\\n')) {\n  const t = line.trim();\n  if (t.startsWith('{')) { try { audioUrl = JSON.parse(t).audioUrl || ''; if (audioUrl) break; } catch (e) {} }\n}\nif (!audioUrl) throw new Error('publish produced no audioUrl');\nreturn [{ json: { ...$('Assert Proof-Gate').first().json, audioUrl } }];\n"
+      }
+    },
+    {
+      "id": "upsert_pg",
+      "name": "Upsert podcast_episodes",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3740,
+        120
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO podcast_episodes (date, episode, stories, audio_url)\nVALUES ($1, $2, $3::jsonb, $4)\nON CONFLICT (date) DO UPDATE SET\n  episode=EXCLUDED.episode, stories=EXCLUDED.stories,\n  audio_url=EXCLUDED.audio_url, published_at=now();",
+        "options": {
+          "queryReplacement": "={{ [$json.date, $json.episode, $('Normalize + Dedupe Stories').first().json.storiesJson, $json.audioUrl] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "fK9icsGZqJ3aJWG3",
+          "name": "Supabase Postgres (podcast)"
+        }
+      }
+    },
+    {
+      "id": "ssh_deliver",
+      "name": "SSH: Deliver Telegram (audio+doc)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        3960,
+        120
+      ],
+      "parameters": {
+        "authentication": "privateKey",
+        "resource": "command",
+        "command": "=set -euo pipefail\nexport PATH=\"/home/pi/.local/bin:/usr/local/bin:/usr/bin:/bin\"\nexport TZ=America/New_York\nHOME_OPS=/home/pi/home-ops\nPY=\"$HOME_OPS/.venv/bin/python\"\ncd \"$HOME_OPS/hermes/podcast\"\neval \"$(\"$PY\" \"$HOME_OPS/hermes/scripts/sops_env.py\" --purpose podcast)\"\nunset TTS_CONNECT_HOST WHISPER_CONNECT_HOST\nBOT_TOKEN=\"$(secret telegram BOT_TOKEN)\"; CHAT_ID=8100669692; D=\"{{ $('Assert Proof-Gate').first().json.podcastDir }}\"; DATE=\"{{ $('Assert Proof-Gate').first().json.date }}\"; EP=\"{{ $('Assert Proof-Gate').first().json.episode }}\"; AUDIO_URL=\"{{ $json.audioUrl }}\"; MP3=\"$D/gurus-tech-bytes-$DATE.mp3\"; SRT=\"$D/gurus-tech-bytes-$DATE.srt\"; curl -sf \"https://api.telegram.org/bot$BOT_TOKEN/sendMessage\" --data-urlencode \"chat_id=$CHAT_ID\" --data-urlencode \"text=\ud83c\udf99\ufe0f Guru's Tech Bytes Ep. $EP \u2014 $DATE (via n8n)\\nCloudinary: $AUDIO_URL\" >/dev/null; curl -sf -F \"chat_id=$CHAT_ID\" -F \"audio=@$MP3\" \"https://api.telegram.org/bot$BOT_TOKEN/sendAudio\" >/dev/null; curl -sf -F \"chat_id=$CHAT_ID\" -F \"document=@$SRT\" \"https://api.telegram.org/bot$BOT_TOKEN/sendDocument\" >/dev/null; echo DELIVERED_OK"
+      },
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "tUgxqrxX7Wdo9hUX",
+          "name": "pi4 (podcast SSH)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Test Trigger": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Episode Number (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Episode Number (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "Merge Episode + Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Episode + Config": {
+      "main": [
+        [
+          {
+            "node": "Fetch HN Stories (Algolia)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch HN Stories (Algolia)": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Dedupe Stories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize + Dedupe Stories": {
+      "main": [
+        [
+          {
+            "node": "SSH: Write stories.json to pi4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH: Write stories.json to pi4": {
+      "main": [
+        [
+          {
+            "node": "SSH: cocoindex Rank + Proof-Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH: cocoindex Rank + Proof-Gate": {
+      "main": [
+        [
+          {
+            "node": "Assert Proof-Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assert Proof-Gate": {
+      "main": [
+        [
+          {
+            "node": "SSH: Author Script (GLM, fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH: Author Script (GLM, fallback)": {
+      "main": [
+        [
+          {
+            "node": "SSH: TTS Segments (Chatterbox)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH: TTS Segments (Chatterbox)": {
+      "main": [
+        [
+          {
+            "node": "SSH: Assert MP3 Duration >60s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH: Assert MP3 Duration >60s": {
+      "main": [
+        [
+          {
+            "node": "SSH: Whisper Transcription (curl)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH: Whisper Transcription (curl)": {
+      "main": [
+        [
+          {
+            "node": "SSH: Build SRT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH: Build SRT": {
+      "main": [
+        [
+          {
+            "node": "dryRun?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dryRun?": {
+      "main": [
+        [
+          {
+            "node": "Build DRY RUN Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SSH: Publish (Cloudinary + git)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build DRY RUN Summary": {
+      "main": [
+        [
+          {
+            "node": "Telegram: DRY RUN Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH: Publish (Cloudinary + git)": {
+      "main": [
+        [
+          {
+            "node": "Parse audioUrl",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse audioUrl": {
+      "main": [
+        [
+          {
+            "node": "Upsert podcast_episodes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert podcast_episodes": {
+      "main": [
+        [
+          {
+            "node": "SSH: Deliver Telegram (audio+doc)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "k5nmdOyJm5znKQzK"
+  },
+  "_meta": {
+    "exportedFrom": "n8n CT109 (10.0.0.188:5678)",
+    "workflowId": "4PSoNGo9f91Wb34A",
+    "active": false
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "name": "WF-error",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "err_trigger",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const e = $input.first().json;\nconst wf = e.workflow || {};\nconst exe = e.execution || {};\nconst nodeName = (e.trigger && e.trigger.node) || (exe.lastNodeExecuted) || 'unknown';\nconst msg = (e.execution && e.execution.error && e.execution.error.message) || 'unknown error';\nconst text = `\\ud83d\\udd34 n8n workflow FAILED\\nWorkflow: ${wf.name || 'unknown'}\\nNode: ${nodeName}\\nError: ${msg}\\nExecution: ${exe.id || 'n/a'}`;\nreturn [{ json: { text } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "id": "build_msg",
+      "name": "Build Alert Text"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "8100669692",
+        "text": "={{ $json.text }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        440,
+        0
+      ],
+      "id": "tg_alert",
+      "name": "Telegram: Error Alert",
+      "credentials": {
+        "telegramApi": {
+          "id": "oOpvPw9TPukkiYK6",
+          "name": "Guru's Tech Bytes Bot (podcast)"
+        }
+      },
+      "webhookId": "9e165511-2bac-4265-bde9-e11a8349682c"
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Alert Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Alert Text": {
+      "main": [
+        [
+          {
+            "node": "Telegram: Error Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "_meta": {
+    "exportedFrom": "n8n CT109 (10.0.0.188:5678)",
+    "workflowId": "k5nmdOyJm5znKQzK",
+    "active": true
+  }
+}

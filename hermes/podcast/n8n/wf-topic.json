@@ -1,0 +1,80 @@
+{
+  "name": "WF-topic",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "trigger1",
+      "name": "Manual Test Trigger"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 5,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        160
+      ],
+      "id": "schedule1",
+      "name": "Schedule Trigger (DISABLED -- cutover only)",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "resource": "command",
+        "command": "=set -euo pipefail\nexport PATH=\"/home/pi/.local/bin:/usr/local/bin:/usr/bin:/bin\"\nexport TZ=America/New_York\nHOME_OPS=/home/pi/home-ops\nbash \"$HOME_OPS/hermes/scripts/run-topic-refresh-pi4.sh\""
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        220,
+        0
+      ],
+      "id": "ssh_topic",
+      "name": "SSH: Topic Refresh (dry, no --write)",
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "tUgxqrxX7Wdo9hUX",
+          "name": "pi4 (podcast SSH)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Test Trigger": {
+      "main": [
+        [
+          {
+            "node": "SSH: Topic Refresh (dry, no --write)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "k5nmdOyJm5znKQzK"
+  },
+  "_meta": {
+    "exportedFrom": "n8n CT109 (10.0.0.188:5678)",
+    "workflowId": "DGRWVbvFSQBtDAdU",
+    "active": false
+  }
+}
