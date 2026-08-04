@@ -63,6 +63,10 @@ if [[ -n "$TTS_CONNECT_HOST" ]]; then
   echo "[tts] Connecting through Tailscale host $TTS_CONNECT_HOST with TLS identity $TTS_URL_HOST"
 fi
 
+# Max whole-request attempts per segment. curl's own --retry covers sub-second
+# blips; this outer loop (with real backoff) survives a longer chatterbox
+# endpoint outage — e.g. a 30-60s restart — that would otherwise fail the episode.
+TTS_MAX_ATTEMPTS=${TTS_MAX_ATTEMPTS:-5}
 : > "$SEGMENTS_DIR/concat.txt"
 for txt in "$SEGMENTS_DIR"/segment-*.txt; do
   base=${txt%.txt}
@@ -80,19 +84,32 @@ payload = {
 }
 pathlib.Path(sys.argv[2]).write_text(json.dumps(payload))
 PY
-  echo "[tts] POST $(basename "$mp3")"
-  curl "${CURL_CONNECT_ARGS[@]}" -fsS --retry 2 --retry-all-errors --connect-timeout 30 --max-time 900 \
-    -X POST "$TTS_URL" \
-    -H "Content-Type: application/json" \
-    --data-binary "@$json" \
-    -o "$mp3"
-  bytes=$(wc -c < "$mp3" | tr -d ' ')
-  duration=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 "$mp3")
-  echo "[tts] $(basename "$mp3") ${bytes} bytes ${duration}s"
-  if [[ "$bytes" -lt 5000 ]]; then
-    echo "ERROR: tiny TTS segment: $mp3 ($bytes bytes)" >&2
-    exit 3
-  fi
+  attempt=1
+  while :; do
+    echo "[tts] POST $(basename "$mp3") (attempt $attempt/$TTS_MAX_ATTEMPTS)"
+    ok=1
+    curl "${CURL_CONNECT_ARGS[@]}" -fsS --retry 2 --retry-all-errors --connect-timeout 30 --max-time 900 \
+      -X POST "$TTS_URL" \
+      -H "Content-Type: application/json" \
+      --data-binary "@$json" \
+      -o "$mp3" || ok=0
+    bytes=0
+    [[ -f "$mp3" ]] && bytes=$(wc -c < "$mp3" | tr -d ' ')
+    if [[ "$ok" = 1 && "$bytes" -ge 5000 ]]; then
+      duration=$(ffprobe -v quiet -show_entries format=duration -of csv=p=0 "$mp3")
+      echo "[tts] $(basename "$mp3") ${bytes} bytes ${duration}s"
+      break
+    fi
+    if [[ "$attempt" -ge "$TTS_MAX_ATTEMPTS" ]]; then
+      echo "ERROR: TTS segment failed after $TTS_MAX_ATTEMPTS attempts: $mp3 (curl_ok=$ok bytes=$bytes)" >&2
+      exit 3
+    fi
+    backoff=$(( attempt * 15 ))
+    echo "[tts] $(basename "$mp3") failed (curl_ok=$ok bytes=$bytes) — retrying in ${backoff}s" >&2
+    rm -f "$mp3"
+    sleep "$backoff"
+    attempt=$(( attempt + 1 ))
+  done
   printf "file '%s'\n" "$mp3" >> "$SEGMENTS_DIR/concat.txt"
 done
 
