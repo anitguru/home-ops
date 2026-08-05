@@ -28,8 +28,9 @@ export OLLAMA_CLOUD_API_KEY="${OLLAMA_CLOUD_API_KEY:-$($SECRET ollama CLOUD_API_
 #     FALLBACK = metroplex CPU chatterbox (always-on, LXC137). If rgb is off,
 #     gaming, or stuck at BIOS, the run fails over to metroplex automatically.
 #     To disable rgb, point TTS_URL back at the metroplex URL.
-export TTS_URL="http://rgb.transformers.lan:4123/v1/audio/speech"
-export TTS_URL_FALLBACK="https://chatterbox.transformers.lan/v1/audio/speech"
+#     NOTE: the actual exports live AFTER the sops_env eval below — the SOPS
+#     'podcast' purpose injects a legacy TTS_URL that would otherwise clobber
+#     the rgb primary. Setting them post-eval makes them authoritative.
 
 TODAY=$(date +%F)
 DAY_NAME=$(date +%A)
@@ -58,6 +59,11 @@ cd "$HOME_OPS/hermes/podcast" || fail "cd podcast dir"
 # --- secrets (podcast purpose) ---
 eval "$("$PY" "$HOME_OPS/hermes/scripts/sops_env.py" --purpose podcast)" || fail "load secrets"
 unset TTS_CONNECT_HOST WHISPER_CONNECT_HOST   # pi4 is on-LAN; direct to *.transformers.lan
+
+# --- TTS endpoints (set AFTER sops_env so they win over the legacy SOPS TTS_URL) ---
+#     PRIMARY = rgb 4090 GPU chatterbox; FALLBACK = metroplex CPU chatterbox (LXC137).
+export TTS_URL="http://rgb.transformers.lan:4123/v1/audio/speech"
+export TTS_URL_FALLBACK="https://chatterbox.transformers.lan/v1/audio/speech"
 
 MP3="$PODCAST_DIR/gurus-tech-bytes-$TODAY.mp3"
 SRT="$PODCAST_DIR/gurus-tech-bytes-$TODAY.srt"

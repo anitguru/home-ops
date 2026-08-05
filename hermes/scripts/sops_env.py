@@ -51,7 +51,9 @@ PURPOSES: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("CLOUDINARY_API_KEY", "cloudinary", "API_KEY"),
         ("CLOUDINARY_API_SECRET", "cloudinary", "API_SECRET"),
         ("COCOINDEX_DATABASE_URL", "supabase", "PG_DSN"),
-        ("TTS_URL", "podcast", "TTS_URL"),
+        # TTS_URL intentionally NOT injected here: it is endpoint *config*, not a
+        # secret, and a legacy value here clobbered the rgb-primary failover set
+        # in run-podcast-pi4.sh. The run script is the single source of truth now.
         ("TTS_VOICE", "podcast", "TTS_VOICE"),
         ("TTS_LOUDNORM", "podcast", "TTS_LOUDNORM"),
         ("WHISPER_URL", "podcast", "WHISPER_URL"),
