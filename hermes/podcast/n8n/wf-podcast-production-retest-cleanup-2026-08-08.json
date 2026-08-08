@@ -1,0 +1,778 @@
+{
+  "id": "pProdRetestCleanX8",
+  "name": "WF-podcast-production-retest-cleanup-2026-08-08",
+  "active": false,
+  "nodes": [
+    {
+      "id": "manual",
+      "name": "Manual Approved Cleanup Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "context",
+      "name": "Approved Cleanup Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{\"approved\":true,\"date\":\"2026-08-08\",\"episode\":125,\"audioUrl\":\"https://res.cloudinary.com/ddicetqs5/video/upload/v1786230258/anitguru/gurus-tech-bytes-2026-08-08.mp3\",\"cloudinaryPublicId\":\"anitguru/gurus-tech-bytes-2026-08-08\",\"cloudinaryBackupPublicId\":\"anitguru-trash/gurus-tech-bytes-2026-08-08-episode-125-retest-backup\",\"githubPath\":\"content/podcast/2026-08-08.md\"}}];"
+      },
+      "notes": "Exact operator-approved cleanup before the final corrected production retest."
+    },
+    {
+      "id": "gate",
+      "name": "Hard Exact-Target Cleanup Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const c=$input.first().json;\nif(c.approved!==true||c.date!=='2026-08-08'||c.episode!==125) throw new Error('cleanup approval target mismatch');\nif(c.cloudinaryPublicId!=='anitguru/gurus-tech-bytes-2026-08-08'||c.githubPath!=='content/podcast/2026-08-08.md') throw new Error('cleanup artifact target mismatch');\nreturn [{json:c}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "get_row",
+      "name": "Supabase - Read Exact Episode 125",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "podcast_episodes",
+        "returnAll": false,
+        "limit": 1,
+        "orderBy": "episode.desc",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "date",
+              "condition": "eq",
+              "keyValue": "={{ $('Approved Cleanup Context').first().json.date }}"
+            },
+            {
+              "keyName": "episode",
+              "condition": "eq",
+              "keyValue": "={{ $('Approved Cleanup Context').first().json.episode }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "duPN6Njb1go7DN8w",
+          "name": "Supabase (podcast)"
+        }
+      }
+    },
+    {
+      "id": "validate_row",
+      "name": "Validate Exact Supabase Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json,c=$('Approved Cleanup Context').first().json;\nif(r.date!==c.date||Number(r.episode)!==c.episode||r.audio_url!==c.audioUrl) throw new Error('Supabase target row changed or missing');\nreturn [{json:r}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "backup_audio",
+      "name": "Cloudinary - Copy Production Audio to Recovery",
+      "type": "n8n-nodes-cloudinary.cloudinary",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "resource": "upload",
+        "operation": "uploadUrl",
+        "url": "={{ $('Approved Cleanup Context').first().json.audioUrl }}",
+        "resource_type": "video",
+        "additionalFields": {
+          "folder": "anitguru-trash",
+          "public_id": "gurus-tech-bytes-2026-08-08-episode-125-retest-backup",
+          "tags": "approved-production-retest-backup,episode-125"
+        }
+      },
+      "credentials": {
+        "cloudinaryApi": {
+          "id": "pCloudinaryX8Q3M7",
+          "name": "Cloudinary (podcast)"
+        }
+      }
+    },
+    {
+      "id": "validate_backup",
+      "name": "Validate Cloudinary Recovery Copy",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json,c=$('Approved Cleanup Context').first().json;\nif(r.public_id!==c.cloudinaryBackupPublicId||Number(r.bytes)<100000||!String(r.secure_url||'').startsWith('https://res.cloudinary.com/')) throw new Error('Cloudinary recovery copy invalid');\nreturn [{json:r}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "get_github",
+      "name": "GitHub - Read Production Episode File",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        1680,
+        0
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "owner": {
+          "mode": "name",
+          "value": "anitguru"
+        },
+        "repository": {
+          "mode": "name",
+          "value": "anit.guru"
+        },
+        "filePath": "={{ $('Approved Cleanup Context').first().json.githubPath }}",
+        "asBinaryProperty": false,
+        "additionalParameters": {
+          "reference": "main"
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "pGithubNodeX8Q3M7Z",
+          "name": "GitHub Node (podcast)"
+        }
+      }
+    },
+    {
+      "id": "validate_github",
+      "name": "Validate Production GitHub File",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json,c=$('Approved Cleanup Context').first().json;\nif(r.path!==c.githubPath||!/^[a-f0-9]{40}$/.test(String(r.sha||''))||!String(r.content||'')) throw new Error('GitHub target file changed or missing');\nreturn [{json:{path:r.path,sha:r.sha,size:r.size}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "ledger_backup",
+      "name": "Ledger - Duplicate Recovery Captured",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2160,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "podcast_run_ledger"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "production-retest-cleanup/2026-08-08/125",
+            "execution_id": "={{ $execution.id }}",
+            "run_mode": "production-cleanup",
+            "episode": 125,
+            "episode_date": "2026-08-08",
+            "stage": "duplicate-backup",
+            "status": "captured",
+            "attempt": 1,
+            "selected_stories_json": "={{ JSON.stringify($('Validate Exact Supabase Row').first().json.stories) }}",
+            "script_sha256": "",
+            "audio_sha256": "",
+            "srt_sha256": "",
+            "qa_json": "={{ JSON.stringify({supabase:$('Validate Exact Supabase Row').first().json,github:$('Validate Production GitHub File').first().json}) }}",
+            "artifact_urls_json": "={{ JSON.stringify({production:$('Approved Cleanup Context').first().json.audioUrl,recovery:$('Validate Cloudinary Recovery Copy').first().json.secure_url}) }}",
+            "error": "",
+            "started_at": "={{ $now.toISO() }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "delete_cloudinary",
+      "name": "Cloudinary - Delete Exact Production Audio",
+      "type": "n8n-nodes-cloudinary.cloudinary",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        0
+      ],
+      "parameters": {
+        "resource": "asset",
+        "operation": "deleteAssets",
+        "publicIds": "={{ $('Approved Cleanup Context').first().json.cloudinaryPublicId }}",
+        "resourceType": "video",
+        "type": "upload",
+        "deleteOptions": {
+          "invalidate": true,
+          "keep_original": false
+        }
+      },
+      "credentials": {
+        "cloudinaryApi": {
+          "id": "pCloudinaryX8Q3M7",
+          "name": "Cloudinary (podcast)"
+        }
+      }
+    },
+    {
+      "id": "validate_cloudinary_delete",
+      "name": "Validate Cloudinary Delete Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json,c=$('Approved Cleanup Context').first().json;\nif(!['deleted','not_found'].includes(String(r.deleted?.[c.cloudinaryPublicId]||''))) throw new Error('Cloudinary delete not acknowledged');\nreturn [{json:r}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "delete_github",
+      "name": "GitHub - Delete Production Episode File",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        2880,
+        0
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "delete",
+        "owner": {
+          "mode": "name",
+          "value": "anitguru"
+        },
+        "repository": {
+          "mode": "name",
+          "value": "anit.guru"
+        },
+        "filePath": "={{ $('Approved Cleanup Context').first().json.githubPath }}",
+        "commitMessage": "cleanup: prepare exact episode 125 production retest",
+        "additionalParameters": {
+          "branch": {
+            "branch": "main"
+          }
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "pGithubNodeX8Q3M7Z",
+          "name": "GitHub Node (podcast)"
+        }
+      }
+    },
+    {
+      "id": "validate_github_delete",
+      "name": "Validate GitHub Delete Commit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json;\nif(!/^[a-f0-9]{40}$/.test(String(r.commit?.sha||''))) throw new Error('GitHub delete commit missing');\nreturn [{json:{deleteCommitSha:r.commit.sha}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "delete_row",
+      "name": "Supabase - Delete Exact Episode 125",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3360,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "delete",
+        "tableId": "podcast_episodes",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "date",
+              "condition": "eq",
+              "keyValue": "={{ $('Approved Cleanup Context').first().json.date }}"
+            },
+            {
+              "keyName": "episode",
+              "condition": "eq",
+              "keyValue": "={{ $('Approved Cleanup Context').first().json.episode }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "duPN6Njb1go7DN8w",
+          "name": "Supabase (podcast)"
+        }
+      }
+    },
+    {
+      "id": "verify_row",
+      "name": "Supabase - Verify Episode 125 Absent",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3600,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "podcast_episodes",
+        "returnAll": false,
+        "limit": 1,
+        "orderBy": "episode.desc",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "date",
+              "condition": "eq",
+              "keyValue": "={{ $('Approved Cleanup Context').first().json.date }}"
+            },
+            {
+              "keyName": "episode",
+              "condition": "eq",
+              "keyValue": "={{ $('Approved Cleanup Context').first().json.episode }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "duPN6Njb1go7DN8w",
+          "name": "Supabase (podcast)"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "verify_cloudinary",
+      "name": "Cloudinary - Verify Deleted Asset Placeholder",
+      "type": "n8n-nodes-cloudinary.cloudinary",
+      "typeVersion": 2,
+      "position": [
+        3840,
+        0
+      ],
+      "parameters": {
+        "resource": "asset",
+        "operation": "getAsset",
+        "assetId": "ae11b2444759a36eefca31e9c8b094d8"
+      },
+      "credentials": {
+        "cloudinaryApi": {
+          "id": "pCloudinaryX8Q3M7",
+          "name": "Cloudinary (podcast)"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "verify_github",
+      "name": "Verify GitHub Production File Absent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4080,
+        0
+      ],
+      "parameters": {
+        "url": "https://api.github.com/repos/anitguru/anit.guru/contents/content%2Fpodcast%2F2026-08-08.md?ref=main",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "pGithubApiX8Q3M7Z",
+          "name": "GitHub API (podcast)"
+        }
+      },
+      "notes": "HTTP exception: native GitHub Get File treats the expected 404 absence as an execution error and cannot return a never-error full response for verification."
+    },
+    {
+      "id": "hard_verify",
+      "name": "Hard Three-System Absence Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4320,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const db=$('Supabase - Verify Episode 125 Absent').first().json,cloud=$('Cloudinary - Verify Deleted Asset Placeholder').first().json,git=$input.first().json;\nif(db.episode||db.date) throw new Error('Supabase duplicate still present');\nif(!cloud.error&&!(cloud.placeholder===true&&Number(cloud.bytes)===0&&cloud.backup===true)) throw new Error('Cloudinary origin still present');\nif(Number(git.statusCode)!==404) throw new Error(`GitHub production file status ${git.statusCode}`);\nreturn [{json:{supabaseAbsent:true,cloudinaryAbsent:true,githubAbsent:true,githubDeleteCommit:$('Validate GitHub Delete Commit').first().json.deleteCommitSha,recoveryUrl:$('Validate Cloudinary Recovery Copy').first().json.secure_url,cleanupValidated:true}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "ledger_complete",
+      "name": "Ledger - Approved Duplicate Removed",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        4560,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "podcast_run_ledger"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "production-retest-cleanup/2026-08-08/125",
+            "execution_id": "={{ $execution.id }}",
+            "run_mode": "production-cleanup",
+            "episode": 125,
+            "episode_date": "2026-08-08",
+            "stage": "duplicate-removed",
+            "status": "passed",
+            "attempt": 1,
+            "selected_stories_json": "={{ JSON.stringify($('Validate Exact Supabase Row').first().json.stories) }}",
+            "script_sha256": "",
+            "audio_sha256": "",
+            "srt_sha256": "",
+            "qa_json": "={{ JSON.stringify($('Hard Three-System Absence Gate').first().json) }}",
+            "artifact_urls_json": "={{ JSON.stringify({recovery:$('Validate Cloudinary Recovery Copy').first().json.secure_url}) }}",
+            "error": "",
+            "started_at": "={{ $now.toISO() }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "stop",
+      "name": "Approved Cleanup Stop",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        4800,
+        0
+      ],
+      "parameters": {},
+      "notes": "One-shot terminal node. No schedule or reusable trigger exists."
+    }
+  ],
+  "connections": {
+    "Manual Approved Cleanup Trigger": {
+      "main": [
+        [
+          {
+            "node": "Approved Cleanup Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approved Cleanup Context": {
+      "main": [
+        [
+          {
+            "node": "Hard Exact-Target Cleanup Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hard Exact-Target Cleanup Gate": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Read Exact Episode 125",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Read Exact Episode 125": {
+      "main": [
+        [
+          {
+            "node": "Validate Exact Supabase Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Exact Supabase Row": {
+      "main": [
+        [
+          {
+            "node": "Cloudinary - Copy Production Audio to Recovery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cloudinary - Copy Production Audio to Recovery": {
+      "main": [
+        [
+          {
+            "node": "Validate Cloudinary Recovery Copy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Cloudinary Recovery Copy": {
+      "main": [
+        [
+          {
+            "node": "GitHub - Read Production Episode File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub - Read Production Episode File": {
+      "main": [
+        [
+          {
+            "node": "Validate Production GitHub File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Production GitHub File": {
+      "main": [
+        [
+          {
+            "node": "Ledger - Duplicate Recovery Captured",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger - Duplicate Recovery Captured": {
+      "main": [
+        [
+          {
+            "node": "Cloudinary - Delete Exact Production Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cloudinary - Delete Exact Production Audio": {
+      "main": [
+        [
+          {
+            "node": "Validate Cloudinary Delete Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Cloudinary Delete Response": {
+      "main": [
+        [
+          {
+            "node": "GitHub - Delete Production Episode File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub - Delete Production Episode File": {
+      "main": [
+        [
+          {
+            "node": "Validate GitHub Delete Commit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate GitHub Delete Commit": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Delete Exact Episode 125",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Delete Exact Episode 125": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Verify Episode 125 Absent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Verify Episode 125 Absent": {
+      "main": [
+        [
+          {
+            "node": "Cloudinary - Verify Deleted Asset Placeholder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cloudinary - Verify Deleted Asset Placeholder": {
+      "main": [
+        [
+          {
+            "node": "Verify GitHub Production File Absent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify GitHub Production File Absent": {
+      "main": [
+        [
+          {
+            "node": "Hard Three-System Absence Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hard Three-System Absence Gate": {
+      "main": [
+        [
+          {
+            "node": "Ledger - Approved Duplicate Removed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger - Approved Duplicate Removed": {
+      "main": [
+        [
+          {
+            "node": "Approved Cleanup Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "tags": []
+}

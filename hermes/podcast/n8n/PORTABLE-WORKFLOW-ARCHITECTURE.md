@@ -20,6 +20,14 @@ logic. The script validator is a still smaller reusable child called by the
 authoring workflow. It is published only because n8n requires called workflows
 to be available; it has no schedule or other self-firing trigger.
 
+The production surface uses a separate thin parent,
+`WF-podcast-portable-production-parent-v1`, which calls the same first four
+children and then `WF-podcast-portable-production-v1`. Both are inactive and
+manual-only. The production child visibly performs the guarded Cloudinary,
+GitHub, Supabase, and Telegram operations and their readbacks; it contains no
+schedule, SSH node, CT143 URL, or hidden worker call. Clean-slate parent
+execution 123 and production child execution 129 succeeded on 2026-08-08.
+
 CT143 is **only** the external n8n Task Runner. The implemented portable graph
 contains no SSH nodes, CT143 URL, or `podcast-worker` dependency. Voice and
 Whisper are direct service calls from visible nodes. Cloudinary, GitHub,

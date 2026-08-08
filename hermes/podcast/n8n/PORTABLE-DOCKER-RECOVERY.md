@@ -141,15 +141,16 @@ the SRT SHA-256 was
 
 ## Production cutover boundary
 
-The proven parent is manual and staging-only. Production scheduling and
-production Cloudinary/GitHub/Supabase/Telegram branches are intentionally not
-enabled. A direct operator instruction to **cut over** is required before:
+Both portable parents are proven: the staging parent and the separate
+manual-production parent. The production parent is inactive, has only a Manual
+Trigger, and calls the same reusable intake, authoring, media, and transcription
+children before calling the production distribution child. The operator's
+one-time authorization was used to prove those production destinations on
+2026-08-08. It did not authorize a schedule or scheduler cutover.
 
-- adding/publishing a schedule trigger;
-- changing `publishMode` from `staging` to production;
-- writing the production Supabase episode row;
-- committing the production episode file to `main`;
-- using the production Cloudinary prefix or production notifications; or
+A direct operator instruction to **cut over** is still required before:
+
+- adding, publishing, or activating a schedule trigger; or
 - changing Hermes/pi4/n8n scheduler ownership.
 
 At cutover: back up n8n and all scheduler states, re-read Hermes/pi4/n8n live
@@ -165,3 +166,39 @@ placeholder for the old asset and a separate recovery copy at public ID
 `anitguru-trash/gurus-tech-bytes-2026-08-08-episode-125-backup` (1,060,269
 bytes). Restoring it is a separate production action and is not part of normal
 Docker recovery.
+
+## Clean manual-production acceptance evidence
+
+The operator authorized deleting the first 2026-08-08 publication and running
+the corrected primary production parent from an empty state. One-shot cleanup
+execution 122 first copied the exact MP3 to
+`anitguru-trash/gurus-tech-bytes-2026-08-08-episode-125-retest-backup`, then its
+hard gate verified the production Supabase row absent, GitHub file absent after
+commit `90d690577929ab2a44274136c4af99b0c2953fee`, and the Cloudinary production
+asset absent.
+
+Parent execution 123 then succeeded from 19:15:37–19:19:50 EDT. Its child
+executions were intake 124, authoring 125 plus validator 126, media 127,
+transcription 128, and production distribution 129. Acceptance values:
+
+- MP3: 1,100,589 bytes, SHA-256
+  `5926fc7378325fecc205071c289eb2de8f44dc6436730db1c9345878c9f6b73f`,
+  137.544 seconds, -17.24 LUFS, -1.63 dBTP, zero clipped samples.
+- SRT SHA-256:
+  `3c5199e105162c593d9cd63b8e6e9ca54c598d02cdb651cc72410f6713421480`;
+  WER 0.1477, exact-anchor ratio 0.898305, 38 cues, 47-character/two-line
+  limits, and all beginning/middle/end anchors present.
+- Cloudinary public ID `anitguru/gurus-tech-bytes-2026-08-08`; an independent
+  download reproduced the byte count and MP3 hash.
+- GitHub `main` commit `ca571e53e32f25250c68d9bd82a2c5e60516f81b`;
+  `content/podcast/2026-08-08.md` blob
+  `223b1433ffccaa4a53a338e3cee8f9a6f8192a61`.
+- Native Supabase readback returned episode 125, four actual JSON story objects,
+  the exact Cloudinary URL, and `duration_secs=138`.
+- Native Telegram nodes returned message IDs 427, 428, and 429.
+- Public `/podcast/ep-125` and `/podcast/feed.xml` both returned HTTP 200 and
+  contained episode 125 plus the new audio URL.
+
+The cleanup and partial-run recovery workflows were archived after this pass.
+The production parent and production distribution child remain unarchived but
+inactive/manual-only. Hermes remains paused; no n8n schedule exists.

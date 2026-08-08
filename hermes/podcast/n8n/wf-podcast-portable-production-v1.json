@@ -1,0 +1,1265 @@
+{
+  "id": "pPortableProdX8Q3M7",
+  "name": "WF-podcast-portable-production-v1",
+  "active": false,
+  "nodes": [
+    {
+      "id": "sub_trigger",
+      "name": "When Called by Manual Production Parent",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"runMode\": \"shadow\",\n  \"publishMode\": \"production\",\n  \"manualProductionApproved\": true,\n  \"date\": \"2026-08-08\",\n  \"runId\": \"portable-production/2026-08-08/example\",\n  \"episode\": 125,\n  \"selectedStories\": [],\n  \"scriptText\": \"approved\",\n  \"script_sha256\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"audio_sha256\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"audioQa\": {\n    \"duration_seconds\": 120\n  },\n  \"srt_sha256\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"alignment\": {},\n  \"transcriptionValidated\": true\n}"
+      }
+    },
+    {
+      "id": "context",
+      "name": "Prepare Production Distribution Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const i=$input.first();const r=i.json;\nif(!i.binary?.audio||!i.binary?.srt) throw new Error('production audio/SRT binaries missing');\nconst seconds=Number(r.audioQa?.duration_seconds);const duration=`${Math.floor(seconds/60)}:${String(Math.round(seconds%60)).padStart(2,'0')}`;\nreturn [{json:{...r,startedAt:$now.toISO(),audio:{sha256:r.audio_sha256,bytes:0,durationSeconds:seconds,duration},srt:{sha256:r.srt_sha256,alignment:r.alignment}},binary:{audio:i.binary.audio,srt:i.binary.srt}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "gate",
+      "name": "Hard Manual Production Authorization Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json;const et=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());\nconst failures=[];if(r.runMode!=='shadow')failures.push('generation mode');if(r.publishMode!=='production')failures.push('publish mode');if(r.manualProductionApproved!==true)failures.push('operator approval');if(r.date!==et)failures.push('ET date');\nif(!/^portable-production\\/\\d{4}-\\d{2}-\\d{2}\\/[A-Za-z0-9_-]+$/.test(String(r.runId||'')))failures.push('run ID');if(r.transcriptionValidated!==true)failures.push('transcription proof');if(failures.length)throw new Error(`production gate: ${failures.join(', ')}`);return [{json:r}];"
+      },
+      "notes": "Explicit one-shot gate: current ET date, production publish mode, operator authorization, and completed transcription proof are all required."
+    },
+    {
+      "id": "ledger_start",
+      "name": "Ledger - Production Distribution Started",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "podcast_run_ledger"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $('Prepare Production Distribution Context').first().json.runId }}",
+            "execution_id": "={{ $execution.id }}",
+            "run_mode": "production-manual",
+            "episode": "={{ $('Prepare Production Distribution Context').first().json.episode }}",
+            "episode_date": "={{ $('Prepare Production Distribution Context').first().json.date }}",
+            "stage": "production-start",
+            "status": "running",
+            "attempt": 1,
+            "selected_stories_json": "={{ JSON.stringify($('Prepare Production Distribution Context').first().json.selectedStories) }}",
+            "script_sha256": "",
+            "audio_sha256": "",
+            "srt_sha256": "={{ $('Prepare Production Distribution Context').first().json.srt.sha256 }}",
+            "qa_json": "",
+            "artifact_urls_json": "",
+            "error": "",
+            "started_at": "={{ $('Prepare Production Distribution Context').first().json.startedAt }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "supabase_absence",
+      "name": "Supabase - Confirm Today's Episode Absent",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "podcast_episodes",
+        "returnAll": false,
+        "limit": 1,
+        "orderBy": "episode.desc",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "date",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Production Distribution Context').first().json.date }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "duPN6Njb1go7DN8w",
+          "name": "Supabase (podcast)"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "validate_db_absence",
+      "name": "Gate - Supabase Date Must Be Empty",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json;if(r.date||r.episode)throw new Error('production date already exists in Supabase');return [{json:$('Hard Manual Production Authorization Gate').first().json}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "github_absence",
+      "name": "GitHub - Confirm Production Page Absent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1440,
+        0
+      ],
+      "parameters": {
+        "url": "={{ 'https://api.github.com/repos/anitguru/anit.guru/contents/content%2Fpodcast%2F' + $json.date + '.md?ref=main' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "pGithubApiX8Q3M7Z",
+          "name": "GitHub API (podcast)"
+        }
+      },
+      "notes": "HTTP exception: native GitHub Get File turns the required 404 precondition into an execution error and cannot return a never-error full response."
+    },
+    {
+      "id": "validate_git_absence",
+      "name": "Gate - GitHub Page Must Be Empty",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json;if(Number(r.statusCode)!==404)throw new Error(`production GitHub page precondition returned ${r.statusCode}`);const c=$('Prepare Production Distribution Context').first();return [{json:c.json,binary:c.binary}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "restore_audio",
+      "name": "Restore Production Audio + SRT Binaries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const c=$('Prepare Production Distribution Context').first();return [{json:c.json,binary:{audio:c.binary.audio,srt:c.binary.srt}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "hash_audio",
+      "name": "SHA256 Production Audio",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        0
+      ],
+      "parameters": {
+        "action": "hash",
+        "binaryData": true,
+        "binaryPropertyName": "audio",
+        "type": "SHA256",
+        "dataPropertyName": "audio_sha256",
+        "encoding": "hex"
+      }
+    },
+    {
+      "id": "validate_audio",
+      "name": "Validate Exact Production Audio Hash",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json,e=$('Prepare Production Distribution Context').first().json.audio.sha256;if(r.audio_sha256!==e)throw new Error('production audio hash mismatch');return [{json:{audio_sha256:r.audio_sha256,verified:true}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "merge_audio",
+      "name": "Merge Production Binary + Verified Hash",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2640,
+        0
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      }
+    },
+    {
+      "id": "upload_audio",
+      "name": "Cloudinary - Upload Production Audio",
+      "type": "n8n-nodes-cloudinary.cloudinary",
+      "typeVersion": 2,
+      "position": [
+        2880,
+        0
+      ],
+      "parameters": {
+        "resource": "upload",
+        "operation": "uploadFile",
+        "file": "audio",
+        "resource_type_file": "video",
+        "additionalFieldsFile": {
+          "folder": "anitguru",
+          "public_id": "={{ 'gurus-tech-bytes-' + $('Prepare Production Distribution Context').first().json.date }}",
+          "tags": "podcast-production,portable-n8n"
+        }
+      },
+      "credentials": {
+        "cloudinaryApi": {
+          "id": "pCloudinaryX8Q3M7",
+          "name": "Cloudinary (podcast)"
+        }
+      }
+    },
+    {
+      "id": "validate_upload",
+      "name": "Validate Production Cloudinary Upload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json,c=$('Prepare Production Distribution Context').first().json,target=`anitguru/gurus-tech-bytes-${c.date}`;\nif(r.public_id!==target||Number(r.bytes)<100000||!String(r.secure_url||'').startsWith('https://res.cloudinary.com/'))throw new Error('production Cloudinary upload invalid');return [{json:{...r,targetKey:target,audioSha256:c.audio.sha256}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "head_audio",
+      "name": "HEAD Verify Production Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3360,
+        0
+      ],
+      "parameters": {
+        "method": "HEAD",
+        "url": "={{ $('Validate Production Cloudinary Upload').first().json.secure_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 20000
+        }
+      },
+      "notes": "HTTP exception: the verified Cloudinary node has no delivery-URL HEAD operation."
+    },
+    {
+      "id": "validate_head",
+      "name": "Validate Production Audio Delivery",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3600,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json;if(Number(r.statusCode)<200||Number(r.statusCode)>=400)throw new Error(`production audio HEAD ${r.statusCode}`);return [{json:{statusCode:r.statusCode,verified:true}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "ledger_cloudinary",
+      "name": "Ledger - Production Cloudinary Verified",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3840,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "podcast_run_ledger"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $('Prepare Production Distribution Context').first().json.runId }}",
+            "execution_id": "={{ $execution.id }}",
+            "run_mode": "production-manual",
+            "episode": "={{ $('Prepare Production Distribution Context').first().json.episode }}",
+            "episode_date": "={{ $('Prepare Production Distribution Context').first().json.date }}",
+            "stage": "production-cloudinary",
+            "status": "passed",
+            "attempt": 1,
+            "selected_stories_json": "={{ JSON.stringify($('Prepare Production Distribution Context').first().json.selectedStories) }}",
+            "script_sha256": "",
+            "audio_sha256": "={{ $('Prepare Production Distribution Context').first().json.audio.sha256 }}",
+            "srt_sha256": "={{ $('Prepare Production Distribution Context').first().json.srt.sha256 }}",
+            "qa_json": "",
+            "artifact_urls_json": "={{ JSON.stringify({audio:$('Validate Production Cloudinary Upload').first().json.secure_url}) }}",
+            "error": "",
+            "started_at": "={{ $('Prepare Production Distribution Context').first().json.startedAt }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "markdown",
+      "name": "Generate Production Episode Markdown",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4080,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const c=$('Prepare Production Distribution Context').first().json,u=$('Validate Production Cloudinary Upload').first().json;const clean=v=>String(v??'').replace(/\\s+/g,' ').trim();\nconst title=`${clean(c.selectedStories[0]?.title)||\"Guru's Tech Bytes\"} | EP #${c.episode}`;const stories=c.selectedStories.map(s=>`  - title: ${JSON.stringify(clean(s.title))}\\n    url: ${JSON.stringify(s.url)}\\n    hnUrl: ${JSON.stringify(s.hnUrl)}\\n    score: ${Number(s.score)}`).join('\\n');\nconst markdown=`---\\ntitle: ${JSON.stringify(title)}\\nepisode: ${c.episode}\\ndate: ${JSON.stringify(c.date)}\\naudioUrl: ${JSON.stringify(u.secure_url)}\\naudioLength: ${u.bytes}\\nduration: ${JSON.stringify(c.audio.duration)}\\nstories:\\n${stories}\\n---\\n\\n${c.scriptText.trim()}\\n`;return [{json:{markdown,path:`content/podcast/${c.date}.md`}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "github_create",
+      "name": "GitHub - Create Production Episode on Main",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        4320,
+        0
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "create",
+        "owner": {
+          "mode": "name",
+          "value": "anitguru"
+        },
+        "repository": {
+          "mode": "name",
+          "value": "anit.guru"
+        },
+        "filePath": "={{ $('Generate Production Episode Markdown').first().json.path }}",
+        "binaryData": false,
+        "fileContent": "={{ $('Generate Production Episode Markdown').first().json.markdown }}",
+        "commitMessage": "={{ 'podcast: publish portable episode ' + $('Prepare Production Distribution Context').first().json.date }}",
+        "additionalParameters": {
+          "branch": {
+            "branch": "main"
+          }
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "pGithubNodeX8Q3M7Z",
+          "name": "GitHub Node (podcast)"
+        }
+      }
+    },
+    {
+      "id": "github_get",
+      "name": "GitHub - Read Production Episode from Main",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        4560,
+        0
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "owner": {
+          "mode": "name",
+          "value": "anitguru"
+        },
+        "repository": {
+          "mode": "name",
+          "value": "anit.guru"
+        },
+        "filePath": "={{ $('Generate Production Episode Markdown').first().json.path }}",
+        "asBinaryProperty": false,
+        "additionalParameters": {
+          "reference": "main"
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "pGithubNodeX8Q3M7Z",
+          "name": "GitHub Node (podcast)"
+        }
+      }
+    },
+    {
+      "id": "validate_github",
+      "name": "Validate Production GitHub Readback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4800,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const f=$input.first().json,e=$('Generate Production Episode Markdown').first().json,c=$('GitHub - Create Production Episode on Main').first().json,d=Buffer.from(String(f.content||'').replace(/\\n/g,''),'base64').toString('utf8');\nif(f.path!==e.path||d!==e.markdown||!/^[a-f0-9]{40}$/.test(String(c.commit?.sha||'')))throw new Error('production GitHub readback invalid');return [{json:{branch:'main',path:f.path,commitSha:c.commit.sha,contentSha:f.sha,verified:true}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "ledger_github",
+      "name": "Ledger - Production GitHub Verified",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        5040,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "podcast_run_ledger"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $('Prepare Production Distribution Context').first().json.runId }}",
+            "execution_id": "={{ $execution.id }}",
+            "run_mode": "production-manual",
+            "episode": "={{ $('Prepare Production Distribution Context').first().json.episode }}",
+            "episode_date": "={{ $('Prepare Production Distribution Context').first().json.date }}",
+            "stage": "production-github",
+            "status": "passed",
+            "attempt": 1,
+            "selected_stories_json": "={{ JSON.stringify($('Prepare Production Distribution Context').first().json.selectedStories) }}",
+            "script_sha256": "",
+            "audio_sha256": "={{ $('Prepare Production Distribution Context').first().json.audio.sha256 }}",
+            "srt_sha256": "={{ $('Prepare Production Distribution Context').first().json.srt.sha256 }}",
+            "qa_json": "",
+            "artifact_urls_json": "={{ JSON.stringify({audio:$('Validate Production Cloudinary Upload').first().json.secure_url,github:$('Validate Production GitHub Readback').first().json}) }}",
+            "error": "",
+            "started_at": "={{ $('Prepare Production Distribution Context').first().json.startedAt }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "db_row",
+      "name": "Prepare Native Supabase Episode Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5280,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const c=$('Prepare Production Distribution Context').first().json;return [{json:{date:c.date,episode:c.episode,stories:c.selectedStories,audio_url:$('Validate Production Cloudinary Upload').first().json.secure_url,duration_secs:Math.round(c.audio.durationSeconds)}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "supabase_create",
+      "name": "Supabase - Create Production Episode Row",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        5520,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "tableId": "podcast_episodes",
+        "dataToSend": "autoMapInputData",
+        "inputsToIgnore": ""
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "duPN6Njb1go7DN8w",
+          "name": "Supabase (podcast)"
+        }
+      }
+    },
+    {
+      "id": "supabase_get",
+      "name": "Supabase - Read Back Production Episode",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        5760,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "podcast_episodes",
+        "returnAll": false,
+        "limit": 1,
+        "orderBy": "episode.desc",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "date",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Production Distribution Context').first().json.date }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "duPN6Njb1go7DN8w",
+          "name": "Supabase (podcast)"
+        }
+      }
+    },
+    {
+      "id": "validate_db",
+      "name": "Validate Production Supabase Readback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6000,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json,c=$('Prepare Production Distribution Context').first().json,u=$('Validate Production Cloudinary Upload').first().json;if(r.date!==c.date||Number(r.episode)!==c.episode||r.audio_url!==u.secure_url||!Array.isArray(r.stories)||r.stories.length!==4||Number(r.duration_secs)!==Math.round(c.audio.durationSeconds))throw new Error('production Supabase readback invalid');return [{json:{row:r,verified:true}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "ledger_db",
+      "name": "Ledger - Production Supabase Verified",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        6240,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "podcast_run_ledger"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $('Prepare Production Distribution Context').first().json.runId }}",
+            "execution_id": "={{ $execution.id }}",
+            "run_mode": "production-manual",
+            "episode": "={{ $('Prepare Production Distribution Context').first().json.episode }}",
+            "episode_date": "={{ $('Prepare Production Distribution Context').first().json.date }}",
+            "stage": "production-database",
+            "status": "passed",
+            "attempt": 1,
+            "selected_stories_json": "={{ JSON.stringify($('Prepare Production Distribution Context').first().json.selectedStories) }}",
+            "script_sha256": "",
+            "audio_sha256": "={{ $('Prepare Production Distribution Context').first().json.audio.sha256 }}",
+            "srt_sha256": "={{ $('Prepare Production Distribution Context').first().json.srt.sha256 }}",
+            "qa_json": "",
+            "artifact_urls_json": "={{ JSON.stringify({audio:$('Validate Production Cloudinary Upload').first().json.secure_url}) }}",
+            "error": "",
+            "started_at": "={{ $('Prepare Production Distribution Context').first().json.startedAt }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "notification",
+      "name": "Prepare Production Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6480,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const c=$('Prepare Production Distribution Context').first().json,u=$('Validate Production Cloudinary Upload').first().json;return [{json:{text:`\ud83c\udf99\ufe0f Guru's Tech Bytes EP #${c.episode} is live \u2014 ${c.date}\\n${u.secure_url}`}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "telegram_text",
+      "name": "Telegram - Send Production Summary",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        6720,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "8100669692",
+        "text": "={{ $json.text }}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "oOpvPw9TPukkiYK6",
+          "name": "Guru's Tech Bytes Bot (podcast)"
+        }
+      }
+    },
+    {
+      "id": "restore_notify_audio",
+      "name": "Restore Audio for Telegram",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6960,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const c=$('Prepare Production Distribution Context').first();return [{json:{},binary:{audio:c.binary.audio}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "telegram_audio",
+      "name": "Telegram - Send Production MP3",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        7200,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendAudio",
+        "chatId": "8100669692",
+        "binaryData": true,
+        "binaryPropertyName": "audio",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "oOpvPw9TPukkiYK6",
+          "name": "Guru's Tech Bytes Bot (podcast)"
+        }
+      }
+    },
+    {
+      "id": "restore_notify_srt",
+      "name": "Restore SRT for Telegram",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7440,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const c=$('Prepare Production Distribution Context').first();return [{json:{},binary:{srt:c.binary.srt}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "telegram_srt",
+      "name": "Telegram - Send Production SRT",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        7680,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendDocument",
+        "chatId": "8100669692",
+        "binaryData": true,
+        "binaryPropertyName": "srt",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "oOpvPw9TPukkiYK6",
+          "name": "Guru's Tech Bytes Bot (podcast)"
+        }
+      }
+    },
+    {
+      "id": "validate_notifications",
+      "name": "Validate Production Telegram Delivery",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7920,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const ids=[$('Telegram - Send Production Summary').first().json.result?.message_id,$('Telegram - Send Production MP3').first().json.result?.message_id,$input.first().json.result?.message_id];if(ids.some(x=>!Number.isInteger(x)||x<1))throw new Error('production Telegram delivery missing');return [{json:{messageIds:ids,verified:true}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "ledger_complete",
+      "name": "Ledger - Manual Production Complete",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        8160,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "podcast_run_ledger"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $('Prepare Production Distribution Context').first().json.runId }}",
+            "execution_id": "={{ $execution.id }}",
+            "run_mode": "production-manual",
+            "episode": "={{ $('Prepare Production Distribution Context').first().json.episode }}",
+            "episode_date": "={{ $('Prepare Production Distribution Context').first().json.date }}",
+            "stage": "production-complete",
+            "status": "passed",
+            "attempt": 1,
+            "selected_stories_json": "={{ JSON.stringify($('Prepare Production Distribution Context').first().json.selectedStories) }}",
+            "script_sha256": "",
+            "audio_sha256": "={{ $('Prepare Production Distribution Context').first().json.audio.sha256 }}",
+            "srt_sha256": "={{ $('Prepare Production Distribution Context').first().json.srt.sha256 }}",
+            "qa_json": "={{ JSON.stringify({audio:$('Prepare Production Distribution Context').first().json.audio,srt:$('Prepare Production Distribution Context').first().json.srt.alignment}) }}",
+            "artifact_urls_json": "={{ JSON.stringify({audio:$('Validate Production Cloudinary Upload').first().json.secure_url,github:$('Validate Production GitHub Readback').first().json,telegram:$('Validate Production Telegram Delivery').first().json.messageIds}) }}",
+            "error": "",
+            "started_at": "={{ $('Prepare Production Distribution Context').first().json.startedAt }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "return_contract",
+      "name": "Return Production Distribution Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8400,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const c=$('Prepare Production Distribution Context').first().json,u=$('Validate Production Cloudinary Upload').first().json,g=$('Validate Production GitHub Readback').first().json,n=$('Validate Production Telegram Delivery').first().json;return [{json:{runMode:c.runMode,publishMode:'production',date:c.date,runId:c.runId,episode:c.episode,audio_sha256:c.audio.sha256,srt_sha256:c.srt.sha256,cloudinary:{publicId:u.public_id,secureUrl:u.secure_url,bytes:u.bytes},github:g,supabasePersisted:true,telegramMessageIds:n.messageIds,distributionValidated:true}}];"
+      },
+      "notes": ""
+    }
+  ],
+  "connections": {
+    "When Called by Manual Production Parent": {
+      "main": [
+        [
+          {
+            "node": "Prepare Production Distribution Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Production Distribution Context": {
+      "main": [
+        [
+          {
+            "node": "Hard Manual Production Authorization Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hard Manual Production Authorization Gate": {
+      "main": [
+        [
+          {
+            "node": "Ledger - Production Distribution Started",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger - Production Distribution Started": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Confirm Today's Episode Absent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Confirm Today's Episode Absent": {
+      "main": [
+        [
+          {
+            "node": "Gate - Supabase Date Must Be Empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate - Supabase Date Must Be Empty": {
+      "main": [
+        [
+          {
+            "node": "GitHub - Confirm Production Page Absent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub - Confirm Production Page Absent": {
+      "main": [
+        [
+          {
+            "node": "Gate - GitHub Page Must Be Empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate - GitHub Page Must Be Empty": {
+      "main": [
+        [
+          {
+            "node": "Restore Production Audio + SRT Binaries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Production Audio + SRT Binaries": {
+      "main": [
+        [
+          {
+            "node": "SHA256 Production Audio",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Production Binary + Verified Hash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SHA256 Production Audio": {
+      "main": [
+        [
+          {
+            "node": "Validate Exact Production Audio Hash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Exact Production Audio Hash": {
+      "main": [
+        [
+          {
+            "node": "Merge Production Binary + Verified Hash",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Production Binary + Verified Hash": {
+      "main": [
+        [
+          {
+            "node": "Cloudinary - Upload Production Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cloudinary - Upload Production Audio": {
+      "main": [
+        [
+          {
+            "node": "Validate Production Cloudinary Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Production Cloudinary Upload": {
+      "main": [
+        [
+          {
+            "node": "HEAD Verify Production Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HEAD Verify Production Audio": {
+      "main": [
+        [
+          {
+            "node": "Validate Production Audio Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Production Audio Delivery": {
+      "main": [
+        [
+          {
+            "node": "Ledger - Production Cloudinary Verified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger - Production Cloudinary Verified": {
+      "main": [
+        [
+          {
+            "node": "Generate Production Episode Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Production Episode Markdown": {
+      "main": [
+        [
+          {
+            "node": "GitHub - Create Production Episode on Main",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub - Create Production Episode on Main": {
+      "main": [
+        [
+          {
+            "node": "GitHub - Read Production Episode from Main",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub - Read Production Episode from Main": {
+      "main": [
+        [
+          {
+            "node": "Validate Production GitHub Readback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Production GitHub Readback": {
+      "main": [
+        [
+          {
+            "node": "Ledger - Production GitHub Verified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger - Production GitHub Verified": {
+      "main": [
+        [
+          {
+            "node": "Prepare Native Supabase Episode Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Native Supabase Episode Row": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Create Production Episode Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Create Production Episode Row": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Read Back Production Episode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Read Back Production Episode": {
+      "main": [
+        [
+          {
+            "node": "Validate Production Supabase Readback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Production Supabase Readback": {
+      "main": [
+        [
+          {
+            "node": "Ledger - Production Supabase Verified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger - Production Supabase Verified": {
+      "main": [
+        [
+          {
+            "node": "Prepare Production Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Production Notification": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Send Production Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram - Send Production Summary": {
+      "main": [
+        [
+          {
+            "node": "Restore Audio for Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Audio for Telegram": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Send Production MP3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram - Send Production MP3": {
+      "main": [
+        [
+          {
+            "node": "Restore SRT for Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore SRT for Telegram": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Send Production SRT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram - Send Production SRT": {
+      "main": [
+        [
+          {
+            "node": "Validate Production Telegram Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Production Telegram Delivery": {
+      "main": [
+        [
+          {
+            "node": "Ledger - Manual Production Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger - Manual Production Complete": {
+      "main": [
+        [
+          {
+            "node": "Return Production Distribution Contract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "tags": []
+}

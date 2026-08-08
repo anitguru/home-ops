@@ -1,0 +1,998 @@
+{
+  "id": "pProdResume113X8Q3",
+  "name": "WF-podcast-portable-production-resume-113",
+  "active": false,
+  "nodes": [
+    {
+      "id": "manual",
+      "name": "Manual Resume Production 113 Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "context",
+      "name": "Production Resume 113 Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{\"runMode\":\"shadow\",\"publishMode\":\"production-recovery\",\"manualProductionApproved\":true,\"date\":\"2026-08-08\",\"runId\":\"portable-production/2026-08-08/113\",\"episode\":125,\"selectedStories\":[{\"id\":\"49209539\",\"title\":\"What happens if an entire class of workers loses faith in their careers\",\"url\":\"https://www.noemamag.com/why-is-everyone-in-tech-so-sad/\",\"hnUrl\":\"https://news.ycombinator.com/item?id=49209539\",\"score\":964},{\"id\":\"49214008\",\"title\":\"DeepSeek V4 Flash 0731\",\"url\":\"https://arcprize.org/results/deepseek-v4-flash-0731\",\"hnUrl\":\"https://news.ycombinator.com/item?id=49214008\",\"score\":754},{\"id\":\"49220126\",\"title\":\"DeepMind's WeatherNext model achieves breakthrough forecasting cyclones\",\"url\":\"https://deepmind.google/blog/weathernext-ai-model-achieves-breakthrough-in-forecasting-cyclones/\",\"hnUrl\":\"https://news.ycombinator.com/item?id=49220126\",\"score\":352},{\"id\":\"49219508\",\"title\":\"Hardware backdoors in some x86 CPUs\",\"url\":\"https://github.com/xoreaxeaxeax/rosenbridge\",\"hnUrl\":\"https://news.ycombinator.com/item?id=49219508\",\"score\":322}],\"script_sha256\":\"6fe6b77a6fc9901b1fa491b79e7ae03941df16abf737e9fa93f548f0b3975261\",\"audio_sha256\":\"f2b9cea5af9c54d460d286eb60fb53b808e0c41caf30c61c732103c0fe553814\",\"audioUrl\":\"https://res.cloudinary.com/ddicetqs5/video/upload/v1786230258/anitguru/gurus-tech-bytes-2026-08-08.mp3\",\"audioQa\":{\"duration_seconds\":125.808,\"integrated_lufs\":-17.3,\"true_peak_dbtp\":-1.7,\"clipped_samples\":0,\"long_silence_ratio\":0,\"sample_rate_hz\":24000,\"channels\":1},\"githubPath\":\"content/podcast/2026-08-08.md\",\"githubCommit\":\"c2f88c1f7ac7651693eef9b2eb207930c24b71c4\"}}];"
+      },
+      "notes": "Pinned nonsecret proof from failed-closed execution 113; it can repair only this exact date, episode, hashes, URL, and commit."
+    },
+    {
+      "id": "gate",
+      "name": "Hard Production Resume 113 Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const c=$input.first().json;if(c.manualProductionApproved!==true||c.date!=='2026-08-08'||c.episode!==125||c.githubCommit!=='c2f88c1f7ac7651693eef9b2eb207930c24b71c4'||c.audio_sha256!=='f2b9cea5af9c54d460d286eb60fb53b808e0c41caf30c61c732103c0fe553814')throw new Error('production resume target mismatch');return [{json:c}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "github_get",
+      "name": "GitHub - Re-read Production Episode",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "owner": {
+          "mode": "name",
+          "value": "anitguru"
+        },
+        "repository": {
+          "mode": "name",
+          "value": "anit.guru"
+        },
+        "filePath": "={{ $json.githubPath }}",
+        "asBinaryProperty": false,
+        "additionalParameters": {
+          "reference": "main"
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "pGithubNodeX8Q3M7Z",
+          "name": "GitHub Node (podcast)"
+        }
+      }
+    },
+    {
+      "id": "parse_page",
+      "name": "Validate Page + Recover Approved Transcript",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const f=$input.first().json,c=$('Production Resume 113 Context').first().json,raw=Buffer.from(String(f.content||'').replace(/\\n/g,''),'base64').toString('utf8');const parts=raw.split(/^---\\s*$/m);const scriptText=(parts[2]||'').trim();if(f.path!==c.githubPath||!raw.includes(`episode: ${c.episode}`)||!raw.includes(c.audioUrl)||scriptText.split(/\\n\\n/).length!==6)throw new Error('production page/transcript readback invalid');return [{json:{...c,scriptText,mediaValidated:true}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "head_audio",
+      "name": "HEAD Re-verify Production MP3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "method": "HEAD",
+        "url": "={{ $json.audioUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 20000
+        }
+      },
+      "notes": "HTTP exception: the Cloudinary community node has no delivery-URL HEAD action."
+    },
+    {
+      "id": "head_gate",
+      "name": "Gate - Production MP3 Reachable",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json,c=$('Validate Page + Recover Approved Transcript').first().json;if(Number(r.statusCode)<200||Number(r.statusCode)>=400)throw new Error(`production MP3 HEAD ${r.statusCode}`);return [{json:c}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "download_audio",
+      "name": "Download Exact Production MP3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1680,
+        0
+      ],
+      "parameters": {
+        "url": "={{ $json.audioUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "audio"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "notes": "HTTP exception: the Cloudinary community node has no binary download action."
+    },
+    {
+      "id": "hash_audio",
+      "name": "SHA256 Recovered Production MP3",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        0
+      ],
+      "parameters": {
+        "action": "hash",
+        "binaryData": true,
+        "binaryPropertyName": "audio",
+        "type": "SHA256",
+        "dataPropertyName": "audio_sha256",
+        "encoding": "hex"
+      }
+    },
+    {
+      "id": "hash_gate",
+      "name": "Gate - Exact Production MP3 Hash",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json,c=$('Validate Page + Recover Approved Transcript').first().json;if(r.audio_sha256!==c.audio_sha256)throw new Error('recovered production MP3 hash mismatch');return [{json:c}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "merge_audio",
+      "name": "Merge Recovered MP3 + Proven Context",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2400,
+        0
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      }
+    },
+    {
+      "id": "call_transcription",
+      "name": "Run Reusable Transcription + SRT",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2640,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "pTransSubX8Q3M7",
+          "mode": "list",
+          "cachedResultName": "WF-podcast-sub-transcription-v1"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "runMode": "={{ $json.runMode }}",
+            "date": "={{ $json.date }}",
+            "runId": "={{ $json.runId }}",
+            "episode": "={{ $json.episode }}",
+            "selectedStories": "={{ $json.selectedStories }}",
+            "scriptText": "={{ $json.scriptText }}",
+            "script_sha256": "={{ $json.script_sha256 }}",
+            "audio_sha256": "={{ $json.audio_sha256 }}",
+            "audioQa": "={{ $json.audioQa }}",
+            "mediaValidated": "={{ $json.mediaValidated }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "runMode",
+              "displayName": "runMode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "runId",
+              "displayName": "runId",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "episode",
+              "displayName": "episode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "selectedStories",
+              "displayName": "selectedStories",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "array"
+            },
+            {
+              "id": "scriptText",
+              "displayName": "scriptText",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "script_sha256",
+              "displayName": "script_sha256",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "audio_sha256",
+              "displayName": "audio_sha256",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "audioQa",
+              "displayName": "audioQa",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            },
+            {
+              "id": "mediaValidated",
+              "displayName": "mediaValidated",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "boolean"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "validate_transcription",
+      "name": "Validate Recovered Production SRT",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2880,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const i=$input.first(),r=i.json,a=r.alignment||{};if(r.transcriptionValidated!==true||!i.binary?.audio||!i.binary?.srt||a.wordErrorRate>0.20||a.maximumLineCharacters>47||a.maximumLinesPerCue>2)throw new Error('recovered production SRT proof invalid');return [i];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "prepare_row",
+      "name": "Prepare Correct Native Supabase Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json;return [{json:{date:r.date,episode:r.episode,stories:r.selectedStories,audio_url:$('Production Resume 113 Context').first().json.audioUrl,duration_secs:Math.round(r.audioQa.duration_seconds)}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "supabase_update",
+      "name": "Supabase - Correct Production Episode 125",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3360,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "tableId": "podcast_episodes",
+        "dataToSend": "autoMapInputData",
+        "inputsToIgnore": "",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "date",
+              "condition": "eq",
+              "keyValue": "={{ $('Production Resume 113 Context').first().json.date }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "duPN6Njb1go7DN8w",
+          "name": "Supabase (podcast)"
+        }
+      }
+    },
+    {
+      "id": "supabase_get",
+      "name": "Supabase - Verify Correct Production Row",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3600,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "podcast_episodes",
+        "returnAll": false,
+        "limit": 1,
+        "orderBy": "episode.desc",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "date",
+              "condition": "eq",
+              "keyValue": "={{ $('Production Resume 113 Context').first().json.date }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "duPN6Njb1go7DN8w",
+          "name": "Supabase (podcast)"
+        }
+      }
+    },
+    {
+      "id": "validate_row",
+      "name": "Validate Correct Supabase Types + Values",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3840,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json,c=$('Production Resume 113 Context').first().json;if(r.date!==c.date||Number(r.episode)!==c.episode||r.audio_url!==c.audioUrl||!Array.isArray(r.stories)||r.stories.length!==4||Number(r.duration_secs)!==126)throw new Error('corrected Supabase row invalid');return [{json:{row:r,verified:true}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "ledger_db",
+      "name": "Ledger - Production Row Repaired",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        4080,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "podcast_run_ledger"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $('Production Resume 113 Context').first().json.runId }}",
+            "execution_id": "={{ $execution.id }}",
+            "run_mode": "production-recovery",
+            "episode": "={{ $('Production Resume 113 Context').first().json.episode }}",
+            "episode_date": "={{ $('Production Resume 113 Context').first().json.date }}",
+            "stage": "production-database-repaired",
+            "status": "passed",
+            "attempt": 1,
+            "selected_stories_json": "={{ JSON.stringify($('Production Resume 113 Context').first().json.selectedStories) }}",
+            "script_sha256": "",
+            "audio_sha256": "={{ $('Production Resume 113 Context').first().json.audio_sha256 }}",
+            "srt_sha256": "={{ $('Validate Recovered Production SRT').first().json.srt_sha256 }}",
+            "qa_json": "",
+            "artifact_urls_json": "={{ JSON.stringify({audio:$('Production Resume 113 Context').first().json.audioUrl,github:$('Production Resume 113 Context').first().json.githubCommit}) }}",
+            "error": "",
+            "started_at": "={{ $('Production Resume 113 Context').first().json.startedAt }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "notify_text",
+      "name": "Prepare Recovered Production Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4320,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const c=$('Production Resume 113 Context').first().json;return [{json:{text:`\ud83c\udf99\ufe0f Guru's Tech Bytes EP #${c.episode} is live \u2014 ${c.date}\\n${c.audioUrl}`}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "telegram_text",
+      "name": "Telegram - Send Production Summary",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        4560,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "8100669692",
+        "text": "={{ $json.text }}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "oOpvPw9TPukkiYK6",
+          "name": "Guru's Tech Bytes Bot (podcast)"
+        }
+      }
+    },
+    {
+      "id": "restore_audio",
+      "name": "Restore Production MP3 for Telegram",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4800,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const i=$('Validate Recovered Production SRT').first();return [{json:{},binary:{audio:i.binary.audio}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "telegram_audio",
+      "name": "Telegram - Send Production MP3",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        5040,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendAudio",
+        "chatId": "8100669692",
+        "binaryData": true,
+        "binaryPropertyName": "audio",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "oOpvPw9TPukkiYK6",
+          "name": "Guru's Tech Bytes Bot (podcast)"
+        }
+      }
+    },
+    {
+      "id": "restore_srt",
+      "name": "Restore Production SRT for Telegram",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5280,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const i=$('Validate Recovered Production SRT').first();return [{json:{},binary:{srt:i.binary.srt}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "telegram_srt",
+      "name": "Telegram - Send Production SRT",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        5520,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendDocument",
+        "chatId": "8100669692",
+        "binaryData": true,
+        "binaryPropertyName": "srt",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "oOpvPw9TPukkiYK6",
+          "name": "Guru's Tech Bytes Bot (podcast)"
+        }
+      }
+    },
+    {
+      "id": "validate_delivery",
+      "name": "Validate Three Production Telegram Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5760,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const ids=[$('Telegram - Send Production Summary').first().json.result?.message_id,$('Telegram - Send Production MP3').first().json.result?.message_id,$input.first().json.result?.message_id];if(ids.some(x=>!Number.isInteger(x)||x<1))throw new Error('production Telegram delivery incomplete');return [{json:{messageIds:ids,verified:true}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "ledger_complete",
+      "name": "Ledger - Production 113 Completed",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        6000,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "podcast_run_ledger"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $('Production Resume 113 Context').first().json.runId }}",
+            "execution_id": "={{ $execution.id }}",
+            "run_mode": "production-recovery",
+            "episode": "={{ $('Production Resume 113 Context').first().json.episode }}",
+            "episode_date": "={{ $('Production Resume 113 Context').first().json.date }}",
+            "stage": "production-complete",
+            "status": "passed",
+            "attempt": 1,
+            "selected_stories_json": "={{ JSON.stringify($('Production Resume 113 Context').first().json.selectedStories) }}",
+            "script_sha256": "",
+            "audio_sha256": "={{ $('Production Resume 113 Context').first().json.audio_sha256 }}",
+            "srt_sha256": "={{ $('Validate Recovered Production SRT').first().json.srt_sha256 }}",
+            "qa_json": "={{ JSON.stringify($('Validate Recovered Production SRT').first().json.alignment) }}",
+            "artifact_urls_json": "={{ JSON.stringify({audio:$('Production Resume 113 Context').first().json.audioUrl,github:$('Production Resume 113 Context').first().json.githubCommit,telegram:$('Validate Three Production Telegram Messages').first().json.messageIds}) }}",
+            "error": "",
+            "started_at": "={{ $('Production Resume 113 Context').first().json.startedAt }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "return_contract",
+      "name": "Return Recovered Production Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6240,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const c=$('Production Resume 113 Context').first().json,t=$('Validate Recovered Production SRT').first().json,n=$('Validate Three Production Telegram Messages').first().json;return [{json:{date:c.date,episode:c.episode,audioUrl:c.audioUrl,audio_sha256:c.audio_sha256,srt_sha256:t.srt_sha256,alignment:t.alignment,githubCommit:c.githubCommit,supabasePersisted:true,telegramMessageIds:n.messageIds,productionValidated:true}}];"
+      },
+      "notes": ""
+    }
+  ],
+  "connections": {
+    "Manual Resume Production 113 Trigger": {
+      "main": [
+        [
+          {
+            "node": "Production Resume 113 Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Production Resume 113 Context": {
+      "main": [
+        [
+          {
+            "node": "Hard Production Resume 113 Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hard Production Resume 113 Gate": {
+      "main": [
+        [
+          {
+            "node": "GitHub - Re-read Production Episode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub - Re-read Production Episode": {
+      "main": [
+        [
+          {
+            "node": "Validate Page + Recover Approved Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Page + Recover Approved Transcript": {
+      "main": [
+        [
+          {
+            "node": "HEAD Re-verify Production MP3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HEAD Re-verify Production MP3": {
+      "main": [
+        [
+          {
+            "node": "Gate - Production MP3 Reachable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate - Production MP3 Reachable": {
+      "main": [
+        [
+          {
+            "node": "Download Exact Production MP3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Exact Production MP3": {
+      "main": [
+        [
+          {
+            "node": "SHA256 Recovered Production MP3",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Recovered MP3 + Proven Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SHA256 Recovered Production MP3": {
+      "main": [
+        [
+          {
+            "node": "Gate - Exact Production MP3 Hash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate - Exact Production MP3 Hash": {
+      "main": [
+        [
+          {
+            "node": "Merge Recovered MP3 + Proven Context",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Recovered MP3 + Proven Context": {
+      "main": [
+        [
+          {
+            "node": "Run Reusable Transcription + SRT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Reusable Transcription + SRT": {
+      "main": [
+        [
+          {
+            "node": "Validate Recovered Production SRT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Recovered Production SRT": {
+      "main": [
+        [
+          {
+            "node": "Prepare Correct Native Supabase Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Correct Native Supabase Row": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Correct Production Episode 125",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Correct Production Episode 125": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Verify Correct Production Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Verify Correct Production Row": {
+      "main": [
+        [
+          {
+            "node": "Validate Correct Supabase Types + Values",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Correct Supabase Types + Values": {
+      "main": [
+        [
+          {
+            "node": "Ledger - Production Row Repaired",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger - Production Row Repaired": {
+      "main": [
+        [
+          {
+            "node": "Prepare Recovered Production Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Recovered Production Notification": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Send Production Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram - Send Production Summary": {
+      "main": [
+        [
+          {
+            "node": "Restore Production MP3 for Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Production MP3 for Telegram": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Send Production MP3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram - Send Production MP3": {
+      "main": [
+        [
+          {
+            "node": "Restore Production SRT for Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Production SRT for Telegram": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Send Production SRT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram - Send Production SRT": {
+      "main": [
+        [
+          {
+            "node": "Validate Three Production Telegram Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Three Production Telegram Messages": {
+      "main": [
+        [
+          {
+            "node": "Ledger - Production 113 Completed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger - Production 113 Completed": {
+      "main": [
+        [
+          {
+            "node": "Return Recovered Production Contract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "tags": []
+}
