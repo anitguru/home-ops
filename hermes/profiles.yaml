@@ -3,7 +3,7 @@ defaults:
   steering_source: /Users/sva/Documents/Repos/Github/home-ops/hermes/steering
   profile_strategy: clone-then-prune
   secret_policy: Use the canonical SOPS+age store and `secret` helper documented in the AnITGuru wiki for shared/durable secrets; profile .env only for local runtime env indirection, never committed. The local Orionpax key is only for SSH/Git authentication.
-  model_policy: Use openai-codex/gpt-5.5 for profile default models; use openai-codex/gpt-5.4-mini for auxiliary/delegation where configured.
+  model_policy: Use ollama-cloud/deepseek-v4-flash:0731-cloud for all profile default, auxiliary, and delegation models.
 repos:
   automations:
     path: /Users/sva/Documents/Repos/Gitea/automations
@@ -44,8 +44,8 @@ profiles:
     - whisper
     - tts
     default_model:
-      provider: openai-codex
-      model: gpt-5.5
+      provider: ollama-cloud
+      model: deepseek-v4-flash:0731-cloud
     mcp_servers:
     - vault
     - firecrawl
@@ -55,7 +55,7 @@ profiles:
     default_cwd: /Users/sva/Documents/Repos/Gitea/automations
     notes:
     - Prefer HashiCorp Vault for shared/durable credentials; .env is acceptable only for local per-profile runtime secrets.
-    - Use openai-codex/gpt-5.5 for agentic work; keep deterministic cron maintenance in no-agent scripts where practical.
+    - Use ollama-cloud/deepseek-v4-flash:0731-cloud for agentic work; keep deterministic cron maintenance in no-agent scripts where practical.
   xposting:
     purpose: One-shot @anitdotguru X post drafting profile invoked by default-profile Hermes cron wrappers.
     primary_repo: home-ops
@@ -66,8 +66,8 @@ profiles:
     - terminal
     - file
     default_model:
-      provider: openai-codex
-      model: gpt-5.5
+      provider: ollama-cloud
+      model: deepseek-v4-flash:0731-cloud
     default_cwd: /Users/sva/Documents/Repos/Github/home-ops/hermes/x-social
     scheduling_owner: default
     notes:
@@ -85,8 +85,8 @@ profiles:
     - terminal
     - file
     default_model:
-      provider: openai-codex
-      model: gpt-5.5
+      provider: ollama-cloud
+      model: deepseek-v4-flash:0731-cloud
     default_cwd: /Users/sva/Documents/Repos/Github/home-ops/hermes/x-social
     scheduling_owner: default
     notes:
@@ -106,11 +106,11 @@ profiles:
     - file
     - ahrefs
     default_model:
-      provider: openai-codex
-      model: gpt-5.5
+      provider: ollama-cloud
+      model: deepseek-v4-flash:0731-cloud
     auxiliary_model:
-      provider: openai-codex
-      model: gpt-5.4-mini
+      provider: ollama-cloud
+      model: deepseek-v4-flash:0731-cloud
     mcp_servers:
     - vault
     - ahrefs
@@ -130,11 +130,11 @@ profiles:
     - file
     - ahrefs
     default_model:
-      provider: openai-codex
-      model: gpt-5.5
+      provider: ollama-cloud
+      model: deepseek-v4-flash:0731-cloud
     auxiliary_model:
-      provider: openai-codex
-      model: gpt-5.4-mini
+      provider: ollama-cloud
+      model: deepseek-v4-flash:0731-cloud
     mcp_servers:
     - vault
     - ahrefs
@@ -155,8 +155,8 @@ profiles:
     - terminal
     - file
     default_model:
-      provider: openai-codex
-      model: gpt-5.5
+      provider: ollama-cloud
+      model: deepseek-v4-flash:0731-cloud
     mcp_servers:
     - vault
     - cocoindex-home-ops
@@ -179,11 +179,11 @@ profiles:
     - terminal
     - file
     default_model:
-      provider: openai-codex
-      model: gpt-5.5
+      provider: ollama-cloud
+      model: deepseek-v4-flash:0731-cloud
     auxiliary_model:
-      provider: openai-codex
-      model: gpt-5.4-mini
+      provider: ollama-cloud
+      model: deepseek-v4-flash:0731-cloud
     mcp_servers:
     - vault
     - cocoindex-observo
@@ -209,11 +209,11 @@ profiles:
     - terminal
     - file
     default_model:
-      provider: openai-codex
-      model: gpt-5.5
+      provider: ollama-cloud
+      model: deepseek-v4-flash:0731-cloud
     auxiliary_model:
-      provider: openai-codex
-      model: gpt-5.4-mini
+      provider: ollama-cloud
+      model: deepseek-v4-flash:0731-cloud
     mcp_servers:
     - vault
     - cocoindex-home-ops
@@ -235,11 +235,11 @@ profiles:
     - firecrawl
     - image_gen
     default_model:
-      provider: openai-codex
-      model: gpt-5.5
+      provider: ollama-cloud
+      model: deepseek-v4-flash:0731-cloud
     auxiliary_model:
-      provider: openai-codex
-      model: gpt-5.4-mini
+      provider: ollama-cloud
+      model: deepseek-v4-flash:0731-cloud
     mcp_servers:
     - vault
     - ahrefs
@@ -259,8 +259,8 @@ profiles:
     - terminal
     - file
     default_model:
-      provider: openai-codex
-      model: gpt-5.5
+      provider: ollama-cloud
+      model: deepseek-v4-flash:0731-cloud
     mcp_servers:
     - vault
     - cocoindex-home-ops
@@ -279,11 +279,11 @@ profiles:
     - terminal
     - file
     default_model:
-      provider: openai-codex
-      model: gpt-5.5
+      provider: ollama-cloud
+      model: deepseek-v4-flash:0731-cloud
     auxiliary_model:
-      provider: openai-codex
-      model: gpt-5.4-mini
+      provider: ollama-cloud
+      model: deepseek-v4-flash:0731-cloud
     mcp_servers:
     - cocoindex-home-ops
     default_cwd: /Users/sva/Documents/Repos/Github/home-ops
@@ -293,4 +293,4 @@ profiles:
     notes:
     - Renamed from the older ops profile; the ops wrapper alias is kept for muscle memory.
     - Daily user-file organization cronjob now runs the version-controlled script from home-ops/hermes/scripts/.
-    - Daily user-file organization cron now uses openai-codex/gpt-5.5; keep future cost-sensitive automations deterministic/no-agent when practical.
+    - Daily user-file organization cron now uses ollama-cloud/deepseek-v4-flash:0731-cloud; keep future cost-sensitive automations deterministic/no-agent when practical.
