@@ -1,0 +1,136 @@
+{
+  "id": "pCloudVer125X8Q3",
+  "name": "WF-podcast-cloudinary-cleanup-verify-2026-08-08",
+  "active": false,
+  "nodes": [
+    {
+      "id": "manual",
+      "name": "Manual Cloudinary Cleanup Verify",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "context",
+      "name": "Exact Deleted Asset Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{assetId:'ae11b2444759a36eefca31e9c8b094d8',publicId:'anitguru/gurus-tech-bytes-2026-08-08'}}];"
+      }
+    },
+    {
+      "id": "get",
+      "name": "Cloudinary - Get Deleted Asset by Immutable ID",
+      "type": "n8n-nodes-cloudinary.cloudinary",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "resource": "asset",
+        "operation": "getAsset",
+        "assetId": "={{ $json.assetId }}"
+      },
+      "credentials": {
+        "cloudinaryApi": {
+          "id": "pCloudinaryX8Q3M7",
+          "name": "Cloudinary (podcast)"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "gate",
+      "name": "Hard Cloudinary Origin Absence Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json;const deletedPlaceholder=r.placeholder===true&&Number(r.bytes)===0&&r.backup===true;if(!deletedPlaceholder&&!r.error) throw new Error('Cloudinary origin asset still exists');return [{json:{cloudinaryOriginAbsent:true,deletedPlaceholder,detail:r.error?String(r.error):'placeholder=true,bytes=0,backup=true'}}];"
+      }
+    },
+    {
+      "id": "stop",
+      "name": "Cloudinary Cleanup Verification Stop",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Manual Cloudinary Cleanup Verify": {
+      "main": [
+        [
+          {
+            "node": "Exact Deleted Asset Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exact Deleted Asset Context": {
+      "main": [
+        [
+          {
+            "node": "Cloudinary - Get Deleted Asset by Immutable ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cloudinary - Get Deleted Asset by Immutable ID": {
+      "main": [
+        [
+          {
+            "node": "Hard Cloudinary Origin Absence Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hard Cloudinary Origin Absence Gate": {
+      "main": [
+        [
+          {
+            "node": "Cloudinary Cleanup Verification Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "tags": []
+}

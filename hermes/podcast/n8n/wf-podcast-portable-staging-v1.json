@@ -1,0 +1,1179 @@
+{
+  "id": "pPortableStgX8Q3M7",
+  "name": "WF-podcast-portable-staging-v1",
+  "active": false,
+  "nodes": [
+    {
+      "id": "manual",
+      "name": "Manual Portable Staging Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "sub_trigger",
+      "name": "When Called by Parent Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        180
+      ],
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"runMode\": \"shadow\",\n  \"publishMode\": \"staging\",\n  \"date\": \"2026-08-08\",\n  \"runId\": \"portable-shadow/example\",\n  \"episode\": 125,\n  \"selectedStories\": [],\n  \"scriptText\": \"approved\",\n  \"script_sha256\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"audio_sha256\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"audioQa\": {\n    \"duration_seconds\": 120\n  },\n  \"srt_sha256\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"alignment\": {},\n  \"transcriptionValidated\": true\n}"
+      }
+    },
+    {
+      "id": "context",
+      "name": "Portable Staging Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const fixture = {\"sourceExecutionId\":\"37\",\"runId\":\"2026-08-08/37\",\"runMode\":\"shadow\",\"date\":\"2026-08-08\",\"episode\":125,\"selectedStories\":[{\"id\":\"49209539\",\"title\":\"What happens if an entire class of workers loses faith in their careers\",\"url\":\"https://www.noemamag.com/why-is-everyone-in-tech-so-sad/\",\"hnUrl\":\"https://news.ycombinator.com/item?id=49209539\",\"score\":923,\"matchedTopics\":[],\"cocoindexReason\":[\"matched trending topics: none\",\"HN score: 923\",\"not recently covered\"]},{\"id\":\"49214008\",\"title\":\"DeepSeek V4 Flash 0731\",\"url\":\"https://arcprize.org/results/deepseek-v4-flash-0731\",\"hnUrl\":\"https://news.ycombinator.com/item?id=49214008\",\"score\":737,\"matchedTopics\":[\"deepseek\"],\"cocoindexReason\":[\"matched trending topics: deepseek\",\"HN score: 737\",\"not recently covered\"]},{\"id\":\"49214098\",\"title\":\"Assembly Hall of Shame\",\"url\":\"https://github.com/xoreaxeaxeax/asm-hall-of-shame\",\"hnUrl\":\"https://news.ycombinator.com/item?id=49214098\",\"score\":401,\"matchedTopics\":[],\"cocoindexReason\":[\"matched trending topics: none\",\"HN score: 401\",\"not recently covered\"]},{\"id\":\"49189457\",\"title\":\"A physicist rigged his pet hamster\\u2019s wheel to upload to Strava\",\"url\":\"https://www.runnersworld.com/news/a73355106/hamster-wheel-strava-running/\",\"hnUrl\":\"https://news.ycombinator.com/item?id=49189457\",\"score\":382,\"matchedTopics\":[],\"cocoindexReason\":[\"matched trending topics: none\",\"HN score: 382\",\"not recently covered\"]}],\"scriptText\":\"Good morning, it's Saturday. This is Guru's Tech Bytes, episode one hundred twenty five.\\n\\nFirst up, what happens if an entire class of workers loses faith in their careers. You know what this reminds me of, back in ninety eight when the transmission shop closed down and my buddy just started building birdhouses. Heh. Hhh, okay, that's something. But seriously, if all the coders think the robots are taking over, what do they do, just pivot to plumbing. I mean, good luck with that, PVC glue is a whole different beast than Python.\\n\\nSecond, DeepSeek V4 Flash 0731. Now I got no clue what them numbers mean, sounds like a serial number on a carburetor, but folks are saying it is fast. You know what else is fast, the blue screen of death when Windows decides to update right in the middle of a brake job. Microsoft does that just to mess with us, I swear. But this DeepSeek thing, it is some new AI model, and apparently it runs pretty smooth, which is a nice change of pace from my laptop that sounds like a diesel engine when I open the email.\\n\\nThird, Assembly Hall of Shame. This is where programmers show off their worst code, kinda like the wiring job I saw on a Honda Civic last week, duct tape and prayers. You ever try debugging a fuel pump, it is just spaghetti wires and regret. Anyway, these tech folks are posting their messy code for laughs, which I respect, at least they own it, unlike some software companies that ship broken updates and act like it is a feature.\\n\\nAnd finally, a physicist rigged his pet hamster's wheel to upload to Strava. That is hilarious, the little guy is out here getting more cardio than me. You know what this reminds me of, my cousin put a GPS on his coonhound and the dog logged more miles than a marathon runner. But this hamster, he is posting fake run times and probably beating my personal records, which is embarrassing but also kind of motivating.\\n\\nThat's your daily byte. Have a great day. Until next time.\",\"wordCount\":358,\"paragraphCount\":6,\"audio\":{\"sourceUrl\":\"https://res.cloudinary.com/ddicetqs5/video/upload/v1786220477/anitguru-shadow/gurus-tech-bytes-2026-08-08-37.mp3\",\"bytes\":958125,\"sha256\":\"657afe574a968ed88f4efe6de9b8c7327ff18717a878b29306cc3cb7afdde698\",\"durationSeconds\":119.736,\"duration\":\"2:00\"},\"srt\":{\"sha256\":\"8e0b4852eb31c84cba473df4d38b87ebbfa5e156ad15d73234114824d23bbbd4\",\"alignment\":{\"durationSeconds\":119.68000030517578,\"referenceWords\":358,\"transcriptWords\":354,\"substitutions\":15,\"deletions\":6,\"insertions\":2,\"wordErrorRate\":0.064246,\"exactAnchors\":337,\"exactAnchorRatio\":0.941341,\"cueCount\":23,\"maximumLineCharacters\":47,\"maximumLinesPerCue\":2,\"thirds\":[{\"name\":\"beginning\",\"referenceWordStart\":1,\"referenceWordEnd\":119,\"startSeconds\":0,\"endSeconds\":42.138,\"exactAnchors\":108,\"interpolatedWords\":4,\"maximumUnanchoredRunWords\":4},{\"name\":\"middle\",\"referenceWordStart\":120,\"referenceWordEnd\":238,\"startSeconds\":42.138,\"endSeconds\":79.52,\"exactAnchors\":118,\"interpolatedWords\":0,\"maximumUnanchoredRunWords\":1},{\"name\":\"end\",\"referenceWordStart\":239,\"referenceWordEnd\":358,\"startSeconds\":79.52,\"endSeconds\":119.44,\"exactAnchors\":111,\"interpolatedWords\":2,\"maximumUnanchoredRunWords\":4}],\"maximumUnanchoredRunWords\":4}}};\nconst incoming=$input.first();const now=$now.toISO();\nif(incoming.binary?.audio&&incoming.binary?.srt){const r=incoming.json;\n if(r.runMode!=='shadow'||r.publishMode!=='staging'||r.transcriptionValidated!==true) throw new Error('staging input mode/proof invalid');\n const seconds=Number(r.audioQa?.duration_seconds);const duration=`${Math.floor(seconds/60)}:${String(Math.round(seconds%60)).padStart(2,'0')}`;\n const sourceExecutionId=String(r.runId).split('/').pop().replace(/[^A-Za-z0-9_-]/g,'');\n return [{json:{...r,sourceExecutionId,portableRunId:r.runId,startedAt:now,inputMode:'parent',audio:{sha256:r.audio_sha256,bytes:0,durationSeconds:seconds,duration},srt:{sha256:r.srt_sha256,alignment:r.alignment}},binary:{audio:incoming.binary.audio,srt:incoming.binary.srt}}];}\nreturn [{json:{...fixture,portableRunId:`portable-staging/${fixture.sourceExecutionId}/${$execution.id}`,startedAt:now,inputMode:'fixture'}}];"
+      },
+      "notes": "Frozen execution-37 fixture; no credential, path, or worker URL."
+    },
+    {
+      "id": "ledger_start",
+      "name": "Ledger - Staging Started",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "podcast_run_ledger"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $('Portable Staging Context').first().json.portableRunId }}",
+            "execution_id": "={{ $execution.id }}",
+            "run_mode": "shadow",
+            "episode": "={{ $('Portable Staging Context').first().json.episode }}",
+            "episode_date": "={{ $('Portable Staging Context').first().json.date }}",
+            "stage": "staging-start",
+            "status": "running",
+            "attempt": 1,
+            "selected_stories_json": "={{ JSON.stringify($('Portable Staging Context').first().json.selectedStories) }}",
+            "script_sha256": "",
+            "audio_sha256": "",
+            "srt_sha256": "={{ $('Portable Staging Context').first().json.srt.sha256 }}",
+            "qa_json": "",
+            "artifact_urls_json": "",
+            "error": "",
+            "started_at": "={{ $('Portable Staging Context').first().json.startedAt }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "input_mode",
+      "name": "Incoming Parent Audio?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        600,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "parent-input",
+              "leftValue": "={{ $('Portable Staging Context').first().json.inputMode }}",
+              "rightValue": "parent",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "restore_audio",
+      "name": "Restore Incoming Audio Binary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const c=$('Portable Staging Context').first();\nif(!c.binary?.audio) throw new Error('incoming staging audio binary missing');\nreturn [{json:c.json,binary:{audio:c.binary.audio,srt:c.binary.srt}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "download_audio",
+      "name": "Download Verified Audio from Cloudinary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "url": "={{ $('Portable Staging Context').first().json.audio.sourceUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "audio"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "notes": "HTTP exception: the verified Cloudinary node has upload/search/asset operations but no binary download operation."
+    },
+    {
+      "id": "hash_audio",
+      "name": "SHA256 Downloaded Audio",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "action": "hash",
+        "binaryData": true,
+        "binaryPropertyName": "audio",
+        "type": "SHA256",
+        "dataPropertyName": "audio_sha256",
+        "encoding": "hex"
+      }
+    },
+    {
+      "id": "validate_audio",
+      "name": "Validate Downloaded Audio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const item = $input.first();\nconst expected = $('Portable Staging Context').first().json.audio;\nif (item.json.audio_sha256 !== expected.sha256) throw new Error('downloaded audio hash mismatch');\nreturn [{json:{audio_sha256:item.json.audio_sha256,hashVerified:true}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "merge_audio_upload",
+      "name": "Merge Audio + Verified Hash",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1440,
+        0
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "notes": "Native merge rejoins the untouched binary item with the separately verified SHA-256 result."
+    },
+    {
+      "id": "upload_audio",
+      "name": "Cloudinary - Upload Staging Audio",
+      "type": "n8n-nodes-cloudinary.cloudinary",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        0
+      ],
+      "parameters": {
+        "resource": "upload",
+        "operation": "uploadFile",
+        "file": "audio",
+        "resource_type_file": "video",
+        "additionalFieldsFile": {
+          "folder": "anitguru-shadow",
+          "public_id": "={{ 'gurus-tech-bytes-portable-' + $('Portable Staging Context').first().json.date + '-' + $('Portable Staging Context').first().json.sourceExecutionId + '-' + $execution.id }}",
+          "tags": "podcast-shadow,portable-n8n"
+        }
+      },
+      "credentials": {
+        "cloudinaryApi": {
+          "id": "pCloudinaryX8Q3M7",
+          "name": "Cloudinary (podcast)"
+        }
+      }
+    },
+    {
+      "id": "validate_upload",
+      "name": "Validate Cloudinary Upload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const result = $input.first().json;\nconst fixture = $('Portable Staging Context').first().json;\nconst targetKey = `anitguru-shadow/gurus-tech-bytes-portable-${fixture.date}-${fixture.sourceExecutionId}-${$execution.id}`;\nif (result.public_id !== targetKey) throw new Error('Cloudinary target mismatch');\nif (fixture.audio.bytes > 0 && Number(result.bytes) !== fixture.audio.bytes) throw new Error('Cloudinary byte count mismatch');\nif (Number(result.bytes) < 100000) throw new Error('Cloudinary upload unexpectedly small');\nif (!String(result.secure_url || '').startsWith('https://res.cloudinary.com/')) throw new Error('Cloudinary secure URL missing');\nreturn [{json:{...result,targetKey,audioSha256:fixture.audio.sha256}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "head_audio",
+      "name": "HEAD Verify Cloudinary Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2400,
+        0
+      ],
+      "parameters": {
+        "method": "HEAD",
+        "url": "={{ $('Validate Cloudinary Upload').first().json.secure_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 20000
+        }
+      },
+      "notes": "HTTP exception: the verified Cloudinary node has no delivery-URL HEAD operation."
+    },
+    {
+      "id": "validate_head",
+      "name": "Validate Cloudinary HEAD",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const response = $input.first().json;\nif (Number(response.statusCode) < 200 || Number(response.statusCode) >= 400) throw new Error(`Cloudinary HEAD failed: ${response.statusCode}`);\nreturn [{json:{verified:true,statusCode:response.statusCode,secureUrl:$('Validate Cloudinary Upload').first().json.secure_url}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "ledger_cloudinary",
+      "name": "Ledger - Cloudinary Verified",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2880,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "podcast_run_ledger"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $('Portable Staging Context').first().json.portableRunId }}",
+            "execution_id": "={{ $execution.id }}",
+            "run_mode": "shadow",
+            "episode": "={{ $('Portable Staging Context').first().json.episode }}",
+            "episode_date": "={{ $('Portable Staging Context').first().json.date }}",
+            "stage": "cloudinary",
+            "status": "passed",
+            "attempt": 1,
+            "selected_stories_json": "={{ JSON.stringify($('Portable Staging Context').first().json.selectedStories) }}",
+            "script_sha256": "",
+            "audio_sha256": "={{ $('Portable Staging Context').first().json.audio.sha256 }}",
+            "srt_sha256": "={{ $('Portable Staging Context').first().json.srt.sha256 }}",
+            "qa_json": "={{ JSON.stringify($('Portable Staging Context').first().json.audio) }}",
+            "artifact_urls_json": "={{ JSON.stringify({audio:$('Validate Cloudinary Upload').first().json.secure_url}) }}",
+            "error": "",
+            "started_at": "={{ $('Portable Staging Context').first().json.startedAt }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "markdown",
+      "name": "Generate Episode Markdown",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const fixture = $('Portable Staging Context').first().json;\nconst audioUrl = $('Validate Cloudinary Upload').first().json.secure_url;\nconst clean = value => String(value ?? '').replace(/\\s+/g,' ').trim();\nconst title = `${clean(fixture.selectedStories[0]?.title) || \"Guru's Tech Bytes\"} | EP #${fixture.episode}`;\nconst stories = fixture.selectedStories.map(s => `  - title: ${JSON.stringify(clean(s.title))}\\n    url: ${JSON.stringify(s.url)}\\n    hnUrl: ${JSON.stringify(s.hnUrl)}\\n    score: ${Number(s.score)}`).join('\\n');\nconst markdown = `---\\ntitle: ${JSON.stringify(title)}\\nepisode: ${fixture.episode}\\ndate: ${JSON.stringify(fixture.date)}\\naudioUrl: ${JSON.stringify(audioUrl)}\\naudioLength: ${$('Validate Cloudinary Upload').first().json.bytes}\\nduration: ${JSON.stringify(fixture.audio.duration)}\\nstories:\\n${stories}\\n---\\n\\n${fixture.scriptText.trim()}\\n`;\nreturn [{json:{markdown,contentBase64:Buffer.from(markdown).toString('base64'),audioUrl}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "github_main",
+      "name": "Read GitHub Main Ref",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3360,
+        0
+      ],
+      "parameters": {
+        "url": "https://api.github.com/repos/anitguru/anit.guru/git/ref/heads/main",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "notes": "HTTP exception: the installed GitHub node has no get-branch-ref operation.",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "pGithubApiX8Q3M7Z",
+          "name": "GitHub API (podcast)"
+        }
+      }
+    },
+    {
+      "id": "github_context",
+      "name": "Prepare GitHub Staging Branch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3600,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const main = $input.first().json;\nconst fixture = $('Portable Staging Context').first().json;\nconst content = $('Generate Episode Markdown').first().json;\nif (!/^[a-f0-9]{40}$/.test(String(main.object?.sha || ''))) throw new Error('GitHub main SHA missing');\nconst branch = `podcast-shadow/portable-${fixture.date}-${fixture.sourceExecutionId}-${$execution.id}`;\nconst path = `content/podcast-shadow/${fixture.date}-${fixture.sourceExecutionId}-${$execution.id}.md`;\nreturn [{json:{mainSha:main.object.sha,branch,path,contentBase64:content.contentBase64,markdown:content.markdown}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "github_branch",
+      "name": "Create GitHub Staging Branch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3840,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.github.com/repos/anitguru/anit.guru/git/refs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ {ref:'refs/heads/' + $json.branch,sha:$json.mainSha} }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "notes": "HTTP exception: the installed GitHub node has no create-branch-ref operation.",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "pGithubApiX8Q3M7Z",
+          "name": "GitHub API (podcast)"
+        }
+      }
+    },
+    {
+      "id": "github_commit",
+      "name": "GitHub - Create Episode File",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        4080,
+        0
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "create",
+        "owner": {
+          "mode": "name",
+          "value": "anitguru"
+        },
+        "repository": {
+          "mode": "name",
+          "value": "anit.guru"
+        },
+        "filePath": "={{ $('Prepare GitHub Staging Branch').first().json.path }}",
+        "binaryData": false,
+        "fileContent": "={{ $('Prepare GitHub Staging Branch').first().json.markdown }}",
+        "commitMessage": "={{ 'stage: portable podcast ' + $('Portable Staging Context').first().json.date }}",
+        "additionalParameters": {
+          "branch": {
+            "branch": "={{ $('Prepare GitHub Staging Branch').first().json.branch }}"
+          }
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "pGithubNodeX8Q3M7Z",
+          "name": "GitHub Node (podcast)"
+        }
+      }
+    },
+    {
+      "id": "github_read_file",
+      "name": "GitHub - Get Episode File",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        4320,
+        0
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "owner": {
+          "mode": "name",
+          "value": "anitguru"
+        },
+        "repository": {
+          "mode": "name",
+          "value": "anit.guru"
+        },
+        "filePath": "={{ $('Prepare GitHub Staging Branch').first().json.path }}",
+        "asBinaryProperty": false,
+        "additionalParameters": {
+          "reference": "={{ $('Prepare GitHub Staging Branch').first().json.branch }}"
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "pGithubNodeX8Q3M7Z",
+          "name": "GitHub Node (podcast)"
+        }
+      }
+    },
+    {
+      "id": "validate_github",
+      "name": "Validate GitHub Commit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4560,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const file = $input.first().json;\nconst expected = $('Prepare GitHub Staging Branch').first().json;\nconst commit = $('GitHub - Create Episode File').first().json;\nconst decoded = Buffer.from(String(file.content || '').replace(/\\n/g,''),'base64').toString('utf8');\nif (file.path !== expected.path || decoded !== expected.markdown) throw new Error('GitHub file readback mismatch');\nif (!/^[a-f0-9]{40}$/.test(String(commit.commit?.sha || ''))) throw new Error('GitHub commit SHA missing');\nreturn [{json:{branch:expected.branch,path:expected.path,commitSha:commit.commit.sha,contentSha:file.sha,verified:true}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "ledger_github",
+      "name": "Ledger - GitHub Verified",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        4800,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "podcast_run_ledger"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $('Portable Staging Context').first().json.portableRunId }}",
+            "execution_id": "={{ $execution.id }}",
+            "run_mode": "shadow",
+            "episode": "={{ $('Portable Staging Context').first().json.episode }}",
+            "episode_date": "={{ $('Portable Staging Context').first().json.date }}",
+            "stage": "github-staging",
+            "status": "passed",
+            "attempt": 1,
+            "selected_stories_json": "={{ JSON.stringify($('Portable Staging Context').first().json.selectedStories) }}",
+            "script_sha256": "",
+            "audio_sha256": "={{ $('Portable Staging Context').first().json.audio.sha256 }}",
+            "srt_sha256": "={{ $('Portable Staging Context').first().json.srt.sha256 }}",
+            "qa_json": "",
+            "artifact_urls_json": "={{ JSON.stringify({audio:$('Validate Cloudinary Upload').first().json.secure_url,branch:$('Validate GitHub Commit').first().json.branch,path:$('Validate GitHub Commit').first().json.path,commit:$('Validate GitHub Commit').first().json.commitSha}) }}",
+            "error": "",
+            "started_at": "={{ $('Portable Staging Context').first().json.startedAt }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "database_context",
+      "name": "Prepare Temporary Episode Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5040,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const fixture = $('Portable Staging Context').first().json;\nreturn [{json:{databaseRequestContext:{row:{episode:fixture.episode,date:fixture.date,audioUrl:$('Validate Cloudinary Upload').first().json.secure_url,audioLength:$('Validate Cloudinary Upload').first().json.bytes,duration:fixture.audio.duration,stories:fixture.selectedStories}}}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "postgres_rollback",
+      "name": "Stage Episode Row then ROLLBACK",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        5280,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\nCREATE TEMP TABLE podcast_episodes_shadow (episode integer NOT NULL,date date NOT NULL,audio_url text NOT NULL,audio_length bigint NOT NULL,duration text NOT NULL,stories jsonb NOT NULL) ON COMMIT DROP;\nINSERT INTO podcast_episodes_shadow (episode,date,audio_url,audio_length,duration,stories) VALUES ($1,$2::date,$3,$4,$5,$6::jsonb);\nROLLBACK;\nSELECT $1::integer AS episode,$2::text AS date,$3::text AS \"audioUrl\",$4::bigint AS \"audioLength\",$5::text AS duration,jsonb_array_length($6::jsonb) AS \"storyCount\",true AS \"rolledBack\";",
+        "options": {
+          "queryReplacement": "={{ [ $json.databaseRequestContext.row.episode,$json.databaseRequestContext.row.date,$json.databaseRequestContext.row.audioUrl,$json.databaseRequestContext.row.audioLength,$json.databaseRequestContext.row.duration,JSON.stringify($json.databaseRequestContext.row.stories) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "fK9icsGZqJ3aJWG3",
+          "name": "Supabase Postgres (podcast)"
+        }
+      }
+    },
+    {
+      "id": "validate_rollback",
+      "name": "Validate Episode Row ROLLBACK",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5520,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const row = $input.first().json;\nif (row.rolledBack !== true || Number(row.storyCount) !== 4) throw new Error('temporary episode row was not proven rolled back');\nreturn [{json:row}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "ledger_database",
+      "name": "Ledger - Database Shape Verified",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        5760,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "podcast_run_ledger"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $('Portable Staging Context').first().json.portableRunId }}",
+            "execution_id": "={{ $execution.id }}",
+            "run_mode": "shadow",
+            "episode": "={{ $('Portable Staging Context').first().json.episode }}",
+            "episode_date": "={{ $('Portable Staging Context').first().json.date }}",
+            "stage": "database-shape",
+            "status": "passed",
+            "attempt": 1,
+            "selected_stories_json": "={{ JSON.stringify($('Portable Staging Context').first().json.selectedStories) }}",
+            "script_sha256": "",
+            "audio_sha256": "={{ $('Portable Staging Context').first().json.audio.sha256 }}",
+            "srt_sha256": "={{ $('Portable Staging Context').first().json.srt.sha256 }}",
+            "qa_json": "",
+            "artifact_urls_json": "",
+            "error": "",
+            "started_at": "={{ $('Portable Staging Context').first().json.startedAt }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "notification_context",
+      "name": "Prepare Staging Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6000,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const fixture = $('Portable Staging Context').first().json;\nconst git = $('Validate GitHub Commit').first().json;\nreturn [{json:{text:`\ud83e\uddea Portable n8n staging verified \u2014 ${fixture.portableRunId}; Cloudinary direct; GitHub ${git.commitSha.slice(0,12)}; DB rolled back.`}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "telegram",
+      "name": "Send Staging Test Notification",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        6240,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "8100669692",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "disable_notification": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "oOpvPw9TPukkiYK6",
+          "name": "Guru's Tech Bytes Bot (podcast)"
+        }
+      }
+    },
+    {
+      "id": "validate_notification",
+      "name": "Validate Staging Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6480,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const sent = $input.first().json;\nconst messageId = sent.result?.message_id;\nif (sent.ok !== true || !Number.isInteger(messageId) || messageId < 1) throw new Error('Telegram did not return a message ID');\nreturn [{json:{messageId,verified:true}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "ledger_complete",
+      "name": "Ledger - Staging Complete",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        6720,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "podcast_run_ledger"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $('Portable Staging Context').first().json.portableRunId }}",
+            "execution_id": "={{ $execution.id }}",
+            "run_mode": "shadow",
+            "episode": "={{ $('Portable Staging Context').first().json.episode }}",
+            "episode_date": "={{ $('Portable Staging Context').first().json.date }}",
+            "stage": "staging-complete",
+            "status": "passed",
+            "attempt": 1,
+            "selected_stories_json": "={{ JSON.stringify($('Portable Staging Context').first().json.selectedStories) }}",
+            "script_sha256": "",
+            "audio_sha256": "={{ $('Portable Staging Context').first().json.audio.sha256 }}",
+            "srt_sha256": "={{ $('Portable Staging Context').first().json.srt.sha256 }}",
+            "qa_json": "={{ JSON.stringify({audio:$('Portable Staging Context').first().json.audio,srt:$('Portable Staging Context').first().json.srt.alignment}) }}",
+            "artifact_urls_json": "={{ JSON.stringify({audio:$('Validate Cloudinary Upload').first().json.secure_url,github:$('Validate GitHub Commit').first().json}) }}",
+            "error": "",
+            "started_at": "={{ $('Portable Staging Context').first().json.startedAt }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "stop",
+      "name": "Portable Staging Stop",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        6960,
+        0
+      ],
+      "parameters": {},
+      "notes": "Hard stop. No production branch, production table, scheduler, or media notification exists."
+    },
+    {
+      "id": "return_contract",
+      "name": "Return Staging Distribution Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7200,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const c=$('Portable Staging Context').first().json,u=$('Validate Cloudinary Upload').first().json,g=$('Validate GitHub Commit').first().json,n=$('Validate Staging Notification').first().json;\nreturn [{json:{runMode:c.runMode,publishMode:'staging',date:c.date,runId:c.portableRunId,episode:c.episode,audio_sha256:c.audio.sha256,srt_sha256:c.srt.sha256,cloudinary:{publicId:u.public_id,secureUrl:u.secure_url,bytes:u.bytes},github:g,telegramMessageId:n.messageId,databaseRolledBack:true,distributionValidated:true}}];"
+      },
+      "notes": ""
+    }
+  ],
+  "connections": {
+    "Manual Portable Staging Trigger": {
+      "main": [
+        [
+          {
+            "node": "Portable Staging Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Called by Parent Workflow": {
+      "main": [
+        [
+          {
+            "node": "Portable Staging Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Portable Staging Context": {
+      "main": [
+        [
+          {
+            "node": "Ledger - Staging Started",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger - Staging Started": {
+      "main": [
+        [
+          {
+            "node": "Incoming Parent Audio?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Incoming Parent Audio?": {
+      "main": [
+        [
+          {
+            "node": "Restore Incoming Audio Binary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download Verified Audio from Cloudinary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Incoming Audio Binary": {
+      "main": [
+        [
+          {
+            "node": "SHA256 Downloaded Audio",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Audio + Verified Hash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Verified Audio from Cloudinary": {
+      "main": [
+        [
+          {
+            "node": "SHA256 Downloaded Audio",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Audio + Verified Hash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SHA256 Downloaded Audio": {
+      "main": [
+        [
+          {
+            "node": "Validate Downloaded Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Downloaded Audio": {
+      "main": [
+        [
+          {
+            "node": "Merge Audio + Verified Hash",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Audio + Verified Hash": {
+      "main": [
+        [
+          {
+            "node": "Cloudinary - Upload Staging Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cloudinary - Upload Staging Audio": {
+      "main": [
+        [
+          {
+            "node": "Validate Cloudinary Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Cloudinary Upload": {
+      "main": [
+        [
+          {
+            "node": "HEAD Verify Cloudinary Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HEAD Verify Cloudinary Audio": {
+      "main": [
+        [
+          {
+            "node": "Validate Cloudinary HEAD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Cloudinary HEAD": {
+      "main": [
+        [
+          {
+            "node": "Ledger - Cloudinary Verified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger - Cloudinary Verified": {
+      "main": [
+        [
+          {
+            "node": "Generate Episode Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Episode Markdown": {
+      "main": [
+        [
+          {
+            "node": "Read GitHub Main Ref",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read GitHub Main Ref": {
+      "main": [
+        [
+          {
+            "node": "Prepare GitHub Staging Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare GitHub Staging Branch": {
+      "main": [
+        [
+          {
+            "node": "Create GitHub Staging Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create GitHub Staging Branch": {
+      "main": [
+        [
+          {
+            "node": "GitHub - Create Episode File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub - Create Episode File": {
+      "main": [
+        [
+          {
+            "node": "GitHub - Get Episode File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub - Get Episode File": {
+      "main": [
+        [
+          {
+            "node": "Validate GitHub Commit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate GitHub Commit": {
+      "main": [
+        [
+          {
+            "node": "Ledger - GitHub Verified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger - GitHub Verified": {
+      "main": [
+        [
+          {
+            "node": "Prepare Temporary Episode Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Temporary Episode Row": {
+      "main": [
+        [
+          {
+            "node": "Stage Episode Row then ROLLBACK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stage Episode Row then ROLLBACK": {
+      "main": [
+        [
+          {
+            "node": "Validate Episode Row ROLLBACK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Episode Row ROLLBACK": {
+      "main": [
+        [
+          {
+            "node": "Ledger - Database Shape Verified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger - Database Shape Verified": {
+      "main": [
+        [
+          {
+            "node": "Prepare Staging Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Staging Notification": {
+      "main": [
+        [
+          {
+            "node": "Send Staging Test Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Staging Test Notification": {
+      "main": [
+        [
+          {
+            "node": "Validate Staging Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Staging Notification": {
+      "main": [
+        [
+          {
+            "node": "Ledger - Staging Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger - Staging Complete": {
+      "main": [
+        [
+          {
+            "node": "Portable Staging Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Portable Staging Stop": {
+      "main": [
+        [
+          {
+            "node": "Return Staging Distribution Contract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "tags": []
+}

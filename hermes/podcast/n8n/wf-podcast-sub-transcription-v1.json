@@ -1,0 +1,593 @@
+{
+  "id": "pTransSubX8Q3M7",
+  "name": "WF-podcast-sub-transcription-v1",
+  "active": false,
+  "nodes": [
+    {
+      "id": "manual",
+      "name": "Manual Transcription Test Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -180
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "sub_trigger",
+      "name": "When Called by Parent Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        80
+      ],
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"runMode\": \"shadow\",\n  \"date\": \"2026-08-08\",\n  \"runId\": \"portable-shadow/example\",\n  \"episode\": 125,\n  \"selectedStories\": [],\n  \"scriptText\": \"approved authored text\",\n  \"script_sha256\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"audio_sha256\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"audioQa\": {\n    \"duration_seconds\": 120\n  },\n  \"mediaValidated\": true\n}"
+      }
+    },
+    {
+      "id": "fixture",
+      "name": "Prepare Transcription Fixture Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -260
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{\"runMode\":\"shadow\",\"date\":\"2026-08-08\",\"runId\":\"transcription-fixture/run37\",\"episode\":125,\"selectedStories\":[{\"id\":\"49209539\",\"title\":\"What happens if an entire class of workers loses faith in their careers\",\"url\":\"https://www.noemamag.com/why-is-everyone-in-tech-so-sad/\",\"hnUrl\":\"https://news.ycombinator.com/item?id=49209539\",\"score\":923,\"matchedTopics\":[],\"cocoindexReason\":[\"matched trending topics: none\",\"HN score: 923\",\"not recently covered\"]},{\"id\":\"49214008\",\"title\":\"DeepSeek V4 Flash 0731\",\"url\":\"https://arcprize.org/results/deepseek-v4-flash-0731\",\"hnUrl\":\"https://news.ycombinator.com/item?id=49214008\",\"score\":737,\"matchedTopics\":[\"deepseek\"],\"cocoindexReason\":[\"matched trending topics: deepseek\",\"HN score: 737\",\"not recently covered\"]},{\"id\":\"49214098\",\"title\":\"Assembly Hall of Shame\",\"url\":\"https://github.com/xoreaxeaxeax/asm-hall-of-shame\",\"hnUrl\":\"https://news.ycombinator.com/item?id=49214098\",\"score\":401,\"matchedTopics\":[],\"cocoindexReason\":[\"matched trending topics: none\",\"HN score: 401\",\"not recently covered\"]},{\"id\":\"49189457\",\"title\":\"A physicist rigged his pet hamster\\u2019s wheel to upload to Strava\",\"url\":\"https://www.runnersworld.com/news/a73355106/hamster-wheel-strava-running/\",\"hnUrl\":\"https://news.ycombinator.com/item?id=49189457\",\"score\":382,\"matchedTopics\":[],\"cocoindexReason\":[\"matched trending topics: none\",\"HN score: 382\",\"not recently covered\"]}],\"scriptText\":\"Good morning, it's Saturday. This is Guru's Tech Bytes, episode one hundred twenty five.\\n\\nFirst up, what happens if an entire class of workers loses faith in their careers. You know what this reminds me of, back in ninety eight when the transmission shop closed down and my buddy just started building birdhouses. Heh. Hhh, okay, that's something. But seriously, if all the coders think the robots are taking over, what do they do, just pivot to plumbing. I mean, good luck with that, PVC glue is a whole different beast than Python.\\n\\nSecond, DeepSeek V4 Flash 0731. Now I got no clue what them numbers mean, sounds like a serial number on a carburetor, but folks are saying it is fast. You know what else is fast, the blue screen of death when Windows decides to update right in the middle of a brake job. Microsoft does that just to mess with us, I swear. But this DeepSeek thing, it is some new AI model, and apparently it runs pretty smooth, which is a nice change of pace from my laptop that sounds like a diesel engine when I open the email.\\n\\nThird, Assembly Hall of Shame. This is where programmers show off their worst code, kinda like the wiring job I saw on a Honda Civic last week, duct tape and prayers. You ever try debugging a fuel pump, it is just spaghetti wires and regret. Anyway, these tech folks are posting their messy code for laughs, which I respect, at least they own it, unlike some software companies that ship broken updates and act like it is a feature.\\n\\nAnd finally, a physicist rigged his pet hamster's wheel to upload to Strava. That is hilarious, the little guy is out here getting more cardio than me. You know what this reminds me of, my cousin put a GPS on his coonhound and the dog logged more miles than a marathon runner. But this hamster, he is posting fake run times and probably beating my personal records, which is embarrassing but also kind of motivating.\\n\\nThat's your daily byte. Have a great day. Until next time.\",\"script_sha256\":\"9aa0a94dcb7a6a0ab4c178dc65f5dc956627f865cad53d2c06f2ff8aa9c5e819\",\"audio_sha256\":\"657afe574a968ed88f4efe6de9b8c7327ff18717a878b29306cc3cb7afdde698\",\"audioQa\":{\"duration_seconds\":119.736},\"mediaValidated\":true}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "fixture_audio",
+      "name": "Download Verified Fixture Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        240,
+        -100
+      ],
+      "parameters": {
+        "url": "https://res.cloudinary.com/ddicetqs5/video/upload/v1786220477/anitguru-shadow/gurus-tech-bytes-2026-08-08-37.mp3",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "audio"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "notes": "HTTP exception: the verified Cloudinary node supports upload/transform operations but not downloading an existing delivery URL for this manual fixture branch."
+    },
+    {
+      "id": "fixture_merge",
+      "name": "Merge Fixture Context + Audio",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        480,
+        -180
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      }
+    },
+    {
+      "id": "validate_input",
+      "name": "Validate Transcription Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const i=$input.first();const r=i.json;const failures=[];\nif(r.runMode!=='shadow'||r.mediaValidated!==true) failures.push('mode/media proof');\nif(!/^[a-f0-9]{64}$/.test(String(r.script_sha256||''))||!/^[a-f0-9]{64}$/.test(String(r.audio_sha256||''))) failures.push('hashes');\nif(!i.binary?.audio) failures.push('audio binary');\nif(String(r.scriptText||'').split(/\\n\\s*\\n/).filter(Boolean).length!==6) failures.push('six paragraphs');\nif(failures.length) throw new Error(`transcription input: ${failures.join(', ')}`);\nreturn [{json:r,binary:{audio:i.binary.audio}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "whisper",
+      "name": "Whisper - Verbose Word Timestamps",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://whisper.transformers.lan/v1/audio/transcriptions",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "audio"
+            },
+            {
+              "name": "response_format",
+              "value": "verbose_json"
+            },
+            {
+              "name": "language",
+              "value": "en"
+            },
+            {
+              "name": "timestamp_granularities[]",
+              "value": "word"
+            }
+          ]
+        },
+        "options": {
+          "allowUnauthorizedCerts": true,
+          "timeout": 300000
+        }
+      },
+      "notes": "HTTP exception: the self-hosted whisper.cpp service has no native n8n node; verbose segment/word timestamps are required for authored-text alignment."
+    },
+    {
+      "id": "normalize",
+      "name": "Normalize Authored + Whisper Words",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const w=$input.first().json;const c=$('Validate Transcription Input').first().json;\nconst norm=s=>String(s).toLowerCase().replace(/['\u2019]/g,' ').match(/[a-z0-9]+/g)||[];\nconst heard=(w.segments||[]).flatMap(s=>(s.words||[]).flatMap(x=>norm(x.word).map(word=>({word,start:Number(x.start),end:Number(x.end)}))));\nconst raw=String(c.scriptText).split(/\\s+/).filter(Boolean);const reference=[];const display=[];\nfor(const text of raw){const parts=norm(text);if(!parts.length) continue;const start=reference.length;reference.push(...parts);display.push({text,start,end:reference.length-1});}\nif(!heard.length||!reference.length) throw new Error('Whisper/reference words missing');\nreturn [{json:{...c,whisperText:w.text,whisperDuration:Number(w.duration),heard,reference,display}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "align",
+      "name": "Align Authored Words to Whisper",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json,a=r.reference,b=r.heard.map(x=>x.word),n=a.length,m=b.length;\nconst d=Array.from({length:n+1},()=>new Uint16Array(m+1));\nfor(let i=1;i<=n;i++) for(let j=1;j<=m;j++) d[i][j]=a[i-1]===b[j-1]?d[i-1][j-1]+1:Math.max(d[i-1][j],d[i][j-1]);\nconst anchors=[];let i=n,j=m;while(i&&j){if(a[i-1]===b[j-1]){anchors.push({r:i-1,h:j-1});i--;j--;}else if(d[i-1][j]>=d[i][j-1])i--;else j--;};anchors.reverse();\nif(!anchors.length) throw new Error('no exact transcription anchors');\nconst times=Array(n);for(const x of anchors) times[x.r]={start:r.heard[x.h].start,end:r.heard[x.h].end,exact:true};\nconst points=[{r:-1,t:0},...anchors.map(x=>({r:x.r,t:r.heard[x.h].start})),{r:n,t:r.whisperDuration}];\nfor(let p=0;p<points.length-1;p++){const l=points[p],q=points[p+1],span=q.r-l.r;for(let k=l.r+1;k<q.r;k++){const t=l.t+(q.t-l.t)*(k-l.r)/span;times[k]={start:t,end:t+0.12,exact:false};}}\nfor(let k=0;k<n;k++){if(!times[k]) continue;times[k].start=Math.max(0,times[k].start);times[k].end=Math.max(times[k].start+0.04,times[k].end);}\nreturn [{json:{...r,anchors,times,exactAnchorRatio:anchors.length/n}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "srt",
+      "name": "Build Authored Text SRT Cues",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json,fmt=x=>{x=Math.max(0,x);const h=Math.floor(x/3600),m=Math.floor(x%3600/60),s=Math.floor(x%60),ms=Math.round((x-Math.floor(x))*1000);return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')},${String(ms).padStart(3,'0')}`};\nconst wrap=ws=>{let a='',b='';for(const w of ws){if((a+' '+w).trim().length<=47)a=(a+' '+w).trim();else b=(b+' '+w).trim();}return b?[a,b]:[a];};\nconst cues=[];let words=[];const flush=()=>{if(!words.length)return;const first=words[0],last=words[words.length-1],lines=wrap(words.map(x=>x.text));cues.push({start:r.times[first.start].start,end:r.times[last.end].end,lines});words=[];};\nfor(const w of r.display){const trial=[...words,w],lines=wrap(trial.map(x=>x.text));if(words.length&&(lines.length>2||lines.some(x=>x.length>47)))flush();words.push(w);if(/[.!?][\\\"']?$/.test(w.text)&&words.length>=5)flush();}flush();\nconst srtText=cues.map((c,i)=>`${i+1}\\n${fmt(c.start)} --> ${fmt(c.end)}\\n${c.lines.join('\\n')}\\n`).join('\\n');\nreturn [{json:{...r,cues,srtText,cueCount:cues.length,maximumLineCharacters:Math.max(...cues.flatMap(c=>c.lines.map(x=>x.length))),maximumLinesPerCue:Math.max(...cues.map(c=>c.lines.length))}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "to_file",
+      "name": "Convert SRT Text to File",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1920,
+        120
+      ],
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "srtText",
+        "binaryPropertyName": "srt",
+        "options": {
+          "encoding": "utf8",
+          "fileName": "={{ `gurus-tech-bytes-${$('Validate Transcription Input').first().json.date}.srt` }}"
+        }
+      }
+    },
+    {
+      "id": "srt_hash",
+      "name": "SHA256 SRT File",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        120
+      ],
+      "parameters": {
+        "action": "hash",
+        "binaryData": true,
+        "binaryPropertyName": "srt",
+        "type": "SHA256",
+        "dataPropertyName": "srt_sha256",
+        "encoding": "hex"
+      }
+    },
+    {
+      "id": "merge_srt",
+      "name": "Merge SRT Contract + File Hash",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2400,
+        0
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      }
+    },
+    {
+      "id": "qa",
+      "name": "Measure Transcript Alignment QA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const i=$input.first(),r=i.json,a=r.reference,b=r.heard.map(x=>x.word);let prev=Array.from({length:b.length+1},(_,j)=>j);\nfor(let x=1;x<=a.length;x++){const cur=[x];for(let y=1;y<=b.length;y++)cur[y]=a[x-1]===b[y-1]?prev[y-1]:1+Math.min(prev[y-1],prev[y],cur[y-1]);prev=cur;}\nconst thirds=['beginning','middle','end'].map((name,k)=>{const lo=Math.floor(a.length*k/3),hi=Math.floor(a.length*(k+1)/3)-1,found=r.anchors.filter(x=>x.r>=lo&&x.r<=hi);return {name,referenceWordStart:lo+1,referenceWordEnd:hi+1,startSeconds:r.times[lo].start,endSeconds:r.times[hi].end,exactAnchors:found.length};});\nlet maxGap=0,last=-1;for(const x of r.anchors){maxGap=Math.max(maxGap,x.r-last-1);last=x.r;}maxGap=Math.max(maxGap,a.length-last-1);\nconst alignment={durationSeconds:r.whisperDuration,referenceWords:a.length,transcriptWords:b.length,wordErrorRate:Number((prev[b.length]/a.length).toFixed(6)),exactAnchors:r.anchors.length,exactAnchorRatio:Number(r.exactAnchorRatio.toFixed(6)),cueCount:r.cueCount,maximumLineCharacters:r.maximumLineCharacters,maximumLinesPerCue:r.maximumLinesPerCue,thirds,maximumUnanchoredRunWords:maxGap};\nconst srt=$('Convert SRT Text to File').first().binary?.srt;if(!srt) throw new Error('native SRT file binary missing');\nreturn [{json:{runMode:r.runMode,date:r.date,runId:r.runId,episode:r.episode,selectedStories:r.selectedStories,scriptText:r.scriptText,script_sha256:r.script_sha256,audio_sha256:r.audio_sha256,audioQa:r.audioQa,srt_sha256:r.srt_sha256,alignment,transcriptionValidated:true},binary:{srt}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "gate",
+      "name": "Hard Transcript + SRT Quality Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2880,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const i=$input.first(),r=i.json,a=r.alignment,fail=[];\nif(!/^[a-f0-9]{64}$/.test(String(r.srt_sha256||''))) fail.push('SRT hash');\nif(a.wordErrorRate>0.20||a.exactAnchorRatio<0.60) fail.push('WER/anchors');\nif(a.maximumLineCharacters>47||a.maximumLinesPerCue>2||a.cueCount<6) fail.push('cue layout');\nif(a.thirds?.map(x=>x.name).join(',')!=='beginning,middle,end'||a.thirds.some(x=>x.exactAnchors<1)) fail.push('third anchors');\nif(a.maximumUnanchoredRunWords>20) fail.push('unanchored run');\nif(fail.length) throw new Error(`transcription gate: ${fail.join(', ')}`);\nreturn [i];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "ledger",
+      "name": "Ledger - Transcription QA Passed",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3120,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "podcast_run_ledger"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $json.runId }}",
+            "execution_id": "={{ $execution.id }}",
+            "run_mode": "shadow",
+            "episode": "={{ $json.episode }}",
+            "episode_date": "={{ $json.date }}",
+            "stage": "transcription-qa",
+            "status": "passed",
+            "attempt": 1,
+            "selected_stories_json": "={{ JSON.stringify($json.selectedStories) }}",
+            "script_sha256": "={{ $json.script_sha256 }}",
+            "audio_sha256": "={{ $json.audio_sha256 }}",
+            "srt_sha256": "={{ $json.srt_sha256 }}",
+            "qa_json": "={{ JSON.stringify({audio:$json.audioQa,alignment:$json.alignment}) }}",
+            "artifact_urls_json": "",
+            "error": "",
+            "started_at": "={{ $now.toISO() }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "merge_binary",
+      "name": "Merge Audio + SRT Binaries",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        3120,
+        180
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      }
+    },
+    {
+      "id": "merge_final",
+      "name": "Merge Binaries + Transcription Ledger",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        3360,
+        0
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      }
+    },
+    {
+      "id": "return_contract",
+      "name": "Return Clean Transcription Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3600,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const i=$input.first();\nif(!i.binary?.audio||!i.binary?.srt) throw new Error('audio/SRT binaries missing at transcription boundary');\nreturn [{json:{runMode:i.json.runMode,date:i.json.date||i.json.episode_date,runId:i.json.runId||i.json.run_id,episode:i.json.episode,selectedStories:i.json.selectedStories,scriptText:i.json.scriptText,script_sha256:i.json.script_sha256,audio_sha256:i.json.audio_sha256,audioQa:i.json.audioQa,srt_sha256:i.json.srt_sha256,alignment:i.json.alignment,transcriptionValidated:true},binary:{audio:i.binary.audio,srt:i.binary.srt}}];"
+      },
+      "notes": "Reusable boundary returns only the assembled audio and authored SRT binaries plus their verified hashes/QA contract."
+    }
+  ],
+  "connections": {
+    "Manual Transcription Test Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Transcription Fixture Context",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Download Verified Fixture Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Transcription Fixture Context": {
+      "main": [
+        [
+          {
+            "node": "Merge Fixture Context + Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Verified Fixture Audio": {
+      "main": [
+        [
+          {
+            "node": "Merge Fixture Context + Audio",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Fixture Context + Audio": {
+      "main": [
+        [
+          {
+            "node": "Validate Transcription Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Called by Parent Workflow": {
+      "main": [
+        [
+          {
+            "node": "Validate Transcription Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Transcription Input": {
+      "main": [
+        [
+          {
+            "node": "Whisper - Verbose Word Timestamps",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Audio + SRT Binaries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Whisper - Verbose Word Timestamps": {
+      "main": [
+        [
+          {
+            "node": "Normalize Authored + Whisper Words",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Authored + Whisper Words": {
+      "main": [
+        [
+          {
+            "node": "Align Authored Words to Whisper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Align Authored Words to Whisper": {
+      "main": [
+        [
+          {
+            "node": "Build Authored Text SRT Cues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Authored Text SRT Cues": {
+      "main": [
+        [
+          {
+            "node": "Convert SRT Text to File",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge SRT Contract + File Hash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert SRT Text to File": {
+      "main": [
+        [
+          {
+            "node": "SHA256 SRT File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SHA256 SRT File": {
+      "main": [
+        [
+          {
+            "node": "Merge SRT Contract + File Hash",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge SRT Contract + File Hash": {
+      "main": [
+        [
+          {
+            "node": "Measure Transcript Alignment QA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Measure Transcript Alignment QA": {
+      "main": [
+        [
+          {
+            "node": "Hard Transcript + SRT Quality Gate",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Audio + SRT Binaries",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Hard Transcript + SRT Quality Gate": {
+      "main": [
+        [
+          {
+            "node": "Ledger - Transcription QA Passed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Audio + SRT Binaries": {
+      "main": [
+        [
+          {
+            "node": "Merge Binaries + Transcription Ledger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger - Transcription QA Passed": {
+      "main": [
+        [
+          {
+            "node": "Merge Binaries + Transcription Ledger",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Binaries + Transcription Ledger": {
+      "main": [
+        [
+          {
+            "node": "Return Clean Transcription Contract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "tags": []
+}

@@ -59,7 +59,6 @@ def test_podcast_mapping_uses_expected_sops_vendor_keys():
         "CLOUDINARY_API_KEY": "value-for-cloudinary-API_KEY",
         "CLOUDINARY_API_SECRET": "value-for-cloudinary-API_SECRET",
         "COCOINDEX_DATABASE_URL": "value-for-supabase-PG_DSN",
-        "TTS_URL": "value-for-podcast-TTS_URL",
         "TTS_VOICE": "value-for-podcast-TTS_VOICE",
         "TTS_LOUDNORM": "value-for-podcast-TTS_LOUDNORM",
         "WHISPER_URL": "value-for-podcast-WHISPER_URL",
@@ -69,12 +68,68 @@ def test_podcast_mapping_uses_expected_sops_vendor_keys():
         ("cloudinary", "API_KEY"),
         ("cloudinary", "API_SECRET"),
         ("supabase", "PG_DSN"),
-        ("podcast", "TTS_URL"),
         ("podcast", "TTS_VOICE"),
         ("podcast", "TTS_LOUDNORM"),
         ("podcast", "WHISPER_URL"),
     ]
     assert "TELEGRAM_BOT_TOKEN" not in env
+
+
+def test_n8n_mcp_mapping_uses_expected_sops_vendor_keys():
+    calls: list[tuple[str, str]] = []
+
+    def fake_reader(vendor: str, key: str) -> str:
+        calls.append((vendor, key))
+        return f"value-for-{vendor}-{key}"
+
+    env = sops_env.collect_env("n8n_mcp", reader=fake_reader)
+
+    assert env == {
+        "N8N_MCP_URL": "value-for-n8n-MCP_URL",
+        "N8N_MCP_ACCESS_TOKEN": "value-for-n8n-MCP_ACCESS_TOKEN",
+        "N8N_MCP_CONFIG_JSON": "value-for-n8n-MCP_CONFIG_JSON",
+    }
+    assert calls == [
+        ("n8n", "MCP_URL"),
+        ("n8n", "MCP_ACCESS_TOKEN"),
+        ("n8n", "MCP_CONFIG_JSON"),
+    ]
+
+
+def test_n8n_runner_mapping_uses_expected_sops_vendor_key():
+    calls: list[tuple[str, str]] = []
+
+    def fake_reader(vendor: str, key: str) -> str:
+        calls.append((vendor, key))
+        return f"value-for-{vendor}-{key}"
+
+    env = sops_env.collect_env("n8n_runner", reader=fake_reader)
+
+    assert env == {
+        "N8N_RUNNERS_AUTH_TOKEN": "value-for-n8n-RUNNER_AUTH_TOKEN",
+    }
+    assert calls == [("n8n", "RUNNER_AUTH_TOKEN")]
+
+
+def test_n8n_podcast_mapping_uses_only_cloudinary_signing_keys():
+    calls: list[tuple[str, str]] = []
+
+    def fake_reader(vendor: str, key: str) -> str:
+        calls.append((vendor, key))
+        return f"value-for-{vendor}-{key}"
+
+    env = sops_env.collect_env("n8n_podcast", reader=fake_reader)
+
+    assert env == {
+        "CLOUDINARY_CLOUD_NAME": "value-for-cloudinary-CLOUD_NAME",
+        "CLOUDINARY_API_KEY": "value-for-cloudinary-API_KEY",
+        "CLOUDINARY_API_SECRET": "value-for-cloudinary-API_SECRET",
+    }
+    assert calls == [
+        ("cloudinary", "CLOUD_NAME"),
+        ("cloudinary", "API_KEY"),
+        ("cloudinary", "API_SECRET"),
+    ]
 
 
 def test_render_exports_shell_quotes_values_without_printing_labels_as_values():

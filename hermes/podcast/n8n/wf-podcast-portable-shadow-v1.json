@@ -1,0 +1,921 @@
+{
+  "id": "pPortableShX8Q3M7",
+  "name": "WF-podcast-portable-shadow-v1",
+  "active": false,
+  "nodes": [
+    {
+      "id": "manual",
+      "name": "Manual Portable Shadow Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "context",
+      "name": "Prepare Portable Shadow Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const now=new Date();\nconst date=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);\nreturn [{json:{runMode:'shadow',publishMode:'staging',notifyMode:'test-summary',date,runId:`portable-shadow/${date}/${$execution.id}`,attempt:1}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "gate",
+      "name": "Portable Shadow Safety Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const c=$input.first().json;\nconst failures=[];\nif(c.runMode!=='shadow') failures.push('runMode');\nif(c.publishMode!=='staging') failures.push('publishMode');\nif(c.notifyMode!=='test-summary') failures.push('notifyMode');\nif(!/^portable-shadow\\/\\d{4}-\\d{2}-\\d{2}\\/[A-Za-z0-9_-]+$/.test(c.runId)) failures.push('runId');\nif(failures.length) throw new Error(`portable safety gate: ${failures.join(', ')}`);\nreturn [{json:c}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "ledger_start",
+      "name": "Ledger - Portable Run Started",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        780,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "podcast_run_ledger"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $json.runId }}",
+            "execution_id": "={{ $execution.id }}",
+            "run_mode": "shadow",
+            "episode": 0,
+            "episode_date": "={{ $json.date }}",
+            "stage": "portable-start",
+            "status": "running",
+            "attempt": 1,
+            "selected_stories_json": "",
+            "script_sha256": "",
+            "audio_sha256": "",
+            "srt_sha256": "",
+            "qa_json": "",
+            "artifact_urls_json": "",
+            "error": "",
+            "started_at": "={{ $now.toISO() }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "call_intake",
+      "name": "Run Intake + Ranking Sub-workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1040,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "pIntakeSubX8Q3M7",
+          "mode": "list",
+          "cachedResultName": "WF-podcast-sub-intake-v1"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "runMode": "={{ $('Portable Shadow Safety Gate').first().json.runMode }}",
+            "date": "={{ $('Portable Shadow Safety Gate').first().json.date }}",
+            "runId": "={{ $('Portable Shadow Safety Gate').first().json.runId }}",
+            "attempt": "={{ $('Portable Shadow Safety Gate').first().json.attempt }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "runMode",
+              "displayName": "runMode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "runId",
+              "displayName": "runId",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "attempt",
+              "displayName": "attempt",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Calls the reusable native Supabase + Hacker News intake workflow and waits for its proven contract."
+    },
+    {
+      "id": "validate_intake",
+      "name": "Validate Intake Sub-workflow Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json;\nif(r.runMode!=='shadow'||!Number.isInteger(r.episode)||r.episode<1) throw new Error('invalid intake episode contract');\nif(!Array.isArray(r.selectedStories)||r.selectedStories.length!==4) throw new Error('intake did not return four stories');\nif(r.rankingProof?.domainDiverse!==true||r.rankingProof?.selectedCount!==4) throw new Error('ranking proof missing');\nreturn [{json:r}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "call_authoring",
+      "name": "Run Authoring Sub-workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1560,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "pAuthorSubX8Q3M7",
+          "mode": "list",
+          "cachedResultName": "WF-podcast-sub-authoring-v1"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "runMode": "={{ $json.runMode }}",
+            "date": "={{ $json.date }}",
+            "runId": "={{ $json.runId }}",
+            "attempt": "={{ $json.attempt }}",
+            "episode": "={{ $json.episode }}",
+            "selectedStories": "={{ $json.selectedStories }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "runMode",
+              "displayName": "runMode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "runId",
+              "displayName": "runId",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "attempt",
+              "displayName": "attempt",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "episode",
+              "displayName": "episode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "selectedStories",
+              "displayName": "selectedStories",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "array"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Calls native GLM-5.2 authoring with bounded retries and the reusable script-validator workflow."
+    },
+    {
+      "id": "validate_authoring",
+      "name": "Validate Authoring Sub-workflow Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1820,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json;\nif(r.authoringValidated!==true||![1,2,3].includes(r.authoringAttempt)) throw new Error('authoring validation proof missing');\nif(r.paragraphCount!==6||r.wordCount<330||r.wordCount>400) throw new Error('authoring shape invalid');\nif(!/^[a-f0-9]{64}$/.test(String(r.script_sha256||''))) throw new Error('script hash missing');\nreturn [{json:r}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "call_media",
+      "name": "Run Media Render + QA Sub-workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2080,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "pMediaSubX8Q3M7",
+          "mode": "list",
+          "cachedResultName": "WF-podcast-sub-media-v1"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "runMode": "={{ $json.runMode }}",
+            "date": "={{ $json.date }}",
+            "runId": "={{ $json.runId }}",
+            "episode": "={{ Number($json.episode) }}",
+            "selectedStories": "={{ $json.selectedStories }}",
+            "scriptText": "={{ $json.scriptText }}",
+            "script_sha256": "={{ $json.script_sha256 }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "runMode",
+              "displayName": "runMode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "runId",
+              "displayName": "runId",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "episode",
+              "displayName": "episode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "selectedStories",
+              "displayName": "selectedStories",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "array"
+            },
+            {
+              "id": "scriptText",
+              "displayName": "scriptText",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "script_sha256",
+              "displayName": "script_sha256",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Calls six visible Chatterbox segment nodes, visible assembly/QA routes, native hash, hard gate, and run ledger.",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "validate_media",
+      "name": "Validate Media Sub-workflow Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2340,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const i=$input.first(),r=i.json,q=r.audioQa||{};\nif(r.mediaValidated!==true||!i.binary?.audio) throw new Error('media proof/audio missing');\nif(!/^[a-f0-9]{64}$/.test(String(r.audio_sha256||''))) throw new Error('audio hash missing');\nif(q.duration_seconds<60||q.integrated_lufs<-18||q.integrated_lufs>-14||q.true_peak_dbtp>-1.5||q.clipped_samples!==0||q.long_silence_ratio>0.08) throw new Error('media QA contract invalid');\nreturn [i];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "call_transcription",
+      "name": "Run Transcription + SRT Sub-workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2600,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "pTransSubX8Q3M7",
+          "mode": "list",
+          "cachedResultName": "WF-podcast-sub-transcription-v1"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "runMode": "={{ $json.runMode }}",
+            "date": "={{ $json.date }}",
+            "runId": "={{ $json.runId }}",
+            "episode": "={{ Number($json.episode) }}",
+            "selectedStories": "={{ $json.selectedStories }}",
+            "scriptText": "={{ $json.scriptText }}",
+            "script_sha256": "={{ $json.script_sha256 }}",
+            "audio_sha256": "={{ $json.audio_sha256 }}",
+            "audioQa": "={{ $json.audioQa }}",
+            "mediaValidated": "={{ $json.mediaValidated }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "runMode",
+              "displayName": "runMode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "runId",
+              "displayName": "runId",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "episode",
+              "displayName": "episode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "selectedStories",
+              "displayName": "selectedStories",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "array"
+            },
+            {
+              "id": "scriptText",
+              "displayName": "scriptText",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "script_sha256",
+              "displayName": "script_sha256",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "audio_sha256",
+              "displayName": "audio_sha256",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "audioQa",
+              "displayName": "audioQa",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            },
+            {
+              "id": "mediaValidated",
+              "displayName": "mediaValidated",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "boolean"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Calls direct Whisper, compact authored-word alignment nodes, native SRT file conversion/hash, hard QA gate, and run ledger."
+    },
+    {
+      "id": "validate_transcription",
+      "name": "Validate Transcription Sub-workflow Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2860,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const i=$input.first(),r=i.json,a=r.alignment||{};\nif(r.transcriptionValidated!==true||!i.binary?.audio||!i.binary?.srt) throw new Error('transcription binaries/proof missing');\nif(!/^[a-f0-9]{64}$/.test(String(r.srt_sha256||''))) throw new Error('SRT hash missing');\nif(a.wordErrorRate>0.20||a.exactAnchorRatio<0.60||a.maximumLineCharacters>47||a.maximumLinesPerCue>2) throw new Error('transcription QA contract invalid');\nif(a.thirds?.map(x=>x.name).join(',')!=='beginning,middle,end') throw new Error('third alignment proof missing');\nreturn [i];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "call_distribution",
+      "name": "Run Staging Distribution Sub-workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        3120,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "pPortableStgX8Q3M7",
+          "mode": "list",
+          "cachedResultName": "WF-podcast-portable-staging-v1"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "runMode": "={{ $json.runMode }}",
+            "publishMode": "={{ $('Portable Shadow Safety Gate').first().json.publishMode }}",
+            "date": "={{ $json.date }}",
+            "runId": "={{ $json.runId }}",
+            "episode": "={{ Number($json.episode) }}",
+            "selectedStories": "={{ $json.selectedStories }}",
+            "scriptText": "={{ $json.scriptText }}",
+            "script_sha256": "={{ $json.script_sha256 }}",
+            "audio_sha256": "={{ $json.audio_sha256 }}",
+            "audioQa": "={{ $json.audioQa }}",
+            "srt_sha256": "={{ $json.srt_sha256 }}",
+            "alignment": "={{ $json.alignment }}",
+            "transcriptionValidated": "={{ $json.transcriptionValidated }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "runMode",
+              "displayName": "runMode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "publishMode",
+              "displayName": "publishMode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "runId",
+              "displayName": "runId",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "episode",
+              "displayName": "episode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "selectedStories",
+              "displayName": "selectedStories",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "array"
+            },
+            {
+              "id": "scriptText",
+              "displayName": "scriptText",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "script_sha256",
+              "displayName": "script_sha256",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "audio_sha256",
+              "displayName": "audio_sha256",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "audioQa",
+              "displayName": "audioQa",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            },
+            {
+              "id": "srt_sha256",
+              "displayName": "srt_sha256",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "alignment",
+              "displayName": "alignment",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            },
+            {
+              "id": "transcriptionValidated",
+              "displayName": "transcriptionValidated",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "boolean"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Calls the visible staging-only Cloudinary, GitHub, rollback-only Postgres shape check, Telegram test notification, and ledger workflow."
+    },
+    {
+      "id": "validate_distribution",
+      "name": "Validate Staging Distribution Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3380,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json;\nif(r.distributionValidated!==true||r.publishMode!=='staging'||r.databaseRolledBack!==true) throw new Error('staging distribution proof missing');\nif(!String(r.cloudinary?.secureUrl||'').startsWith('https://res.cloudinary.com/')||!/^[a-f0-9]{40}$/.test(String(r.github?.commitSha||''))) throw new Error('staging artifact readback missing');\nif(!Number.isInteger(r.telegramMessageId)||r.telegramMessageId<1) throw new Error('test notification proof missing');\nreturn [{json:r}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "stop",
+      "name": "Portable Parent Staging Stop",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3640,
+        0
+      ],
+      "parameters": {},
+      "notes": "Hard staging stop. The parent has no schedule and no production destination branch."
+    }
+  ],
+  "connections": {
+    "Manual Portable Shadow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Portable Shadow Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Portable Shadow Context": {
+      "main": [
+        [
+          {
+            "node": "Portable Shadow Safety Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Portable Shadow Safety Gate": {
+      "main": [
+        [
+          {
+            "node": "Ledger - Portable Run Started",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger - Portable Run Started": {
+      "main": [
+        [
+          {
+            "node": "Run Intake + Ranking Sub-workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Intake + Ranking Sub-workflow": {
+      "main": [
+        [
+          {
+            "node": "Validate Intake Sub-workflow Contract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Intake Sub-workflow Contract": {
+      "main": [
+        [
+          {
+            "node": "Run Authoring Sub-workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Authoring Sub-workflow": {
+      "main": [
+        [
+          {
+            "node": "Validate Authoring Sub-workflow Contract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Authoring Sub-workflow Contract": {
+      "main": [
+        [
+          {
+            "node": "Run Media Render + QA Sub-workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Media Render + QA Sub-workflow": {
+      "main": [
+        [
+          {
+            "node": "Validate Media Sub-workflow Contract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Media Sub-workflow Contract": {
+      "main": [
+        [
+          {
+            "node": "Run Transcription + SRT Sub-workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Transcription + SRT Sub-workflow": {
+      "main": [
+        [
+          {
+            "node": "Validate Transcription Sub-workflow Contract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Transcription Sub-workflow Contract": {
+      "main": [
+        [
+          {
+            "node": "Run Staging Distribution Sub-workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Staging Distribution Sub-workflow": {
+      "main": [
+        [
+          {
+            "node": "Validate Staging Distribution Contract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Staging Distribution Contract": {
+      "main": [
+        [
+          {
+            "node": "Portable Parent Staging Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "tags": []
+}

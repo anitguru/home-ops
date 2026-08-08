@@ -22,7 +22,7 @@ VOICE_SPEC = """Write a 60-90 second spoken script (~330-400 words) in Peter Gri
   placed right after one joke lands. Do NOT use bracketed stage directions.
 
 Structure -- EXACTLY 6 paragraphs, each separated by a blank line:
-1. Greeting, verbatim shape: "Good morning, it's {DAY}. This is Guru's Tech Bytes, episode {EP}." (plain number, no zero-pad, no "Ep." prefix)
+1. Greeting, verbatim shape: "Good morning, it's {DAY}. This is Guru's Tech Bytes, episode {EP_SPOKEN}." Spell the episode number fully in words for reliable TTS pronunciation; never put digits in the spoken greeting.
 2. Story 1 (highest upvotes): 2-3 sentences, Peter voice, lead with "First up..."
 3. Story 2: lead with "Second..."
 4. Story 3: lead with "Third..."
@@ -57,14 +57,46 @@ def load_selection(pdir: pathlib.Path):
     return sel
 
 
+def number_to_words(value: int) -> str:
+    """Render a non-negative episode number as American English words."""
+    if not 0 <= value <= 999_999:
+        raise ValueError(f"episode number outside supported range: {value}")
+    ones = [
+        "zero", "one", "two", "three", "four", "five", "six", "seven",
+        "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen",
+        "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
+    ]
+    tens = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"]
+
+    def under_thousand(number: int) -> str:
+        parts = []
+        if number >= 100:
+            parts.extend((ones[number // 100], "hundred"))
+            number %= 100
+        if number >= 20:
+            parts.append(tens[number // 10])
+            if number % 10:
+                parts.append(ones[number % 10])
+        elif number:
+            parts.append(ones[number])
+        return " ".join(parts)
+
+    if value < 1000:
+        return under_thousand(value) or "zero"
+    thousands, remainder = divmod(value, 1000)
+    result = f"{under_thousand(thousands)} thousand"
+    return f"{result} {under_thousand(remainder)}" if remainder else result
+
+
 def build_prompt(sel, episode, day):
-    lines = [VOICE_SPEC.replace("{DAY}", day).replace("{EP}", str(episode)), "", "The four stories, in order (Story 1 = highest upvotes):"]
+    episode_spoken = number_to_words(int(episode))
+    lines = [VOICE_SPEC.replace("{DAY}", day).replace("{EP_SPOKEN}", episode_spoken), "", "The four stories, in order (Story 1 = highest upvotes):"]
     for i, s in enumerate(sel, 1):
         lines.append(f"{i}. {s['title']}  ({s['score']} upvotes)")
     return "\n".join(lines)
 
 
-def validate(text: str) -> list[str]:
+def validate(text: str, episode_spoken: str) -> list[str]:
     errs = []
     paras = [p.strip() for p in text.strip().split("\n\n") if p.strip()]
     if len(paras) != 6:
@@ -77,6 +109,10 @@ def validate(text: str) -> list[str]:
         errs.append(f"chuckle used {ch} times (max 1)")
     if paras and not paras[0].lower().startswith("good morning"):
         errs.append("paragraph 1 is not the greeting")
+    if paras and f"episode {episode_spoken}." not in paras[0].lower():
+        errs.append(f"paragraph 1 must spell the episode as: episode {episode_spoken}.")
+    if paras and any(ch.isdigit() for ch in paras[0]):
+        errs.append("paragraph 1 contains digits; spell the episode number in words")
     if paras and "daily byte" not in paras[-1].lower():
         errs.append("paragraph 6 is not the closing")
     return errs
@@ -139,11 +175,12 @@ def main() -> int:
     sel = load_selection(pdir)
     (pdir / "selected-stories.json").write_text(json.dumps(sel, indent=2))
     prompt = build_prompt(sel, episode, day)
+    episode_spoken = number_to_words(int(episode))
 
     last = ""
     for attempt in range(1, tries + 1):
         text = gen(prompt, model)
-        errs = validate(text)
+        errs = validate(text, episode_spoken)
         if not errs:
             (pdir / "script.txt").write_text(text.strip() + "\n")
             print(f"[script] OK on attempt {attempt} ({len(text.split())} words, model={model})")

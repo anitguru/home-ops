@@ -58,6 +58,19 @@ PURPOSES: dict[str, tuple[tuple[str, str, str], ...]] = {
         ("TTS_LOUDNORM", "podcast", "TTS_LOUDNORM"),
         ("WHISPER_URL", "podcast", "WHISPER_URL"),
     ),
+    "n8n_mcp": (
+        ("N8N_MCP_URL", "n8n", "MCP_URL"),
+        ("N8N_MCP_ACCESS_TOKEN", "n8n", "MCP_ACCESS_TOKEN"),
+        ("N8N_MCP_CONFIG_JSON", "n8n", "MCP_CONFIG_JSON"),
+    ),
+    "n8n_runner": (
+        ("N8N_RUNNERS_AUTH_TOKEN", "n8n", "RUNNER_AUTH_TOKEN"),
+    ),
+    "n8n_podcast": (
+        ("CLOUDINARY_CLOUD_NAME", "cloudinary", "CLOUD_NAME"),
+        ("CLOUDINARY_API_KEY", "cloudinary", "API_KEY"),
+        ("CLOUDINARY_API_SECRET", "cloudinary", "API_SECRET"),
+    ),
 }
 
 

@@ -1,0 +1,498 @@
+{
+  "id": "pIntakeSubX8Q3M7",
+  "name": "WF-podcast-sub-intake-v1",
+  "active": false,
+  "nodes": [
+    {
+      "id": "manual",
+      "name": "Manual Intake Test Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -160
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "sub_trigger",
+      "name": "When Called by Parent Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        80
+      ],
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"runMode\": \"shadow\",\n  \"date\": \"2026-08-08\",\n  \"runId\": \"portable-shadow/2026-08-08/example\",\n  \"attempt\": 1\n}"
+      },
+      "notes": "Reusable entry point. The parent passes runMode/date/runId; no host path or secret is accepted."
+    },
+    {
+      "id": "manual_input",
+      "name": "Prepare Manual Shadow Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const now = new Date();\nconst date = new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);\nreturn [{json:{runMode:'shadow',date,runId:`intake-manual/${date}/${$execution.id}`,attempt:1}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "validate",
+      "name": "Validate Intake Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const request = $input.first().json;\nif (request.runMode !== 'shadow') throw new Error('intake sub-workflow accepts shadow mode only');\nif (!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(request.date || ''))) throw new Error('invalid ET date');\nif (!/^[A-Za-z0-9/_-]+$/.test(String(request.runId || ''))) throw new Error('invalid run ID');\nreturn [{json:{runMode:'shadow',date:request.date,runId:request.runId,attempt:Number(request.attempt || 1)}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "supabase_date",
+      "name": "Supabase - Find Episode for Date",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        720,
+        -120
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "podcast_episodes",
+        "returnAll": false,
+        "limit": 1,
+        "orderBy": "episode.desc",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "date",
+              "condition": "eq",
+              "keyValue": "={{ $json.date }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "duPN6Njb1go7DN8w",
+          "name": "Supabase (podcast)"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "supabase_latest",
+      "name": "Supabase - Get Latest Episode",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        720,
+        120
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "podcast_episodes",
+        "returnAll": false,
+        "limit": 1,
+        "orderBy": "episode.desc",
+        "filterType": "none"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "duPN6Njb1go7DN8w",
+          "name": "Supabase (podcast)"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "merge_episode",
+      "name": "Merge Supabase Episode Lookups",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      }
+    },
+    {
+      "id": "choose_episode",
+      "name": "Choose Idempotent Episode Number",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const request = $('Validate Intake Request').first().json;\nconst sameDate = $('Supabase - Find Episode for Date').first().json;\nconst latest = $('Supabase - Get Latest Episode').first().json;\nconst episode = Number(sameDate.episode || 0) || (Number(latest.episode || 0) + 1);\nif (!Number.isInteger(episode) || episode < 1) throw new Error('Supabase returned no valid episode number');\nreturn [{json:{...request,episode,episodeSource:sameDate.episode?'existing-date':'latest-plus-one'}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "hacker_news",
+      "name": "Hacker News - Get Front Page",
+      "type": "n8n-nodes-base.hackerNews",
+      "typeVersion": 1,
+      "position": [
+        1440,
+        0
+      ],
+      "parameters": {
+        "resource": "all",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 20,
+        "additionalFields": {
+          "tags": [
+            "front_page"
+          ]
+        }
+      },
+      "notes": "Native Hacker News node; this maps to the same Algolia front_page feed previously called through HTTP."
+    },
+    {
+      "id": "normalize",
+      "name": "Normalize Hacker News Stories",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const context = $('Choose Idempotent Episode Number').first().json;\nconst stories = $input.all().map(({json:s}) => ({\n  id:String(s.objectID || s.id || ''),\n  title:String(s.title || s.story_title || '').replace(/\\s+/g,' ').trim(),\n  url:String(s.url || s.story_url || '').trim(),\n  hnUrl:`https://news.ycombinator.com/item?id=${s.objectID || s.id}`,\n  score:Number(s.points || s.score || 0),\n  createdAt:s.created_at || null,\n})).filter(s => /^https?:\\/\\//.test(s.url) && s.id && s.title);\nif (stories.length < 4) throw new Error(`only ${stories.length} usable Hacker News stories`);\nreturn [{json:{...context,stories}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "domain",
+      "name": "Deduplicate Story Domains",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const context = $input.first().json;\nconst seen = new Set();\nconst stories = context.stories.filter(story => {\n  const domain = story.url.replace(/^https?:\\/\\//i,'').split('/')[0].split(':')[0].toLowerCase().replace(/^www\\./,'');\n  if (!domain || !domain.includes('.')) return false;\n  if (seen.has(domain)) return false;\n  seen.add(domain); story.domain = domain; return true;\n});\nif (stories.length < 4) throw new Error(`only ${stories.length} domain-diverse stories`);\nreturn [{json:{...context,stories}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "topics",
+      "name": "Score Technology Topic Matches",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const context = $input.first().json;\nconst topics=['ai','openai','llm','model','linux','security','database','postgres','supabase','cloud','developer','programming','python','javascript','hardware','chip','robot','network','privacy','browser','github'];\nconst stories=context.stories.map(story=>{\n  const haystack=`${story.title} ${story.url}`.toLowerCase();\n  const matchedTopics=topics.filter(topic=>haystack.includes(topic));\n  return {...story,matchedTopics,rankScore:story.score + matchedTopics.length*120};\n});\nreturn [{json:{...context,stories}}];"
+      },
+      "notes": "Small reusable scoring transform. Weight and topic vocabulary are visible and versioned in this node."
+    },
+    {
+      "id": "sort",
+      "name": "Sort Ranked Candidates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const context=$input.first().json;\nconst stories=[...context.stories].sort((a,b)=>b.rankScore-a.rankScore || b.score-a.score || a.id.localeCompare(b.id));\nreturn [{json:{...context,stories}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "select",
+      "name": "Select Four Stories",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const context=$input.first().json;\nconst selectedStories=context.stories.slice(0,4).map(({rankScore,domain,...story},index)=>({...story,rank:index+1,domain,rankScore}));\nif (selectedStories.length !== 4 || new Set(selectedStories.map(s=>s.domain)).size !== 4) throw new Error('four-story selection proof failed');\nreturn [{json:{runMode:context.runMode,date:context.date,runId:context.runId,attempt:context.attempt,episode:context.episode,episodeSource:context.episodeSource,selectedStories,candidateCount:context.stories.length,rankingProof:{algorithm:'visible-topic-score-v1',domainDiverse:true,selectedCount:4}}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "ledger",
+      "name": "Ledger - Intake Selected",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2880,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "podcast_run_ledger"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $json.runId }}",
+            "execution_id": "={{ $execution.id }}",
+            "run_mode": "shadow",
+            "episode": "={{ $json.episode }}",
+            "episode_date": "={{ $json.date }}",
+            "stage": "intake-selected",
+            "status": "passed",
+            "attempt": "={{ $json.attempt }}",
+            "selected_stories_json": "={{ JSON.stringify($json.selectedStories) }}",
+            "script_sha256": "",
+            "audio_sha256": "",
+            "srt_sha256": "",
+            "qa_json": "={{ JSON.stringify($json.rankingProof) }}",
+            "artifact_urls_json": "",
+            "error": "",
+            "started_at": "={{ $now.toISO() }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "restore",
+      "name": "Return Intake Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:$('Select Four Stories').first().json}];"
+      },
+      "notes": "The last node returns the stable contract to the parent workflow."
+    }
+  ],
+  "connections": {
+    "Manual Intake Test Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Manual Shadow Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Manual Shadow Input": {
+      "main": [
+        [
+          {
+            "node": "Validate Intake Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Called by Parent Workflow": {
+      "main": [
+        [
+          {
+            "node": "Validate Intake Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Intake Request": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Find Episode for Date",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Supabase - Get Latest Episode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Find Episode for Date": {
+      "main": [
+        [
+          {
+            "node": "Merge Supabase Episode Lookups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Get Latest Episode": {
+      "main": [
+        [
+          {
+            "node": "Merge Supabase Episode Lookups",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Supabase Episode Lookups": {
+      "main": [
+        [
+          {
+            "node": "Choose Idempotent Episode Number",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Choose Idempotent Episode Number": {
+      "main": [
+        [
+          {
+            "node": "Hacker News - Get Front Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hacker News - Get Front Page": {
+      "main": [
+        [
+          {
+            "node": "Normalize Hacker News Stories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Hacker News Stories": {
+      "main": [
+        [
+          {
+            "node": "Deduplicate Story Domains",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deduplicate Story Domains": {
+      "main": [
+        [
+          {
+            "node": "Score Technology Topic Matches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Technology Topic Matches": {
+      "main": [
+        [
+          {
+            "node": "Sort Ranked Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort Ranked Candidates": {
+      "main": [
+        [
+          {
+            "node": "Select Four Stories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Four Stories": {
+      "main": [
+        [
+          {
+            "node": "Ledger - Intake Selected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger - Intake Selected": {
+      "main": [
+        [
+          {
+            "node": "Return Intake Contract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "tags": []
+}

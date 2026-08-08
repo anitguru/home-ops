@@ -1,0 +1,971 @@
+{
+  "id": "pAuthorSubX8Q3M7",
+  "name": "WF-podcast-sub-authoring-v1",
+  "active": false,
+  "nodes": [
+    {
+      "id": "manual",
+      "name": "Manual Authoring Test Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "sub_trigger",
+      "name": "When Called by Parent Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        -60
+      ],
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"runMode\": \"shadow\",\n  \"date\": \"2026-08-08\",\n  \"runId\": \"portable-shadow/example\",\n  \"attempt\": 1,\n  \"episode\": 125,\n  \"selectedStories\": []\n}"
+      }
+    },
+    {
+      "id": "fixture",
+      "name": "Prepare Authoring Fixture",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{\"runMode\":\"shadow\",\"date\":\"2026-08-08\",\"runId\":\"authoring-fixture/run37\",\"attempt\":1,\"episode\":125,\"selectedStories\":[{\"id\":\"49209539\",\"title\":\"What happens if an entire class of workers loses faith in their careers\",\"url\":\"https://www.noemamag.com/why-is-everyone-in-tech-so-sad/\",\"hnUrl\":\"https://news.ycombinator.com/item?id=49209539\",\"score\":923,\"matchedTopics\":[],\"cocoindexReason\":[\"matched trending topics: none\",\"HN score: 923\",\"not recently covered\"]},{\"id\":\"49214008\",\"title\":\"DeepSeek V4 Flash 0731\",\"url\":\"https://arcprize.org/results/deepseek-v4-flash-0731\",\"hnUrl\":\"https://news.ycombinator.com/item?id=49214008\",\"score\":737,\"matchedTopics\":[\"deepseek\"],\"cocoindexReason\":[\"matched trending topics: deepseek\",\"HN score: 737\",\"not recently covered\"]},{\"id\":\"49214098\",\"title\":\"Assembly Hall of Shame\",\"url\":\"https://github.com/xoreaxeaxeax/asm-hall-of-shame\",\"hnUrl\":\"https://news.ycombinator.com/item?id=49214098\",\"score\":401,\"matchedTopics\":[],\"cocoindexReason\":[\"matched trending topics: none\",\"HN score: 401\",\"not recently covered\"]},{\"id\":\"49189457\",\"title\":\"A physicist rigged his pet hamster\\u2019s wheel to upload to Strava\",\"url\":\"https://www.runnersworld.com/news/a73355106/hamster-wheel-strava-running/\",\"hnUrl\":\"https://news.ycombinator.com/item?id=49189457\",\"score\":382,\"matchedTopics\":[],\"cocoindexReason\":[\"matched trending topics: none\",\"HN score: 382\",\"not recently covered\"]}]}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "validate_request",
+      "name": "Validate Authoring Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        -160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json;\nif(r.runMode!=='shadow') throw new Error('authoring accepts shadow mode only');\nif(!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(r.date||''))) throw new Error('invalid date');\nif(!Number.isInteger(r.episode)||r.episode<1) throw new Error('invalid episode');\nif(!Array.isArray(r.selectedStories)||r.selectedStories.length!==4) throw new Error('authoring requires four selected stories');\nreturn [{json:r}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "episode_words",
+      "name": "Format Spoken Episode Number",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        -160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json;const ones=['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];const tens=['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];\nconst under=n=>{const p=[];if(n>=100){p.push(ones[Math.floor(n/100)],'hundred');n%=100;}if(n>=20){p.push(tens[Math.floor(n/10)]);if(n%10)p.push(ones[n%10]);}else if(n)p.push(ones[n]);return p.join(' ');};\nconst n=r.episode;if(n>999999) throw new Error('episode number exceeds spoken formatter');\nconst episodeSpoken=n<1000?under(n):`${under(Math.floor(n/1000))} thousand${n%1000?' '+under(n%1000):''}`;\nconst dayName=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',weekday:'long'}).format(new Date(`${r.date}T12:00:00-04:00`));\nreturn [{json:{...r,episodeSpoken,dayName}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "prompt",
+      "name": "Build Six-Paragraph Author Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        -160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json;\nconst rules=`Write a 60-90 second spoken script. Hard acceptance range: 330-400 words; target 365-390. Use a rambling, self-interrupting blue-collar everyman voice enthusiastic about AI, with at most one exact chuckle: Heh. Hhh, okay, that's something. No stage directions.\\n\\nExactly 6 paragraphs separated by blank lines:\\n1. Good morning, it's ${r.dayName}. This is Guru's Tech Bytes, episode ${r.episodeSpoken}. Never put digits in the greeting.\\n2. Lead with First up...\\n3. Lead with Second...\\n4. Lead with Third...\\n5. Lead with And finally...\\n6. Exactly: That's your daily byte. Have a great day. Until next time.\\n\\nOutput only script text.`;\nconst stories=r.selectedStories.map((s,i)=>`${i+1}. ${s.title} (${Number(s.score||0)} upvotes)`).join('\\n');\nreturn [{json:{...r,authorPrompt:`${rules}\\n\\nThe four stories, in order:\\n${stories}`,authoringAttempt:1}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "chain1",
+      "name": "Author Script Attempt 1 (GLM-5.2)",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1200,
+        -160
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.authorPrompt }}",
+        "hasOutputParser": false,
+        "batching": {
+          "batchSize": 1,
+          "delayBetweenBatches": 0
+        }
+      }
+    },
+    {
+      "id": "model1",
+      "name": "Ollama Cloud GLM-5.2 Attempt 1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        60
+      ],
+      "parameters": {
+        "model": "glm-5.2",
+        "options": {
+          "think": false,
+          "temperature": 0.2,
+          "numCtx": 8192,
+          "numPredict": 700
+        }
+      },
+      "credentials": {
+        "ollamaApi": {
+          "id": "3QQRE0XvtKk5UsPB",
+          "name": "Ollama Cloud (podcast)"
+        }
+      }
+    },
+    {
+      "id": "validation_input1",
+      "name": "Prepare Validation Attempt 1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        -160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const raw=$input.first().json;return [{json:{context:$('Build Six-Paragraph Author Prompt').first().json,draft:String(raw.text??raw.output??raw.response??raw.content??''),attempt:1}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "validator1",
+      "name": "Run Reusable Validator - Attempt 1",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1680,
+        -160
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "pScriptValX8Q3M7",
+          "mode": "list",
+          "cachedResultName": "WF-podcast-sub-script-validator-v1"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "context": "={{ $json.context }}",
+            "draft": "={{ $json.draft }}",
+            "attempt": 1
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "context",
+              "displayName": "context",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            },
+            {
+              "id": "draft",
+              "displayName": "draft",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "attempt",
+              "displayName": "attempt",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Attempt 1 calls the same reusable validator sub-workflow; input context comes from Build Six-Paragraph Author Prompt."
+    },
+    {
+      "id": "valid1",
+      "name": "Script Valid Attempt 1?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1920,
+        -160
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid-1",
+              "leftValue": "={{ $json.authoringValid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "chain2",
+      "name": "Author Script Attempt 2 (GLM-5.2)",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        2160,
+        -40
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.authorPrompt }}",
+        "hasOutputParser": false,
+        "batching": {
+          "batchSize": 1,
+          "delayBetweenBatches": 0
+        }
+      }
+    },
+    {
+      "id": "model2",
+      "name": "Ollama Cloud GLM-5.2 Attempt 2",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        2160,
+        180
+      ],
+      "parameters": {
+        "model": "glm-5.2",
+        "options": {
+          "think": false,
+          "temperature": 0.2,
+          "numCtx": 8192,
+          "numPredict": 700
+        }
+      },
+      "credentials": {
+        "ollamaApi": {
+          "id": "3QQRE0XvtKk5UsPB",
+          "name": "Ollama Cloud (podcast)"
+        }
+      }
+    },
+    {
+      "id": "validation_input2",
+      "name": "Prepare Validation Attempt 2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        -40
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const raw=$input.first().json;return [{json:{context:$('Run Reusable Validator - Attempt 1').first().json,draft:String(raw.text??raw.output??raw.response??raw.content??''),attempt:2}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "validator2",
+      "name": "Run Reusable Validator - Attempt 2",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2640,
+        -160
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "pScriptValX8Q3M7",
+          "mode": "list",
+          "cachedResultName": "WF-podcast-sub-script-validator-v1"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "context": "={{ $json.context }}",
+            "draft": "={{ $json.draft }}",
+            "attempt": 2
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "context",
+              "displayName": "context",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            },
+            {
+              "id": "draft",
+              "displayName": "draft",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "attempt",
+              "displayName": "attempt",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Attempt 2 calls the same reusable validator sub-workflow; input context comes from Run Reusable Validator - Attempt 1."
+    },
+    {
+      "id": "valid2",
+      "name": "Script Valid Attempt 2?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2880,
+        -160
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid-2",
+              "leftValue": "={{ $json.authoringValid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "chain3",
+      "name": "Author Script Attempt 3 (GLM-5.2)",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        3120,
+        80
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.authorPrompt }}",
+        "hasOutputParser": false,
+        "batching": {
+          "batchSize": 1,
+          "delayBetweenBatches": 0
+        }
+      }
+    },
+    {
+      "id": "model3",
+      "name": "Ollama Cloud GLM-5.2 Attempt 3",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        3120,
+        300
+      ],
+      "parameters": {
+        "model": "glm-5.2",
+        "options": {
+          "think": false,
+          "temperature": 0.2,
+          "numCtx": 8192,
+          "numPredict": 700
+        }
+      },
+      "credentials": {
+        "ollamaApi": {
+          "id": "3QQRE0XvtKk5UsPB",
+          "name": "Ollama Cloud (podcast)"
+        }
+      }
+    },
+    {
+      "id": "validation_input3",
+      "name": "Prepare Validation Attempt 3",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3360,
+        80
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const raw=$input.first().json;return [{json:{context:$('Run Reusable Validator - Attempt 2').first().json,draft:String(raw.text??raw.output??raw.response??raw.content??''),attempt:3}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "validator3",
+      "name": "Run Reusable Validator - Attempt 3",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        3600,
+        -160
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "pScriptValX8Q3M7",
+          "mode": "list",
+          "cachedResultName": "WF-podcast-sub-script-validator-v1"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "context": "={{ $json.context }}",
+            "draft": "={{ $json.draft }}",
+            "attempt": 3
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "context",
+              "displayName": "context",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            },
+            {
+              "id": "draft",
+              "displayName": "draft",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "attempt",
+              "displayName": "attempt",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Attempt 3 calls the same reusable validator sub-workflow; input context comes from Run Reusable Validator - Attempt 2."
+    },
+    {
+      "id": "valid3",
+      "name": "Script Valid Attempt 3?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3840,
+        -160
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid-3",
+              "leftValue": "={{ $json.authoringValid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "fail",
+      "name": "Fail Authoring After 3 Attempts",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        4080,
+        160
+      ],
+      "parameters": {
+        "errorType": "errorMessage",
+        "errorMessage": "={{ $json.failureMessage }}"
+      }
+    },
+    {
+      "id": "approved",
+      "name": "Build Approved Authoring Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4080,
+        -160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json;const failures=[];\nif(r.authoringValidated!==true) failures.push('validation');\nif(!Array.isArray(r.selectedStories)||r.selectedStories.length!==4) failures.push('stories');\nif(typeof r.scriptText!=='string'||r.scriptText.trim().split(/\\s+/).length!==r.wordCount) failures.push('word count');\nif(r.paragraphCount!==6) failures.push('paragraph count');\nif(failures.length) throw new Error(`approved authoring contract: ${failures.join(', ')}`);\nreturn [{json:r}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "hash",
+      "name": "SHA256 Approved Script",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        4320,
+        -160
+      ],
+      "parameters": {
+        "action": "hash",
+        "binaryData": false,
+        "type": "SHA256",
+        "value": "={{ $json.scriptText }}",
+        "dataPropertyName": "script_sha256",
+        "encoding": "hex"
+      }
+    },
+    {
+      "id": "ledger",
+      "name": "Ledger - Authoring Approved",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        4560,
+        -160
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "podcast_run_ledger"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $json.runId }}",
+            "execution_id": "={{ $execution.id }}",
+            "run_mode": "shadow",
+            "episode": "={{ $json.episode }}",
+            "episode_date": "={{ $json.date }}",
+            "stage": "authoring-approved",
+            "status": "passed",
+            "attempt": "={{ $json.authoringAttempt }}",
+            "selected_stories_json": "={{ JSON.stringify($json.selectedStories) }}",
+            "script_sha256": "={{ $json.script_sha256 }}",
+            "audio_sha256": "",
+            "srt_sha256": "",
+            "qa_json": "={{ JSON.stringify({wordCount:$json.wordCount,paragraphCount:$json.paragraphCount,provider:$json.scriptProvider,model:$json.scriptModel}) }}",
+            "artifact_urls_json": "",
+            "error": "",
+            "started_at": "={{ $now.toISO() }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "return",
+      "name": "Return Authoring Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4800,
+        -160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:$('SHA256 Approved Script').first().json}];"
+      },
+      "notes": ""
+    }
+  ],
+  "connections": {
+    "Manual Authoring Test Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Authoring Fixture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Authoring Fixture": {
+      "main": [
+        [
+          {
+            "node": "Validate Authoring Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Called by Parent Workflow": {
+      "main": [
+        [
+          {
+            "node": "Validate Authoring Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Authoring Request": {
+      "main": [
+        [
+          {
+            "node": "Format Spoken Episode Number",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Spoken Episode Number": {
+      "main": [
+        [
+          {
+            "node": "Build Six-Paragraph Author Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Six-Paragraph Author Prompt": {
+      "main": [
+        [
+          {
+            "node": "Author Script Attempt 1 (GLM-5.2)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Author Script Attempt 1 (GLM-5.2)": {
+      "main": [
+        [
+          {
+            "node": "Prepare Validation Attempt 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Validation Attempt 1": {
+      "main": [
+        [
+          {
+            "node": "Run Reusable Validator - Attempt 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Reusable Validator - Attempt 1": {
+      "main": [
+        [
+          {
+            "node": "Script Valid Attempt 1?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Cloud GLM-5.2 Attempt 1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Author Script Attempt 1 (GLM-5.2)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Script Valid Attempt 1?": {
+      "main": [
+        [
+          {
+            "node": "Build Approved Authoring Contract",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Author Script Attempt 2 (GLM-5.2)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Author Script Attempt 2 (GLM-5.2)": {
+      "main": [
+        [
+          {
+            "node": "Prepare Validation Attempt 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Validation Attempt 2": {
+      "main": [
+        [
+          {
+            "node": "Run Reusable Validator - Attempt 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Reusable Validator - Attempt 2": {
+      "main": [
+        [
+          {
+            "node": "Script Valid Attempt 2?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Cloud GLM-5.2 Attempt 2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Author Script Attempt 2 (GLM-5.2)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Script Valid Attempt 2?": {
+      "main": [
+        [
+          {
+            "node": "Build Approved Authoring Contract",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Author Script Attempt 3 (GLM-5.2)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Author Script Attempt 3 (GLM-5.2)": {
+      "main": [
+        [
+          {
+            "node": "Prepare Validation Attempt 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Validation Attempt 3": {
+      "main": [
+        [
+          {
+            "node": "Run Reusable Validator - Attempt 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Reusable Validator - Attempt 3": {
+      "main": [
+        [
+          {
+            "node": "Script Valid Attempt 3?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Cloud GLM-5.2 Attempt 3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Author Script Attempt 3 (GLM-5.2)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Script Valid Attempt 3?": {
+      "main": [
+        [
+          {
+            "node": "Build Approved Authoring Contract",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail Authoring After 3 Attempts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Approved Authoring Contract": {
+      "main": [
+        [
+          {
+            "node": "SHA256 Approved Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SHA256 Approved Script": {
+      "main": [
+        [
+          {
+            "node": "Ledger - Authoring Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger - Authoring Approved": {
+      "main": [
+        [
+          {
+            "node": "Return Authoring Contract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "tags": []
+}

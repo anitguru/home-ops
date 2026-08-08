@@ -1,0 +1,152 @@
+{
+  "id": "pRunLedgerX8Q3M7Z",
+  "name": "bootstrap-podcast-run-ledger",
+  "active": false,
+  "nodes": [
+    {
+      "id": "manual_trigger",
+      "name": "Manual Ledger Bootstrap",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "create_ledger",
+      "name": "Ensure Podcast Run Ledger",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "resource": "table",
+        "operation": "create",
+        "tableName": "podcast_run_ledger",
+        "columns": {
+          "column": [
+            {
+              "name": "run_id",
+              "type": "string"
+            },
+            {
+              "name": "execution_id",
+              "type": "string"
+            },
+            {
+              "name": "run_mode",
+              "type": "string"
+            },
+            {
+              "name": "episode",
+              "type": "number"
+            },
+            {
+              "name": "episode_date",
+              "type": "string"
+            },
+            {
+              "name": "stage",
+              "type": "string"
+            },
+            {
+              "name": "status",
+              "type": "string"
+            },
+            {
+              "name": "attempt",
+              "type": "number"
+            },
+            {
+              "name": "selected_stories_json",
+              "type": "string"
+            },
+            {
+              "name": "script_sha256",
+              "type": "string"
+            },
+            {
+              "name": "audio_sha256",
+              "type": "string"
+            },
+            {
+              "name": "srt_sha256",
+              "type": "string"
+            },
+            {
+              "name": "qa_json",
+              "type": "string"
+            },
+            {
+              "name": "artifact_urls_json",
+              "type": "string"
+            },
+            {
+              "name": "error",
+              "type": "string"
+            },
+            {
+              "name": "started_at",
+              "type": "date"
+            },
+            {
+              "name": "updated_at",
+              "type": "date"
+            }
+          ]
+        },
+        "options": {
+          "createIfNotExists": true
+        }
+      },
+      "notes": "Idempotently creates the portable metadata ledger; binary artifacts never enter this table."
+    },
+    {
+      "id": "ledger_stop",
+      "name": "Ledger Ready",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Manual Ledger Bootstrap": {
+      "main": [
+        [
+          {
+            "node": "Ensure Podcast Run Ledger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ensure Podcast Run Ledger": {
+      "main": [
+        [
+          {
+            "node": "Ledger Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "tags": []
+}

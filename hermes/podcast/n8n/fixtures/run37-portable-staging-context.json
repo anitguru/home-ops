@@ -1,0 +1,123 @@
+{
+  "sourceExecutionId": "37",
+  "runId": "2026-08-08/37",
+  "runMode": "shadow",
+  "date": "2026-08-08",
+  "episode": 125,
+  "selectedStories": [
+    {
+      "id": "49209539",
+      "title": "What happens if an entire class of workers loses faith in their careers",
+      "url": "https://www.noemamag.com/why-is-everyone-in-tech-so-sad/",
+      "hnUrl": "https://news.ycombinator.com/item?id=49209539",
+      "score": 923,
+      "matchedTopics": [],
+      "cocoindexReason": [
+        "matched trending topics: none",
+        "HN score: 923",
+        "not recently covered"
+      ]
+    },
+    {
+      "id": "49214008",
+      "title": "DeepSeek V4 Flash 0731",
+      "url": "https://arcprize.org/results/deepseek-v4-flash-0731",
+      "hnUrl": "https://news.ycombinator.com/item?id=49214008",
+      "score": 737,
+      "matchedTopics": [
+        "deepseek"
+      ],
+      "cocoindexReason": [
+        "matched trending topics: deepseek",
+        "HN score: 737",
+        "not recently covered"
+      ]
+    },
+    {
+      "id": "49214098",
+      "title": "Assembly Hall of Shame",
+      "url": "https://github.com/xoreaxeaxeax/asm-hall-of-shame",
+      "hnUrl": "https://news.ycombinator.com/item?id=49214098",
+      "score": 401,
+      "matchedTopics": [],
+      "cocoindexReason": [
+        "matched trending topics: none",
+        "HN score: 401",
+        "not recently covered"
+      ]
+    },
+    {
+      "id": "49189457",
+      "title": "A physicist rigged his pet hamster’s wheel to upload to Strava",
+      "url": "https://www.runnersworld.com/news/a73355106/hamster-wheel-strava-running/",
+      "hnUrl": "https://news.ycombinator.com/item?id=49189457",
+      "score": 382,
+      "matchedTopics": [],
+      "cocoindexReason": [
+        "matched trending topics: none",
+        "HN score: 382",
+        "not recently covered"
+      ]
+    }
+  ],
+  "scriptText": "Good morning, it's Saturday. This is Guru's Tech Bytes, episode one hundred twenty five.\n\nFirst up, what happens if an entire class of workers loses faith in their careers. You know what this reminds me of, back in ninety eight when the transmission shop closed down and my buddy just started building birdhouses. Heh. Hhh, okay, that's something. But seriously, if all the coders think the robots are taking over, what do they do, just pivot to plumbing. I mean, good luck with that, PVC glue is a whole different beast than Python.\n\nSecond, DeepSeek V4 Flash 0731. Now I got no clue what them numbers mean, sounds like a serial number on a carburetor, but folks are saying it is fast. You know what else is fast, the blue screen of death when Windows decides to update right in the middle of a brake job. Microsoft does that just to mess with us, I swear. But this DeepSeek thing, it is some new AI model, and apparently it runs pretty smooth, which is a nice change of pace from my laptop that sounds like a diesel engine when I open the email.\n\nThird, Assembly Hall of Shame. This is where programmers show off their worst code, kinda like the wiring job I saw on a Honda Civic last week, duct tape and prayers. You ever try debugging a fuel pump, it is just spaghetti wires and regret. Anyway, these tech folks are posting their messy code for laughs, which I respect, at least they own it, unlike some software companies that ship broken updates and act like it is a feature.\n\nAnd finally, a physicist rigged his pet hamster's wheel to upload to Strava. That is hilarious, the little guy is out here getting more cardio than me. You know what this reminds me of, my cousin put a GPS on his coonhound and the dog logged more miles than a marathon runner. But this hamster, he is posting fake run times and probably beating my personal records, which is embarrassing but also kind of motivating.\n\nThat's your daily byte. Have a great day. Until next time.",
+  "wordCount": 358,
+  "paragraphCount": 6,
+  "audio": {
+    "sourceUrl": "https://res.cloudinary.com/ddicetqs5/video/upload/v1786220477/anitguru-shadow/gurus-tech-bytes-2026-08-08-37.mp3",
+    "bytes": 958125,
+    "sha256": "657afe574a968ed88f4efe6de9b8c7327ff18717a878b29306cc3cb7afdde698",
+    "durationSeconds": 119.736,
+    "duration": "2:00"
+  },
+  "srt": {
+    "sha256": "8e0b4852eb31c84cba473df4d38b87ebbfa5e156ad15d73234114824d23bbbd4",
+    "alignment": {
+      "durationSeconds": 119.68000030517578,
+      "referenceWords": 358,
+      "transcriptWords": 354,
+      "substitutions": 15,
+      "deletions": 6,
+      "insertions": 2,
+      "wordErrorRate": 0.064246,
+      "exactAnchors": 337,
+      "exactAnchorRatio": 0.941341,
+      "cueCount": 23,
+      "maximumLineCharacters": 47,
+      "maximumLinesPerCue": 2,
+      "thirds": [
+        {
+          "name": "beginning",
+          "referenceWordStart": 1,
+          "referenceWordEnd": 119,
+          "startSeconds": 0,
+          "endSeconds": 42.138,
+          "exactAnchors": 108,
+          "interpolatedWords": 4,
+          "maximumUnanchoredRunWords": 4
+        },
+        {
+          "name": "middle",
+          "referenceWordStart": 120,
+          "referenceWordEnd": 238,
+          "startSeconds": 42.138,
+          "endSeconds": 79.52,
+          "exactAnchors": 118,
+          "interpolatedWords": 0,
+          "maximumUnanchoredRunWords": 1
+        },
+        {
+          "name": "end",
+          "referenceWordStart": 239,
+          "referenceWordEnd": 358,
+          "startSeconds": 79.52,
+          "endSeconds": 119.44,
+          "exactAnchors": 111,
+          "interpolatedWords": 2,
+          "maximumUnanchoredRunWords": 4
+        }
+      ],
+      "maximumUnanchoredRunWords": 4
+    }
+  }
+}

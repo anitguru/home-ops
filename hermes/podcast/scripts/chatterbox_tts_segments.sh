@@ -12,6 +12,7 @@ TTS_CONNECT_HOST=${TTS_CONNECT_HOST:-}
 TTS_VOICE=${TTS_VOICE:-peter-griffin.wav}
 TTS_MODEL=${TTS_MODEL:-tts-1}
 TTS_SPEED=${TTS_SPEED:-1.0}
+TTS_SEED=${TTS_SEED:-}
 TTS_LOUDNORM=${TTS_LOUDNORM:-I=-16:TP=-1.5:LRA=11}
 MIN_DURATION_SECONDS=${MIN_DURATION_SECONDS:-60}
 
@@ -83,7 +84,7 @@ for txt in "$SEGMENTS_DIR"/segment-*.txt; do
   base=${txt%.txt}
   json="$base.json"
   mp3="$base.mp3"
-  python3 - "$txt" "$json" "$TTS_MODEL" "$TTS_VOICE" "$TTS_SPEED" <<'PY'
+python3 - "$txt" "$json" "$TTS_MODEL" "$TTS_VOICE" "$TTS_SPEED" "$TTS_SEED" <<'PY'
 import json, pathlib, sys
 text = pathlib.Path(sys.argv[1]).read_text()
 payload = {
@@ -93,16 +94,21 @@ payload = {
     "response_format": "mp3",
     "speed": float(sys.argv[5]),
 }
+if sys.argv[6]:
+    payload["seed"] = int(sys.argv[6])
 pathlib.Path(sys.argv[2]).write_text(json.dumps(payload))
 PY
   attempt=1
   while :; do
     idx=$(( attempt - 1 )); (( idx >= ${#TTS_URLS[@]} )) && idx=$(( ${#TTS_URLS[@]} - 1 ))
     url="${TTS_URLS[$idx]}"
-    cargs=(); [[ "$url" == "$TTS_URL" ]] && cargs=("${CURL_CONNECT_ARGS[@]}")   # Tailscale connect-to only valid for primary
+    cargs=()
+    if [[ "$url" == "$TTS_URL" && -n "$TTS_CONNECT_HOST" ]]; then
+      cargs=("${CURL_CONNECT_ARGS[@]}")   # Tailscale connect-to only valid for primary
+    fi
     echo "[tts] POST $(basename "$mp3") (attempt $attempt/$TTS_MAX_ATTEMPTS via $url)"
     ok=1
-    curl "${cargs[@]}" -fsS --retry 2 --retry-all-errors --connect-timeout 30 --max-time 900 \
+    curl ${cargs[@]+"${cargs[@]}"} -fsS --retry 2 --retry-all-errors --connect-timeout 30 --max-time 900 \
       -X POST "$url" \
       -H "Content-Type: application/json" \
       --data-binary "@$json" \
@@ -129,16 +135,22 @@ PY
   printf "file '%s'\n" "$mp3" >> "$SEGMENTS_DIR/concat.txt"
 done
 
-joined_tmp="$MP3.joined.tmp.mp3"
+joined_tmp="$MP3.joined.tmp.wav"
 normalized_tmp="$MP3.normalized.tmp.mp3"
-ffmpeg -hide_banner -y -f concat -safe 0 -i "$SEGMENTS_DIR/concat.txt" -c copy "$joined_tmp"
+# Decode each independently encoded MP3 segment into one continuous PCM stream.
+# Stream-copying MP3 segments produces non-monotonic DTS at boundaries and can
+# drop or repeat samples before the later loudnorm decode.
+ffmpeg -hide_banner -y -f concat -safe 0 -i "$SEGMENTS_DIR/concat.txt" \
+  -ar 24000 -ac 1 -c:a pcm_s16le "$joined_tmp"
 
 if [[ -n "$TTS_LOUDNORM" ]]; then
   echo "[tts] Applying loudness normalization: loudnorm=$TTS_LOUDNORM"
   ffmpeg -hide_banner -y -i "$joined_tmp" -af "loudnorm=$TTS_LOUDNORM" -ar 24000 -ac 1 -codec:a libmp3lame -b:a 64k "$normalized_tmp"
   mv "$normalized_tmp" "$MP3"
 else
-  mv "$joined_tmp" "$MP3"
+  ffmpeg -hide_banner -y -i "$joined_tmp" -ar 24000 -ac 1 \
+    -codec:a libmp3lame -b:a 64k "$normalized_tmp"
+  mv "$normalized_tmp" "$MP3"
 fi
 rm -f "$joined_tmp" "$normalized_tmp"
 
