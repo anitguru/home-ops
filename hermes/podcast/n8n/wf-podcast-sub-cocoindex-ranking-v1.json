@@ -1,0 +1,358 @@
+{
+  "updatedAt": "2026-08-09T07:34:11.150Z",
+  "createdAt": "2026-08-09T07:34:11.150Z",
+  "id": "wMx9nanglSIMP3Ow",
+  "name": "WF-podcast-sub-cocoindex-ranking-v1",
+  "description": "Dedicated visible CocoIndex ranking child: native Postgres evidence + modular ARM64 runner transforms + hard proof.",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "37197873-40a5-4d23-ad44-9ec7b6e4f0bc",
+      "name": "Manual CocoIndex Fixture Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -180
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "679e747a-df2f-4720-8480-b4bdd350eeae",
+      "name": "Prepare Visible Ranking Fixture",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -180
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{runMode:'shadow',date:'2026-08-09',runId:`cocoindex-fixture/${$execution.id}`,attempt:1,episode:126,episodeSource:'fixture',stories:[{id:'a',title:'OpenAI releases a new reasoning model',url:'https://openai.com/a',hnUrl:'https://news.ycombinator.com/item?id=a',score:200,domain:'openai.com'},{id:'b',title:'Linux networking gets faster',url:'https://kernel.org/b',hnUrl:'https://news.ycombinator.com/item?id=b',score:180,domain:'kernel.org'},{id:'c',title:'Postgres indexing techniques',url:'https://postgresql.org/c',hnUrl:'https://news.ycombinator.com/item?id=c',score:160,domain:'postgresql.org'},{id:'d',title:'A practical browser security guide',url:'https://example.net/d',hnUrl:'https://news.ycombinator.com/item?id=d',score:140,domain:'example.net'},{id:'e',title:'Unrelated hardware teardown',url:'https://hardware.example/e',hnUrl:'https://news.ycombinator.com/item?id=e',score:120,domain:'hardware.example'}]}}];"
+      }
+    },
+    {
+      "id": "9be7885e-dafd-4b82-8642-974238fc1350",
+      "name": "Validate CocoIndex Ranking Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json;if(!['shadow','production'].includes(r.runMode))throw new Error('invalid ranking mode');if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(r.date||'')))throw new Error('invalid ranking date');if(!Array.isArray(r.stories)||r.stories.length<4)throw new Error('ranking requires at least four stories');return [{json:r}];"
+      }
+    },
+    {
+      "id": "7e35bd00-6900-4831-a61d-e6c7240a948b",
+      "name": "When Called by Intake Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        100
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "runMode",
+              "type": "string"
+            },
+            {
+              "name": "date",
+              "type": "string"
+            },
+            {
+              "name": "runId",
+              "type": "string"
+            },
+            {
+              "name": "attempt",
+              "type": "number"
+            },
+            {
+              "name": "episode",
+              "type": "number"
+            },
+            {
+              "name": "episodeSource",
+              "type": "string"
+            },
+            {
+              "name": "stories",
+              "type": "array"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "82db6d96-b414-4102-864f-b52e8fec2144",
+      "name": "Merge Request with Index Evidence",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1020,
+        0
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "numberInputs": 2
+      }
+    },
+    {
+      "id": "53e0013a-ecb5-482f-af2a-41da92826530",
+      "name": "Postgres - Read CocoIndex Topics + Recent Episodes",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        760,
+        120
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH topic_counts AS (\n  SELECT topic, SUM(CASE WHEN content_type='thread' THEN 5 ELSE 1 END)::integer AS score, MAX(created_at) AS latest\n  FROM hntrendingtopics__hn_topics GROUP BY topic ORDER BY score DESC, latest DESC LIMIT 50\n), recent AS (\n  SELECT COALESCE(jsonb_agg(stories),'[]'::jsonb) AS episode_stories FROM (\n    SELECT stories FROM podcast_episodes WHERE stories IS NOT NULL AND date < $1::date ORDER BY date DESC LIMIT 45\n  ) e\n)\nSELECT COALESCE((SELECT jsonb_agg(to_jsonb(t)) FROM topic_counts t),'[]'::jsonb) AS trending_topics, recent.episode_stories AS recent_episode_stories FROM recent;",
+        "options": {
+          "queryReplacement": "={{ [(\"Validate CocoIndex Ranking Request\" && $(\"Validate CocoIndex Ranking Request\").first().json.date)] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "fK9icsGZqJ3aJWG3",
+          "name": "Supabase Postgres (podcast)"
+        }
+      }
+    },
+    {
+      "id": "ba173819-3653-48ea-aa69-e446a699d141",
+      "name": "Build Recent Story Identity Keys",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "pythonNative",
+        "pythonCode": "import re\nfrom urllib.parse import urlsplit, parse_qsl, urlencode, urlunsplit\n\ncontext = _items[0]['json']\ndef story_keys(story):\n    keys = []\n    for field in ('url', 'hnUrl', 'hn_url'):\n        value = story.get(field)\n        if not value: continue\n        parts = urlsplit(str(value).strip())\n        if not parts.scheme or not parts.netloc: continue\n        path = parts.path.rstrip('/') or '/'\n        query = ''\n        if parts.netloc.lower() == 'news.ycombinator.com' and path == '/item':\n            hn_id = dict(parse_qsl(parts.query)).get('id')\n            if hn_id: query = urlencode({'id': hn_id})\n        keys.append('url:' + urlunsplit((parts.scheme.lower(), parts.netloc.lower(), path, query, '')))\n    title = re.sub(r'[^a-z0-9]+', '-', str(story.get('title') or '').lower()).strip('-')\n    if title: keys.append('title:' + title)\n    return sorted(set(keys))\nrecent_keys = set()\nfor episode_stories in context.get('recent_episode_stories') or []:\n    if isinstance(episode_stories, str):\n        import json\n        episode_stories = json.loads(episode_stories)\n    if isinstance(episode_stories, list):\n        for story in episode_stories:\n            if isinstance(story, dict): recent_keys.update(story_keys(story))\ncontext['recentStoryKeys'] = sorted(recent_keys)\nreturn [{'json': context}]"
+      }
+    },
+    {
+      "id": "f5ee86a6-b66f-4542-b0d9-d2b7a0e9adc9",
+      "name": "Score Against CocoIndex Topic Index",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "pythonNative",
+        "pythonCode": "import cocoindex\nimport os\nimport re\nfrom importlib.metadata import version\n\ncontext = _items[0]['json']\ntrending = context.get('trending_topics') or []\nif not trending: raise Exception('CocoIndex topic table returned no topics; fallback is forbidden')\ntopic_scores = {str(row.get('topic') or '').lower(): float(row.get('score') or 0) for row in trending if row.get('topic')}\nranked = []\nfor original in context.get('stories') or []:\n    story = dict(original); title = str(story.get('title') or '').lower(); matched = []; relevance = 0.0\n    for topic, score in topic_scores.items():\n        if re.search(r'(?<![a-z0-9])' + re.escape(topic) + r'(?![a-z0-9])', title): matched.append(topic); relevance += score\n    story['matchedTopics'] = matched; story['topicScore'] = relevance; story['combinedScore'] = float(story.get('score') or 0) + relevance * 10; ranked.append(story)\ncontext['stories'] = ranked\ncontext['cocoindexRuntime'] = {'version': version('cocoindex'), 'machine': os.uname().machine, 'topicCount': len(trending)}\nreturn [{'json': context}]"
+      }
+    },
+    {
+      "id": "451d469d-b047-44a1-a3fc-436edcf5cb27",
+      "name": "Apply Recent Episode Duplicate Penalties",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const c=$input.first().json;const keys=new Set(c.recentStoryKeys||[]);const normUrl=v=>{try{const u=new URL(v);u.hash='';if(u.hostname==='news.ycombinator.com'&&u.pathname==='/item'){const id=u.searchParams.get('id');u.search=id?`?id=${encodeURIComponent(id)}`:'';}else u.search='';u.pathname=u.pathname.replace(/\\/$/,'')||'/';return `url:${u.protocol}//${u.host.toLowerCase()}${u.pathname}${u.search}`;}catch{return null;}};const storyKeys=s=>[normUrl(s.url),normUrl(s.hnUrl),`title:${String(s.title||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}`].filter(Boolean);const stories=c.stories.map(s=>{const matches=storyKeys(s).filter(k=>keys.has(k));return {...s,isRecentDuplicate:matches.length>0,duplicateMatches:matches,combinedScore:s.combinedScore-(matches.length?100000:0)};});return [{json:{...c,stories}}];"
+      }
+    },
+    {
+      "id": "accfcd29-9063-4e68-8229-291c6c5d0e24",
+      "name": "Prove and Sort CocoIndex Ranking",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2060,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const c=$input.first().json;const stories=[...c.stories].sort((a,b)=>b.combinedScore-a.combinedScore||b.score-a.score||String(a.id).localeCompare(String(b.id)));const proof={algorithm:'cocoindex-topic-index-v1',rankingMode:'topic-index',usedTopicIndex:true,topTrendingTopics:(c.trending_topics||[]).slice(0,10).map(t=>t.topic),recentStoryKeysLoaded:(c.recentStoryKeys||[]).length,cocoindexRuntime:c.cocoindexRuntime,candidateCount:stories.length};if(proof.cocoindexRuntime?.version!=='0.3.9'||proof.cocoindexRuntime?.machine!=='aarch64'||proof.topTrendingTopics.length===0)throw new Error('CocoIndex runtime/index proof failed');return [{json:{runMode:c.runMode,date:c.date,runId:c.runId,attempt:c.attempt,episode:c.episode,episodeSource:c.episodeSource,stories,rankingProof:proof}}];"
+      }
+    },
+    {
+      "id": "324774f4-724c-4e0c-bd11-e3606b31d77d",
+      "name": "Sticky Note 8b3eaeac",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -50,
+        -50
+      ],
+      "parameters": {
+        "content": "## Dedicated CocoIndex ranking service\nNative Postgres reads the persistent CocoIndex topic table and recent episode history. Small Python nodes on the ARM64 external runner build identities and score topic evidence. JavaScript applies the visible penalty/proof contract. No SSH, CT143 API, hidden file, or network call exists in Code nodes.",
+        "color": 5,
+        "width": 2360,
+        "height": 320
+      }
+    }
+  ],
+  "connections": {
+    "Manual CocoIndex Fixture Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Visible Ranking Fixture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Visible Ranking Fixture": {
+      "main": [
+        [
+          {
+            "node": "Validate CocoIndex Ranking Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate CocoIndex Ranking Request": {
+      "main": [
+        [
+          {
+            "node": "Merge Request with Index Evidence",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Postgres - Read CocoIndex Topics + Recent Episodes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Called by Intake Workflow": {
+      "main": [
+        [
+          {
+            "node": "Validate CocoIndex Ranking Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Request with Index Evidence": {
+      "main": [
+        [
+          {
+            "node": "Build Recent Story Identity Keys",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres - Read CocoIndex Topics + Recent Episodes": {
+      "main": [
+        [
+          {
+            "node": "Merge Request with Index Evidence",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Build Recent Story Identity Keys": {
+      "main": [
+        [
+          {
+            "node": "Score Against CocoIndex Topic Index",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Against CocoIndex Topic Index": {
+      "main": [
+        [
+          {
+            "node": "Apply Recent Episode Duplicate Penalties",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Recent Episode Duplicate Penalties": {
+      "main": [
+        [
+          {
+            "node": "Prove and Sort CocoIndex Ranking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "staticData": null,
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  },
+  "nodeGroups": [],
+  "pinData": null,
+  "versionId": "1998110f-c3fd-4691-9888-1e42d283ca64",
+  "activeVersionId": null,
+  "versionCounter": 1,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-08-09T07:34:11.152Z",
+      "createdAt": "2026-08-09T07:34:11.152Z",
+      "role": "workflow:owner",
+      "workflowId": "wMx9nanglSIMP3Ow",
+      "projectId": "lCrhNDMKPRo73k9G",
+      "project": {
+        "updatedAt": "2026-07-20T05:58:27.786Z",
+        "createdAt": "2026-07-20T05:55:30.873Z",
+        "id": "lCrhNDMKPRo73k9G",
+        "name": "Steve VanAllen <sva@me.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "b5bf16c6-703b-48d7-8ccf-cf30ba9ee0f9"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

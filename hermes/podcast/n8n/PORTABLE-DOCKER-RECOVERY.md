@@ -17,24 +17,27 @@ Import these exports in dependency order:
    Table if it was not restored with the n8n database.
 2. `wf-podcast-sub-script-validator-v1.json` — publish this trigger-only child;
    it has no self-firing trigger and must be published for nested calls.
-3. `wf-podcast-sub-intake-v1.json` — native Supabase and Hacker News intake.
-4. `wf-podcast-sub-authoring-v1.json` — native GLM-5.2 with three bounded
+3. `wf-podcast-sub-cocoindex-ranking-v1.json` — dedicated native Postgres plus
+   modular ARM64 CocoIndex ranking child.
+4. `wf-podcast-sub-intake-v1.json` — native Supabase and Hacker News intake;
+   calls the CocoIndex ranking child after domain deduplication.
+5. `wf-podcast-sub-authoring-v1.json` — native GLM-5.2 with three bounded
    attempts and calls to the validator child.
-5. `wf-podcast-sub-authoring-deepseek-v1.json` — optional pinned
+6. `wf-podcast-sub-authoring-deepseek-v1.json` — optional pinned
    DeepSeek-V4-Flash-0731 candidate with the identical prompt/retry/validator
    shape.
-6. `wf-podcast-authoring-ab-v1.json` — optional distribution-free A/B harness
+7. `wf-podcast-authoring-ab-v1.json` — optional distribution-free A/B harness
    calling both authoring children and recording objective comparison evidence.
-7. `wf-podcast-sub-media-v1.json` — six serialized Chatterbox calls, native
+8. `wf-podcast-sub-media-v1.json` — six serialized Chatterbox calls, native
    hash, visible assembly/QA routes, hard gate, and ledger.
-8. `wf-podcast-sub-transcription-v1.json` — direct Whisper, compact authored
+9. `wf-podcast-sub-transcription-v1.json` — direct Whisper, compact authored
    word alignment, native Convert to File, native hash, hard gate, and ledger.
-9. `wf-podcast-portable-staging-v1.json` — native Cloudinary upload, native
+10. `wf-podcast-portable-staging-v1.json` — native Cloudinary upload, native
    GitHub file operations, rollback-only Postgres shape test, Telegram test
    notification, and ledger.
-10. `wf-podcast-portable-shadow-v1.json` — thin 15-node parent calling the five
+11. `wf-podcast-portable-shadow-v1.json` — thin 15-node parent calling the five
    children above.
-11. `wf-error.json` — retain the existing error handler for eventual scheduled
+12. `wf-error.json` — retain the existing error handler for eventual scheduled
    production use.
 
 All podcast workflows import inactive. Publish only trigger-only children needed
@@ -52,7 +55,9 @@ evidence. They import MCP-disabled and must not be part of normal recovery:
 
 - Pin n8n to the version validated by the exports (2.30.7) for the first
   recovery. Upgrade only after the staging acceptance test passes.
-- Configure external Task Runners and restore the broker authentication token.
+- Build and start `runner-cocoindex/compose.yaml`; restore the broker token in
+  `/etc/n8n-runner-cocoindex.env`. The image is pinned for ARM64 and contains
+  CocoIndex 0.3.9 plus psycopg 3.2.9.
 - The validated runner used launcher 1.4.7, Node 24.16.0, JavaScript runner
   2.30.3, Python 3.13.7, and the n8n 2.30.7 runner configuration.
 - The runner needs no podcast repository, SSH key, ffmpeg, local artifact
@@ -79,7 +84,7 @@ into workflow JSON.
 | Name | n8n credential type | Used by |
 | --- | --- | --- |
 | `Supabase (podcast)` | `supabaseApi` | intake and eventual production rows |
-| `Supabase Postgres (podcast)` | `postgres` | staging transaction/rollback proof |
+| `Supabase Postgres (podcast)` | `postgres` | CocoIndex topic/recent reads and staging rollback proof |
 | `Cloudinary (podcast)` | `cloudinaryApi` | native upload/asset operations |
 | `GitHub Node (podcast)` | `githubApi` | native file create/get/delete |
 | `GitHub API (podcast)` | `httpHeaderAuth` | branch/ref and absence operations missing from the native node |
@@ -148,20 +153,18 @@ the SRT SHA-256 was
 ## Production cutover boundary
 
 Both portable parents are proven: the staging parent and the separate
-manual-production parent. The production parent is inactive, has only a Manual
-Trigger, and calls the same reusable intake, authoring, media, and transcription
-children before calling the production distribution child. The operator's
-one-time authorization was used to prove those production destinations on
-2026-08-08. It did not authorize a schedule or scheduler cutover.
+production parent. The production parent calls the same reusable intake,
+authoring, media, and transcription children before calling the production
+distribution child. The authorized cutover has now occurred: the production
+parent is active with one visible native Schedule Trigger at 06:00
+America/New_York plus its Manual Trigger; Hermes is paused and the pi4 `gtb`
+timers are inactive.
 
-A direct operator instruction to **cut over** is still required before:
-
-- adding, publishing, or activating a schedule trigger; or
-- changing Hermes/pi4/n8n scheduler ownership.
-
-At cutover: back up n8n and all scheduler states, re-read Hermes/pi4/n8n live
-ownership, activate exactly one producer, observe the first run through all
-delivery readbacks, and roll back scheduler ownership on any hard failure.
+During disaster recovery, import every workflow inactive and keep the schedule
+inactive until the restored graph passes the acceptance test. Before restoring
+the schedule, back up and re-read Hermes, pi4, and n8n scheduler ownership.
+Activate exactly one producer, observe its first full run and delivery
+readbacks, and roll back scheduler ownership on any hard failure.
 
 ## Approved duplicate cleanup recovery
 

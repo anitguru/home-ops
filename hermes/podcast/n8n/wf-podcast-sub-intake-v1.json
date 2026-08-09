@@ -1,7 +1,11 @@
 {
+  "updatedAt": "2026-08-09T07:36:13.199Z",
+  "createdAt": "2026-08-08T21:22:31.973Z",
   "id": "pIntakeSubX8Q3M7",
   "name": "WF-podcast-sub-intake-v1",
-  "active": false,
+  "description": null,
+  "active": true,
+  "isArchived": false,
   "nodes": [
     {
       "id": "manual",
@@ -209,38 +213,6 @@
       "notes": ""
     },
     {
-      "id": "topics",
-      "name": "Score Technology Topic Matches",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2160,
-        0
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "language": "javaScript",
-        "jsCode": "const context = $input.first().json;\nconst topics={ai:['ai','artificial intelligence','generative ai','machine learning'],openai:['openai'],llm:['llm','large language model','large language models'],model:['model','models'],linux:['linux'],security:['security','cybersecurity','infosec'],database:['database','databases'],postgres:['postgres','postgresql'],supabase:['supabase'],cloud:['cloud'],developer:['developer','developers'],programming:['programming'],python:['python'],javascript:['javascript','nodejs'],hardware:['hardware'],chip:['chip','chips','semiconductor','semiconductors'],robot:['robot','robots','robotic','robotics'],network:['network','networks','networking'],privacy:['privacy'],browser:['browser','browsers'],github:['github']};\nconst stories=context.stories.map(story=>{\n  const haystack=`${story.title} ${story.url}`.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();\n  const padded=` ${haystack} `;\n  const matchedTopics=Object.entries(topics).filter(([,aliases])=>aliases.some(alias=>padded.includes(` ${alias} `))).map(([topic])=>topic);\n  return {...story,matchedTopics,rankScore:story.score + matchedTopics.length*120};\n});\nreturn [{json:{...context,stories}}];"
-      },
-      "notes": "Token/phrase-aware scoring transform. Exact boundaries prevent false positives such as ai in Fastmail; weights and aliases are visible and versioned."
-    },
-    {
-      "id": "sort",
-      "name": "Sort Ranked Candidates",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2400,
-        0
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "language": "javaScript",
-        "jsCode": "const context=$input.first().json;\nconst stories=[...context.stories].sort((a,b)=>b.rankScore-a.rankScore || b.score-a.score || a.id.localeCompare(b.id));\nreturn [{json:{...context,stories}}];"
-      },
-      "notes": ""
-    },
-    {
       "id": "select",
       "name": "Select Four Stories",
       "type": "n8n-nodes-base.code",
@@ -252,7 +224,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const context=$input.first().json;\nconst selectedStories=context.stories.slice(0,4).map(({rankScore,domain,...story},index)=>({...story,rank:index+1,domain,rankScore}));\nif (selectedStories.length !== 4 || new Set(selectedStories.map(s=>s.domain)).size !== 4) throw new Error('four-story selection proof failed');\nreturn [{json:{runMode:context.runMode,date:context.date,runId:context.runId,attempt:context.attempt,episode:context.episode,episodeSource:context.episodeSource,selectedStories,candidateCount:context.stories.length,rankingProof:{algorithm:'visible-token-topic-score-v2',domainDiverse:true,selectedCount:4}}}];"
+        "jsCode": "const context=$input.first().json;\nif(context.rankingProof?.rankingMode!=='topic-index'||context.rankingProof?.usedTopicIndex!==true) throw new Error('CocoIndex topic proof missing');\nconst nonDuplicates=context.stories.filter(s=>!s.isRecentDuplicate);\nconst pool=nonDuplicates.length>=4?nonDuplicates:context.stories;\nconst selectedStories=pool.slice(0,4).map((story,index)=>({\n  id:story.id,title:story.title,url:story.url,hnUrl:story.hnUrl,score:story.score,createdAt:story.createdAt,domain:story.domain,\n  rank:index+1,rankScore:story.combinedScore,matchedTopics:story.matchedTopics||[],isRecentDuplicate:Boolean(story.isRecentDuplicate),\n  cocoindexReason:[`matched trending topics: ${(story.matchedTopics||[]).join(', ')||'none'}`,`HN score: ${story.score}`,story.isRecentDuplicate?'recently covered duplicate':'not recently covered']\n}));\nif(selectedStories.length!==4||new Set(selectedStories.map(s=>s.domain)).size!==4) throw new Error('four-story selection proof failed');\nif(nonDuplicates.length>=4&&selectedStories.some(s=>s.isRecentDuplicate)) throw new Error('recent duplicate selected despite sufficient alternatives');\nreturn [{json:{runMode:context.runMode,date:context.date,runId:context.runId,attempt:context.attempt,episode:context.episode,episodeSource:context.episodeSource,selectedStories,candidateCount:context.stories.length,rankingProof:{...context.rankingProof,domainDiverse:true,selectedCount:4,nonDuplicateCandidateCount:nonDuplicates.length}}}];"
       },
       "notes": ""
     },
@@ -270,7 +242,8 @@
         "operation": "insert",
         "dataTableId": {
           "mode": "name",
-          "value": "podcast_run_ledger"
+          "value": "podcast_run_ledger",
+          "__rl": true
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -312,6 +285,109 @@
         "jsCode": "return [{json:$('Select Four Stories').first().json}];"
       },
       "notes": "The last node returns the stable contract to the parent workflow."
+    },
+    {
+      "id": "93ac6d42-b02e-42a7-99fb-f7df91f1ecb9",
+      "name": "Run CocoIndex Ranking Sub-workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2160,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "wMx9nanglSIMP3Ow",
+          "mode": "list",
+          "cachedResultName": "WF-podcast-sub-cocoindex-ranking-v1"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "runMode": "={{ $json.runMode }}",
+            "date": "={{ $json.date }}",
+            "runId": "={{ $json.runId }}",
+            "attempt": "={{ $json.attempt }}",
+            "episode": "={{ $json.episode }}",
+            "episodeSource": "={{ $json.episodeSource }}",
+            "stories": "={{ $json.stories }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "runMode",
+              "displayName": "runMode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "runId",
+              "displayName": "runId",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "attempt",
+              "displayName": "attempt",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "episode",
+              "displayName": "episode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "episodeSource",
+              "displayName": "episodeSource",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "stories",
+              "displayName": "stories",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "array"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
     }
   ],
   "connections": {
@@ -430,39 +506,6 @@
         ]
       ]
     },
-    "Deduplicate Story Domains": {
-      "main": [
-        [
-          {
-            "node": "Score Technology Topic Matches",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Score Technology Topic Matches": {
-      "main": [
-        [
-          {
-            "node": "Sort Ranked Candidates",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Sort Ranked Candidates": {
-      "main": [
-        [
-          {
-            "node": "Select Four Stories",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Select Four Stories": {
       "main": [
         [
@@ -484,15 +527,70 @@
           }
         ]
       ]
+    },
+    "Deduplicate Story Domains": {
+      "main": [
+        [
+          {
+            "node": "Run CocoIndex Ranking Sub-workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run CocoIndex Ranking Sub-workflow": {
+      "main": [
+        [
+          {
+            "node": "Select Four Stories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": true
   },
+  "staticData": null,
   "meta": {
-    "templateCredsSetupCompleted": true
+    "templateCredsSetupCompleted": true,
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
   },
+  "nodeGroups": [],
   "pinData": {},
-  "tags": []
+  "versionId": "11c09f9a-4703-4ef2-abe0-aeff876d5503",
+  "activeVersionId": "008bb781-baa2-454e-b3b7-21b902beb89e",
+  "versionCounter": 9,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-08-08T21:22:31.975Z",
+      "createdAt": "2026-08-08T21:22:31.975Z",
+      "role": "workflow:owner",
+      "workflowId": "pIntakeSubX8Q3M7",
+      "projectId": "lCrhNDMKPRo73k9G",
+      "project": {
+        "updatedAt": "2026-07-20T05:58:27.786Z",
+        "createdAt": "2026-07-20T05:55:30.873Z",
+        "id": "lCrhNDMKPRo73k9G",
+        "name": "Steve VanAllen <sva@me.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "b5bf16c6-703b-48d7-8ccf-cf30ba9ee0f9"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
 }

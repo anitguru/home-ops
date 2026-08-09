@@ -1,0 +1,15 @@
+services:
+  task-runners:
+    build:
+      context: .
+    image: local/n8n-runners-cocoindex:2.30.7-cocoindex0.3.9
+    container_name: n8n-runners-cocoindex
+    restart: unless-stopped
+    env_file:
+      - /etc/n8n-runner-cocoindex.env
+    volumes:
+      - ./n8n-task-runners.json:/etc/n8n-task-runners.json:ro
+    environment:
+      N8N_RUNNERS_AUTO_SHUTDOWN_TIMEOUT: "0"
+      N8N_RUNNERS_LAUNCHER_LOG_LEVEL: info
+      N8N_RUNNERS_TASK_TIMEOUT: "900"

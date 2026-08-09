@@ -32,22 +32,24 @@ native Schedule Trigger at 06:00 America/New_York plus its Manual Trigger. The
 called children are published so n8n can invoke them, but none contains a
 Schedule Trigger. `WF-error` is attached to scheduled production failures.
 
-## Ranking fidelity boundary
+## CocoIndex ranking boundary
 
-The portable production graph does not run CocoIndex. Historical fixture fields
-named `cocoindexReason` are provenance residue, not evidence of a live semantic
-ranker. Production intake currently uses the visible
-`visible-token-topic-score-v2` pipeline: native Hacker News fetch of 50 front
-page items, URL/title normalization, domain deduplication, exact token/phrase
-technology aliases, HN-score weighting, deterministic sort, and selection of
-four domains. Exact boundaries prevent errors such as matching `ai` inside
-`Fastmail`.
+Production intake fetches 50 front-page items with the native Hacker News node,
+normalizes them, and removes duplicate domains before visibly calling
+`WF-podcast-sub-cocoindex-ranking-v1`. The dedicated child uses a native
+Postgres node to read the persistent CocoIndex topic table and the last 45
+episode story arrays. Small Python Code nodes on the versioned ARM64 runner
+build stable story identities and score exact-boundary topic matches; separate
+JavaScript nodes apply the recent-coverage penalty, sort, and emit a hard proof.
+The child has no SSH node, CT143 API, file-based handoff, or Code-node network
+call.
 
-This is transparent and portable, but it is still lexically shallower than
-CocoIndex/embedding similarity and does not yet restore semantic novelty or
-recent-coverage ranking. Do not describe token scoring as equivalent fidelity.
-Execution 139 proved 50 fetched items, 46 domain-diverse candidates, and zero
-false `ai` matches.
+Execution 147 proved the child independently against 50 live topic rows and
+537 recent story identity keys. Intake execution 148 then fetched 50 live HN
+items, retained 45 domain-diverse candidates, called child execution 149, and
+returned four non-duplicate stories with `cocoindex 0.3.9` / `aarch64` runtime
+evidence. Exact topic boundaries still prevent errors such as matching `ai`
+inside `Fastmail`.
 
 ## Authoring model A/B surface
 
@@ -88,8 +90,9 @@ pre-cloned repository, or SSH target.
 ## Runtime boundaries
 
 - n8n owns orchestration, branching, retry, iteration, validation, and state.
-- CT143 is only an external n8n JavaScript/Python Task Runner. Workflows must
-  contain no CT143 HTTP URL and no SSH node.
+- CT143 is temporarily an external n8n JavaScript-only Task Runner. pi1 is the
+  versioned ARM64 JavaScript/Python runner and the sole Python task provider.
+  Workflows contain no CT143/pi1 HTTP URL and no SSH node.
 - Stable service APIs are called directly from visible nodes: CT137/RGB voice,
   Ollama, CT131 Whisper, Cloudinary, GitHub, Postgres, and Telegram.
 - Prefer the built-in service node whenever it supports the required action.
@@ -110,7 +113,7 @@ pre-cloned repository, or SSH target.
 | Concern | Visible n8n shape |
 | --- | --- |
 | Episode/date safety | Config -> mode guard -> Postgres episode lookup |
-| Story ranking | Native HN top 50 -> normalize -> domain dedupe -> exact token/phrase score -> deterministic sort -> select four -> proof gate |
+| Story ranking | Native HN top 50 -> normalize -> domain dedupe -> Execute CocoIndex child -> native Postgres index/recent reads -> modular ARM64 scoring/penalty/proof -> select four |
 | Authoring | Prepare prompt -> native Ollama model -> reusable validator -> IF retry, capped at three; separate GLM/DeepSeek A/B harness |
 | Voice | Split six paragraphs -> Loop Over Items -> CT137 HTTP -> IF failure -> RGB HTTP -> segment hash/probe -> aggregate |
 | Audio | Direct voice-service render -> direct voice-service assembly/normalization -> objective QA -> hard IF gate |
