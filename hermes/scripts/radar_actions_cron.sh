@@ -48,7 +48,7 @@ export RADAR_USE_LLM="${RADAR_USE_LLM:-1}"
 export RADAR_TRIAGE_LLM="${RADAR_TRIAGE_LLM:-1}"
 # Local Ollama Qwen for triage + draft (override with RADAR_LLM_PROVIDER/RADAR_LLM_MODEL)
 export RADAR_LLM_PROVIDER="${RADAR_LLM_PROVIDER:-ollama-local}"
-export RADAR_LLM_MODEL="${RADAR_LLM_MODEL:-qwen3.5:122b}"
+export RADAR_LLM_MODEL="${RADAR_LLM_MODEL:-qwen3.6:35b-a3b}"
 
 "$PYTHON" scripts/radar.py
 
