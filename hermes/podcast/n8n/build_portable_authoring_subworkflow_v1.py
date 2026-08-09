@@ -112,7 +112,7 @@ return [{json:{...r,episodeSpoken,dayName}}];""",
             960,
             -160,
             r"""const r=$input.first().json;
-const rules=`Write a 60-90 second spoken script. Hard acceptance range: 330-400 words; target 365-390. Use a rambling, self-interrupting blue-collar everyman voice enthusiastic about AI, with at most one exact chuckle: Heh. Hhh, okay, that's something. No stage directions.\n\nExactly 6 paragraphs separated by blank lines:\n1. Good morning, it's ${r.dayName}. This is Guru's Tech Bytes, episode ${r.episodeSpoken}. Never put digits in the greeting.\n2. Lead with First up...\n3. Lead with Second...\n4. Lead with Third...\n5. Lead with And finally...\n6. Exactly: That's your daily byte. Have a great day. Until next time.\n\nOutput only script text.`;
+const rules=`Write a 60-90 second spoken script. Hard acceptance range: 330-400 words; target 365-390. Use a rambling, self-interrupting blue-collar everyman voice enthusiastic about AI, with at most one exact chuckle: Heh. Hhh, okay, that's something. No stage directions.\n\nNARRATION-ONLY CONTRACT: Rules, labels, prompt text, validation feedback, and commentary about these instructions must never appear in the script.\n\nExactly 6 paragraphs separated by blank lines:\n1. Begin with this exact spoken sentence (without quotation marks): \"Good morning, it's ${r.dayName}. This is Guru's Tech Bytes, episode ${r.episodeSpoken}.\" Continue naturally with the opening hook. Spell every number in this paragraph as words.\n2. Begin with the words \"First up\".\n3. Begin with the word \"Second\".\n4. Begin with the word \"Third\".\n5. Begin with the words \"And finally\".\n6. Use only this exact closing: \"That's your daily byte. Have a great day. Until next time.\"\n\nReturn only the six narration paragraphs.`;
 const stories=r.selectedStories.map((s,i)=>`${i+1}. ${s.title} (${Number(s.score||0)} upvotes)`).join('\n');
 return [{json:{...r,authorPrompt:`${rules}\n\nThe four stories, in order:\n${stories}`,authoringAttempt:1,scriptProvider:'ollama',scriptModel:'glm-5.2'}}];""",
         ),
@@ -192,6 +192,9 @@ def validate(workflow: dict) -> None:
             raise ValueError(f"authoring workflow contains forbidden value: {forbidden}")
     if len([n for n in workflow["nodes"] if n["type"] == "n8n-nodes-base.executeWorkflow"]) != 3:
         raise ValueError("all three attempts must call the reusable validator")
+    prompt = next(n for n in workflow["nodes"] if n["id"] == "prompt")["parameters"]["jsCode"]
+    if "Never put digits in the greeting" in prompt or "NARRATION-ONLY CONTRACT" not in prompt:
+        raise ValueError("authoring prompt must separate narration from meta-instructions")
     for item in workflow["nodes"]:
         if item["type"] == "n8n-nodes-base.code":
             lines = [line for line in item["parameters"]["jsCode"].splitlines() if line.strip()]

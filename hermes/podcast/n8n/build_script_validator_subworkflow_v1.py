@@ -37,6 +37,7 @@ def build() -> dict:
             "runId": "validator-fixture/run37",
             "episode": fixture["episode"],
             "episodeSpoken": "one hundred twenty five",
+            "dayName": "Saturday",
             "selectedStories": fixture["selectedStories"],
             "authorPrompt": "fixture validator prompt",
         },
@@ -95,12 +96,20 @@ return [{json:{...r,text,paragraphs,wordCount:words,authoringTrimmed}}];""",
 if(p.length!==6) errors.push(`expected 6 paragraphs, got ${p.length}`);
 if(r.wordCount<330||r.wordCount>400) errors.push(`word count ${r.wordCount} outside 330-400`);
 const chuckle="Heh. Hhh, okay, that's something.";if(r.text.split(chuckle).length-1>1) errors.push('chuckle used more than once');
-if(p[0]&&!p[0].toLowerCase().startsWith('good morning')) errors.push('paragraph 1 is not the greeting');
-if(p[0]&&!p[0].toLowerCase().includes(`episode ${r.context.episodeSpoken}.`)) errors.push(`greeting must spell episode ${r.context.episodeSpoken}`);
+const expectedGreeting=`Good morning, it's ${r.context.dayName}. This is Guru's Tech Bytes, episode ${r.context.episodeSpoken}.`;
+if(p[0]&&!p[0].startsWith(expectedGreeting)) errors.push(`paragraph 1 must begin with the exact required greeting`);
 if(p[0]&&/\d/.test(p[0])) errors.push('paragraph 1 contains digits');
+const leakPatterns=[
+ ['never put digits',/never put digits/i],['output only',/output only/i],['return only the six narration paragraphs',/return only the six narration paragraphs/i],
+ ['lead with',/lead with (?:first up|second|third|and finally)/i],['paragraph specification',/exactly (?:6|six) paragraphs/i],
+ ['word-count instruction',/hard acceptance range|target 365(?:-|–)390/i],['validation feedback',/previous draft failed validation|validation errors/i],
+ ['rewrite instruction',/rewrite the entire six-paragraph script/i],['narration-only contract',/narration-only contract/i]
+];
+const promptLeakagePhrases=leakPatterns.filter(([,pattern])=>pattern.test(r.text)).map(([label])=>label);
+if(promptLeakagePhrases.length) errors.push(`prompt/meta instruction leaked: ${promptLeakagePhrases.join(', ')}`);
 ['first up','second','third','and finally'].forEach((lead,i)=>{if(p[i+1]&&!p[i+1].toLowerCase().startsWith(lead)) errors.push(`paragraph ${i+2} must start with ${lead}`);});
 if(p.at(-1)&&p.at(-1)!=="That's your daily byte. Have a great day. Until next time.") errors.push('paragraph 6 is not the exact closing');
-return [{json:{...r,validationErrors:errors,authoringValid:errors.length===0}}];""",
+return [{json:{...r,promptLeakageDetected:promptLeakagePhrases.length>0,promptLeakagePhrases,validationErrors:errors,authoringValid:errors.length===0}}];""",
         ),
         code(
             "contract",
@@ -110,7 +119,7 @@ return [{json:{...r,validationErrors:errors,authoringValid:errors.length===0}}];
             r"""const r=$input.first().json;const context=r.context;
 const originalAuthorPrompt=context.originalAuthorPrompt||context.authorPrompt;
 const correctionPrompt=r.authoringValid?context.authorPrompt:[originalAuthorPrompt,'',`Previous draft failed validation on attempt ${r.attempt}.`,'Validation errors:','- '+r.validationErrors.join('\n- '),'','Previous draft:','---',r.text,'---','',`Return 365-390 words; the previous draft had ${r.wordCount}. Rewrite the entire six-paragraph script and fix every error. Output only the corrected script.`].join('\n');
-return [{json:{...context,originalAuthorPrompt,authorPrompt:correctionPrompt,priorDraft:r.text,scriptText:r.authoringValid?r.text:null,rawWordCount:r.rawWordCount,wordCount:r.wordCount,authoringTrimmed:r.authoringTrimmed,paragraphCount:r.paragraphs.length,authoringAttempt:r.attempt,authoringValid:r.authoringValid,authoringValidated:r.authoringValid,validationErrors:r.validationErrors,failureMessage:r.authoringValid?'':`SCRIPT VALIDATION FAIL after attempt ${r.attempt}: ${r.validationErrors.join('; ')}`,scriptProvider:context.scriptProvider||'ollama',scriptModel:context.scriptModel||'glm-5.2'}}];""",
+return [{json:{...context,originalAuthorPrompt,authorPrompt:correctionPrompt,priorDraft:r.text,scriptText:r.authoringValid?r.text:null,rawWordCount:r.rawWordCount,wordCount:r.wordCount,authoringTrimmed:r.authoringTrimmed,paragraphCount:r.paragraphs.length,authoringAttempt:r.attempt,authoringValid:r.authoringValid,authoringValidated:r.authoringValid,promptLeakageDetected:r.promptLeakageDetected,promptLeakagePhrases:r.promptLeakagePhrases,validationErrors:r.validationErrors,failureMessage:r.authoringValid?'':`SCRIPT VALIDATION FAIL after attempt ${r.attempt}: ${r.validationErrors.join('; ')}`,scriptProvider:context.scriptProvider||'ollama',scriptModel:context.scriptModel||'glm-5.2'}}];""",
             "Stable result contract used identically by all three bounded authoring attempts.",
         ),
     ]
@@ -133,6 +142,9 @@ def validate(workflow: dict) -> None:
     for forbidden in ("10.0.70.202", ":8787", "podcast-worker", "ssh", "httprequest"):
         if forbidden in raw:
             raise ValueError(f"validator contains forbidden value: {forbidden}")
+    structure = next(n for n in workflow["nodes"] if n["id"] == "structure")["parameters"]["jsCode"]
+    if "prompt/meta instruction leaked" not in structure or "promptLeakageDetected" not in structure:
+        raise ValueError("validator must hard-fail prompt leakage")
     for item in workflow["nodes"]:
         if item["type"] == "n8n-nodes-base.code":
             lines = [line for line in item["parameters"]["jsCode"].splitlines() if line.strip()]

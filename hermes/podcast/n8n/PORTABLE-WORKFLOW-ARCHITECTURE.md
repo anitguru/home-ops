@@ -62,7 +62,15 @@ Data Table, and has no TTS or distribution nodes.
 
 Frozen-fixture execution 131 passed: GLM validated on attempt 3 at 388 words;
 DeepSeek validated on attempt 2 at 381 words; both returned six paragraphs.
-Human style preference remains pending, so production still selects GLM.
+The operator preferred GLM's opening style, so production still selects GLM.
+
+The shared prompt now isolates the exact spoken greeting from all
+meta-instructions, and the reusable validator hard-fails known prompt,
+formatting, or corrective-feedback fragments in narration. Negative regression
+execution 152 rejected the injected sentence `Never put digits in the greeting`
+with explicit leakage proof. Fresh A/B execution 154 then passed: GLM on
+attempt 1 at 387 words and DeepSeek on attempt 2 at 390 words, both with six
+paragraphs, empty validation errors, and `promptLeakageDetected=false`.
 
 CT143 is **only** the external n8n Task Runner. The implemented portable graph
 contains no SSH nodes, CT143 URL, or `podcast-worker` dependency. Voice and

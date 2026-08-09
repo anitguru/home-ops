@@ -304,7 +304,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const rows=$input.all().map(i=>i.json);const by=Object.fromEntries(rows.map(r=>[r.candidate,r.result]));\nconst glm=by['glm-5.2'],deepseek=by['deepseek-v4-flash:0731-cloud'];if(!glm||!deepseek)throw new Error('both A/B candidates are required');\nconst summary=r=>({model:r.scriptModel,validated:r.authoringValidated,attempt:r.authoringAttempt,wordCount:r.wordCount,paragraphCount:r.paragraphCount,scriptSha256:r.script_sha256,scriptText:r.scriptText});\nreturn [{json:{runId:glm.runId,date:glm.date,episode:glm.episode,selectedStories:glm.selectedStories,glm:summary(glm),deepseek:summary(deepseek),objectiveComplete:true,humanPreference:'pending'}}];"
+        "jsCode": "const rows=$input.all().map(i=>i.json);const by=Object.fromEntries(rows.map(r=>[r.candidate,r.result]));\nconst glm=by['glm-5.2'],deepseek=by['deepseek-v4-flash:0731-cloud'];if(!glm||!deepseek)throw new Error('both A/B candidates are required');\nconst summary=r=>({model:r.scriptModel,validated:r.authoringValidated,attempt:r.authoringAttempt,wordCount:r.wordCount,paragraphCount:r.paragraphCount,promptLeakageDetected:r.promptLeakageDetected===true,promptLeakagePhrases:r.promptLeakagePhrases||[],validationErrors:r.validationErrors||[],scriptSha256:r.script_sha256,scriptText:r.scriptText});\nreturn [{json:{runId:glm.runId,date:glm.date,episode:glm.episode,selectedStories:glm.selectedStories,glm:summary(glm),deepseek:summary(deepseek),objectiveComplete:true,humanPreference:'pending'}}];"
       },
       "notes": ""
     },

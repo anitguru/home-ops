@@ -134,6 +134,8 @@ cleanup evidence. Treat this table as operational history, not secret storage.
    published with no schedule/webhook trigger.
 4. Run the parent manually outside 05:25–06:25 America/New_York.
 5. Require terminal success for parent plus all five child executions.
+   Authoring acceptance also requires `promptLeakageDetected=false`, an empty
+   `promptLeakagePhrases` array, and no validation errors.
 6. Read back the final contract: one Cloudinary staging URL, one GitHub
    `podcast-shadow/` branch/file, database rollback true, Telegram message ID,
    audio/SRT hashes, objective audio QA, WER/anchor/layout QA, and ledger rows.
