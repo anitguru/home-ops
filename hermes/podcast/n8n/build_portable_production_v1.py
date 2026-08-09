@@ -134,7 +134,7 @@ const markdown=`---\ntitle: ${JSON.stringify(title)}\nepisode: ${c.episode}\ndat
         node(
             "github_get", "GitHub - Read Production Episode from Main", "n8n-nodes-base.github", 4560,
             {"resource": "file", "operation": "get", "owner": {"mode": "name", "value": "anitguru"}, "repository": {"mode": "name", "value": "anit.guru"}, "filePath": "={{ $('Generate Production Episode Markdown').first().json.path }}", "asBinaryProperty": False, "additionalParameters": {"reference": "main"}},
-            typeVersion=1.1, credentials=GITHUB_NATIVE_CREDENTIAL,
+            typeVersion=1.1, credentials=GITHUB_NATIVE_CREDENTIAL, retryOnFail=True, maxTries=4, waitBetweenTries=2000,
         ),
         code_node(
             "validate_github", "Validate Production GitHub Readback", 4800,

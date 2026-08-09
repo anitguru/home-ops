@@ -53,8 +53,8 @@ inside `Fastmail`.
 
 ## Authoring model A/B surface
 
-GLM-5.2 remains the production authoring child. The optional
-`WF-podcast-sub-authoring-deepseek-v1` pins
+The production parent now selects
+`WF-podcast-sub-authoring-deepseek-v1`, which pins
 `deepseek-v4-flash:0731-cloud` in the same three-attempt native Ollama/validator
 shape. `WF-podcast-authoring-ab-v1` visibly calls both candidates with identical
 stories and prompt, merges their contracts, records objective evidence in the
@@ -62,7 +62,8 @@ Data Table, and has no TTS or distribution nodes.
 
 Frozen-fixture execution 131 passed: GLM validated on attempt 3 at 388 words;
 DeepSeek validated on attempt 2 at 381 words; both returned six paragraphs.
-The operator preferred GLM's opening style, so production still selects GLM.
+GLM remains the quality/control candidate while DeepSeek is the lower-cost
+production candidate.
 
 The shared prompt now isolates the exact spoken greeting from all
 meta-instructions, and the reusable validator hard-fails known prompt,
@@ -82,6 +83,22 @@ validator executions 168–173; every execution version matched its active
 version. GLM passed at 380 words and DeepSeek at 397 words, both with empty
 validation errors and no leakage. Future workflow updates require this active
 version equality plus an integrated published-version test.
+
+Production retest execution 218 exposed a DeepSeek corrective-loop weakness:
+the retry prompt embedded the entire oversized prior draft, so two later runs
+reproduced or truncated it. The published DeepSeek child now gives explicit
+per-paragraph word budgets and builds retries from the original prompt plus
+validation errors only. Published authoring execution 221 then passed on its
+first attempt at 387 words, six paragraphs, and no leakage. Media execution 223
+and transcription execution 224 passed at 130.344 seconds, -17.11 LUFS,
+-1.68 dBTP, zero clipping, WER 0.134146, and 0.9 exact-anchor ratio.
+
+Distribution execution 225 created the Cloudinary asset and GitHub commit but
+hit GitHub's brief post-commit 404 on immediate native readback. n8n's visible
+saved-input retry execution 227 resumed at the failed node and completed
+GitHub verification, Supabase persistence, three Telegram deliveries, and the
+final ledger. The production GitHub readback node is now published with a
+bounded four-attempt, two-second retry to absorb this consistency window.
 
 The same audit found that scheduled intake execution 161 had used its older
 published lexical scorer: the CocoIndex child existed only as an unpublished

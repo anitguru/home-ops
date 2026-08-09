@@ -477,7 +477,10 @@
           "id": "pGithubNodeX8Q3M7Z",
           "name": "GitHub Node (podcast)"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 2000
     },
     {
       "id": "validate_github",

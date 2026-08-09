@@ -190,9 +190,9 @@
         "source": "database",
         "workflowId": {
           "__rl": true,
-          "value": "pAuthorSubX8Q3M7",
+          "value": "pAuthorDSX8Q3M7",
           "mode": "list",
-          "cachedResultName": "WF-podcast-sub-authoring-v1"
+          "cachedResultName": "WF-podcast-sub-authoring-deepseek-v1"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
@@ -269,7 +269,7 @@
           "waitForSubWorkflow": true
         }
       },
-      "notes": "Calls native GLM-5.2 authoring with bounded retries and the reusable script-validator workflow."
+      "notes": "Production authoring lane: published DeepSeek V4 Flash 0731 child with strict validation and three bounded corrective attempts."
     },
     {
       "id": "validate_authoring",

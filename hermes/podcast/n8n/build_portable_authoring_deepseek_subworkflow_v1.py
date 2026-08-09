@@ -31,6 +31,13 @@ def build() -> dict:
     workflow["id"] = WORKFLOW_ID
     workflow["name"] = WORKFLOW_NAME
     for node in workflow["nodes"]:
+        if node["id"] == "prompt":
+            node["parameters"]["jsCode"] = node["parameters"]["jsCode"].replace(
+                "Exactly 6 paragraphs separated by blank lines:",
+                "STRICT PER-PARAGRAPH WORD BUDGETS: paragraph 1 must be 70-80 words; paragraphs 2 through 5 must each be 63-70 words; paragraph 6 is the exact 11-word closing. Do not exceed a paragraph budget.\\n\\nExactly 6 paragraphs separated by blank lines:",
+            )
+        if node["id"] in {"chain2", "chain3"}:
+            node["parameters"]["text"] = "={{ $json.originalAuthorPrompt + '\\n\\nCORRECTION REQUIRED: ' + $json.validationErrors.join('; ') + '\\nDiscard the previous draft completely. Start over, obey every paragraph word budget, include all six paragraphs, and stop immediately after the exact closing. Output narration only.' }}"
         if node["type"] == "@n8n/n8n-nodes-langchain.lmChatOllama":
             node["parameters"]["model"] = MODEL
         if node["id"] == "ledger":
@@ -48,6 +55,12 @@ def validate(workflow: dict) -> None:
     models = [n for n in workflow["nodes"] if n["type"] == "@n8n/n8n-nodes-langchain.lmChatOllama"]
     if len(models) != 3 or any(n["parameters"].get("model") != MODEL for n in models):
         raise ValueError("all three DeepSeek attempts must use the pinned 0731 cloud tag")
+    prompt = next(n for n in workflow["nodes"] if n["id"] == "prompt")["parameters"]["jsCode"]
+    if "STRICT PER-PARAGRAPH WORD BUDGETS" not in prompt:
+        raise ValueError("DeepSeek strict paragraph budgets are missing")
+    retries = [n for n in workflow["nodes"] if n["id"] in {"chain2", "chain3"}]
+    if any("Discard the previous draft completely" not in n["parameters"]["text"] for n in retries):
+        raise ValueError("DeepSeek clean-slate corrective retries are missing")
 
 
 if __name__ == "__main__":

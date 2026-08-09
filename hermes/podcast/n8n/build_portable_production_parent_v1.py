@@ -79,6 +79,10 @@ if(!/^portable-production\/\d{4}-\d{2}-\d{2}\/[A-Za-z0-9_-]+$/.test(c.runId))fai
     ledger["run_mode"] = "production"
     ledger["stage"] = "production-parent-start"
 
+    author = by_id["call_authoring"]
+    author["parameters"]["workflowId"] = {"__rl": True, "value": "pAuthorDSX8Q3M7", "mode": "list", "cachedResultName": "WF-podcast-sub-authoring-deepseek-v1"}
+    author["notes"] = "Production authoring lane: published DeepSeek V4 Flash 0731 child with strict validation and three bounded corrective attempts."
+
     call = by_id["call_distribution"]
     call["parameters"]["workflowId"] = {"__rl": True, "value": "pPortableProdX8Q3M7", "mode": "list", "cachedResultName": "WF-podcast-portable-production-v1"}
     values = call["parameters"]["workflowInputs"]["value"]
@@ -113,6 +117,9 @@ def validate(workflow: dict) -> None:
         raise ValueError("production parent must contain one enabled schedule trigger")
     if len([n for n in workflow["nodes"] if n["type"] == "n8n-nodes-base.executeWorkflow"]) != 5:
         raise ValueError("production parent must retain five visible sub-workflow calls")
+    author = next(n for n in workflow["nodes"] if n["id"] == "call_authoring")
+    if author["parameters"]["workflowId"].get("value") != "pAuthorDSX8Q3M7":
+        raise ValueError("production parent must call the selected DeepSeek authoring child")
 
 
 if __name__ == "__main__":
