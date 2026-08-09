@@ -1,6 +1,6 @@
 # Portable n8n podcast architecture
 
-Updated: 2026-08-08 (America/New_York)
+Updated: 2026-08-09 (America/New_York)
 
 ## Authoritative implemented graph
 
@@ -31,6 +31,36 @@ After explicit cutover authorization, the parent is active with one visible
 native Schedule Trigger at 06:00 America/New_York plus its Manual Trigger. The
 called children are published so n8n can invoke them, but none contains a
 Schedule Trigger. `WF-error` is attached to scheduled production failures.
+
+## Ranking fidelity boundary
+
+The portable production graph does not run CocoIndex. Historical fixture fields
+named `cocoindexReason` are provenance residue, not evidence of a live semantic
+ranker. Production intake currently uses the visible
+`visible-token-topic-score-v2` pipeline: native Hacker News fetch of 50 front
+page items, URL/title normalization, domain deduplication, exact token/phrase
+technology aliases, HN-score weighting, deterministic sort, and selection of
+four domains. Exact boundaries prevent errors such as matching `ai` inside
+`Fastmail`.
+
+This is transparent and portable, but it is still lexically shallower than
+CocoIndex/embedding similarity and does not yet restore semantic novelty or
+recent-coverage ranking. Do not describe token scoring as equivalent fidelity.
+Execution 139 proved 50 fetched items, 46 domain-diverse candidates, and zero
+false `ai` matches.
+
+## Authoring model A/B surface
+
+GLM-5.2 remains the production authoring child. The optional
+`WF-podcast-sub-authoring-deepseek-v1` pins
+`deepseek-v4-flash:0731-cloud` in the same three-attempt native Ollama/validator
+shape. `WF-podcast-authoring-ab-v1` visibly calls both candidates with identical
+stories and prompt, merges their contracts, records objective evidence in the
+Data Table, and has no TTS or distribution nodes.
+
+Frozen-fixture execution 131 passed: GLM validated on attempt 3 at 388 words;
+DeepSeek validated on attempt 2 at 381 words; both returned six paragraphs.
+Human style preference remains pending, so production still selects GLM.
 
 CT143 is **only** the external n8n Task Runner. The implemented portable graph
 contains no SSH nodes, CT143 URL, or `podcast-worker` dependency. Voice and
@@ -80,8 +110,8 @@ pre-cloned repository, or SSH target.
 | Concern | Visible n8n shape |
 | --- | --- |
 | Episode/date safety | Config -> mode guard -> Postgres episode lookup |
-| Story ranking | Postgres topic snapshot -> Postgres recent stories -> Code normalize identities -> Code score -> Code select four -> proof gate |
-| Authoring | Prepare prompt -> LLM attempt -> validate -> IF retry, capped at three |
+| Story ranking | Native HN top 50 -> normalize -> domain dedupe -> exact token/phrase score -> deterministic sort -> select four -> proof gate |
+| Authoring | Prepare prompt -> native Ollama model -> reusable validator -> IF retry, capped at three; separate GLM/DeepSeek A/B harness |
 | Voice | Split six paragraphs -> Loop Over Items -> CT137 HTTP -> IF failure -> RGB HTTP -> segment hash/probe -> aggregate |
 | Audio | Direct voice-service render -> direct voice-service assembly/normalization -> objective QA -> hard IF gate |
 | Subtitles | CT131 Whisper HTTP -> normalize timeline -> edit alignment -> interpolate authored words -> format SRT -> alignment QA |

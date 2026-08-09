@@ -158,7 +158,7 @@ return [{json:{...request,episode,episodeSource:sameDate.episode?'existing-date'
             "n8n-nodes-base.hackerNews",
             1440,
             0,
-            {"resource": "all", "operation": "getAll", "returnAll": False, "limit": 20, "additionalFields": {"tags": ["front_page"]}},
+            {"resource": "all", "operation": "getAll", "returnAll": False, "limit": 50, "additionalFields": {"tags": ["front_page"]}},
             typeVersion=1,
             notes="Native Hacker News node; this maps to the same Algolia front_page feed previously called through HTTP.",
         ),
@@ -201,14 +201,15 @@ return [{json:{...context,stories}}];""",
             2160,
             0,
             r"""const context = $input.first().json;
-const topics=['ai','openai','llm','model','linux','security','database','postgres','supabase','cloud','developer','programming','python','javascript','hardware','chip','robot','network','privacy','browser','github'];
+const topics={ai:['ai','artificial intelligence','generative ai','machine learning'],openai:['openai'],llm:['llm','large language model','large language models'],model:['model','models'],linux:['linux'],security:['security','cybersecurity','infosec'],database:['database','databases'],postgres:['postgres','postgresql'],supabase:['supabase'],cloud:['cloud'],developer:['developer','developers'],programming:['programming'],python:['python'],javascript:['javascript','nodejs'],hardware:['hardware'],chip:['chip','chips','semiconductor','semiconductors'],robot:['robot','robots','robotic','robotics'],network:['network','networks','networking'],privacy:['privacy'],browser:['browser','browsers'],github:['github']};
 const stories=context.stories.map(story=>{
-  const haystack=`${story.title} ${story.url}`.toLowerCase();
-  const matchedTopics=topics.filter(topic=>haystack.includes(topic));
+  const haystack=`${story.title} ${story.url}`.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  const padded=` ${haystack} `;
+  const matchedTopics=Object.entries(topics).filter(([,aliases])=>aliases.some(alias=>padded.includes(` ${alias} `))).map(([topic])=>topic);
   return {...story,matchedTopics,rankScore:story.score + matchedTopics.length*120};
 });
 return [{json:{...context,stories}}];""",
-            "Small reusable scoring transform. Weight and topic vocabulary are visible and versioned in this node.",
+            "Token/phrase-aware scoring transform. Exact boundaries prevent false positives such as ai in Fastmail; weights and aliases are visible and versioned.",
         ),
         code(
             "sort",
@@ -227,7 +228,7 @@ return [{json:{...context,stories}}];""",
             r"""const context=$input.first().json;
 const selectedStories=context.stories.slice(0,4).map(({rankScore,domain,...story},index)=>({...story,rank:index+1,domain,rankScore}));
 if (selectedStories.length !== 4 || new Set(selectedStories.map(s=>s.domain)).size !== 4) throw new Error('four-story selection proof failed');
-return [{json:{runMode:context.runMode,date:context.date,runId:context.runId,attempt:context.attempt,episode:context.episode,episodeSource:context.episodeSource,selectedStories,candidateCount:context.stories.length,rankingProof:{algorithm:'visible-topic-score-v1',domainDiverse:true,selectedCount:4}}}];""",
+return [{json:{runMode:context.runMode,date:context.date,runId:context.runId,attempt:context.attempt,episode:context.episode,episodeSource:context.episodeSource,selectedStories,candidateCount:context.stories.length,rankingProof:{algorithm:'visible-token-topic-score-v2',domainDiverse:true,selectedCount:4}}}];""",
         ),
         node(
             "ledger",

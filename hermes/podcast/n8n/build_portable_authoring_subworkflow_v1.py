@@ -114,7 +114,7 @@ return [{json:{...r,episodeSpoken,dayName}}];""",
             r"""const r=$input.first().json;
 const rules=`Write a 60-90 second spoken script. Hard acceptance range: 330-400 words; target 365-390. Use a rambling, self-interrupting blue-collar everyman voice enthusiastic about AI, with at most one exact chuckle: Heh. Hhh, okay, that's something. No stage directions.\n\nExactly 6 paragraphs separated by blank lines:\n1. Good morning, it's ${r.dayName}. This is Guru's Tech Bytes, episode ${r.episodeSpoken}. Never put digits in the greeting.\n2. Lead with First up...\n3. Lead with Second...\n4. Lead with Third...\n5. Lead with And finally...\n6. Exactly: That's your daily byte. Have a great day. Until next time.\n\nOutput only script text.`;
 const stories=r.selectedStories.map((s,i)=>`${i+1}. ${s.title} (${Number(s.score||0)} upvotes)`).join('\n');
-return [{json:{...r,authorPrompt:`${rules}\n\nThe four stories, in order:\n${stories}`,authoringAttempt:1}}];""",
+return [{json:{...r,authorPrompt:`${rules}\n\nThe four stories, in order:\n${stories}`,authoringAttempt:1,scriptProvider:'ollama',scriptModel:'glm-5.2'}}];""",
         ),
         node("chain1", "Author Script Attempt 1 (GLM-5.2)", "@n8n/n8n-nodes-langchain.chainLlm", 1200, -160, {"promptType": "define", "text": "={{ $json.authorPrompt }}", "hasOutputParser": False, "batching": {"batchSize": 1, "delayBetweenBatches": 0}}, typeVersion=1.9),
         node("model1", "Ollama Cloud GLM-5.2 Attempt 1", "@n8n/n8n-nodes-langchain.lmChatOllama", 1200, 60, {"model": "glm-5.2", "options": {"think": False, "temperature": 0.2, "numCtx": 8192, "numPredict": 700}}, typeVersion=1, credentials=OLLAMA_CREDENTIAL),

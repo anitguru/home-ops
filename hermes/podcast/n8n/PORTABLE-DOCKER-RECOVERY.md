@@ -1,6 +1,6 @@
 # Portable podcast recovery and Docker migration
 
-Updated: 2026-08-08 (America/New_York)
+Updated: 2026-08-09 (America/New_York)
 
 This is the recovery contract for the visible n8n implementation. A recovery
 passes only when a fresh n8n instance plus an external Task Runner can import
@@ -20,21 +20,27 @@ Import these exports in dependency order:
 3. `wf-podcast-sub-intake-v1.json` — native Supabase and Hacker News intake.
 4. `wf-podcast-sub-authoring-v1.json` — native GLM-5.2 with three bounded
    attempts and calls to the validator child.
-5. `wf-podcast-sub-media-v1.json` — six serialized Chatterbox calls, native
+5. `wf-podcast-sub-authoring-deepseek-v1.json` — optional pinned
+   DeepSeek-V4-Flash-0731 candidate with the identical prompt/retry/validator
+   shape.
+6. `wf-podcast-authoring-ab-v1.json` — optional distribution-free A/B harness
+   calling both authoring children and recording objective comparison evidence.
+7. `wf-podcast-sub-media-v1.json` — six serialized Chatterbox calls, native
    hash, visible assembly/QA routes, hard gate, and ledger.
-6. `wf-podcast-sub-transcription-v1.json` — direct Whisper, compact authored
+8. `wf-podcast-sub-transcription-v1.json` — direct Whisper, compact authored
    word alignment, native Convert to File, native hash, hard gate, and ledger.
-7. `wf-podcast-portable-staging-v1.json` — native Cloudinary upload, native
+9. `wf-podcast-portable-staging-v1.json` — native Cloudinary upload, native
    GitHub file operations, rollback-only Postgres shape test, Telegram test
    notification, and ledger.
-8. `wf-podcast-portable-shadow-v1.json` — thin 15-node parent calling the five
+10. `wf-podcast-portable-shadow-v1.json` — thin 15-node parent calling the five
    children above.
-9. `wf-error.json` — retain the existing error handler for eventual scheduled
+11. `wf-error.json` — retain the existing error handler for eventual scheduled
    production use.
 
-All podcast workflows import inactive. Do not publish the parent or add a
-schedule during recovery. Only the script-validator child needs publication;
-its live trigger count must remain zero.
+All podcast workflows import inactive. Publish only trigger-only children needed
+by the recovery test; none has a Schedule Trigger. Publish the production parent
+only when restoring the authorized scheduler cutover after proving exactly one
+scheduled producer.
 
 The approved cleanup and Cloudinary verifier exports are historical recovery
 evidence. They import MCP-disabled and must not be part of normal recovery:
@@ -78,7 +84,7 @@ into workflow JSON.
 | `GitHub Node (podcast)` | `githubApi` | native file create/get/delete |
 | `GitHub API (podcast)` | `httpHeaderAuth` | branch/ref and absence operations missing from the native node |
 | `Guru's Tech Bytes Bot (podcast)` | `telegramApi` | staging notification |
-| existing Ollama Cloud credential | Ollama chat-model credential | GLM-5.2 authoring |
+| existing Ollama Cloud credential | Ollama chat-model credential | GLM-5.2 production authoring and DeepSeek-0731 A/B candidate |
 
 After import, reattach credentials by node type/name and export again to confirm
 that no secret value entered the JSON.

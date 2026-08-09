@@ -1,0 +1,506 @@
+{
+  "id": "pAuthorABX8Q3M7",
+  "name": "WF-podcast-authoring-ab-v1",
+  "active": false,
+  "nodes": [
+    {
+      "id": "manual",
+      "name": "Manual Authoring A/B Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -260
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "called",
+      "name": "When Called with Four Stories",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        40
+      ],
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"runMode\": \"shadow\",\n  \"date\": \"2026-08-08\",\n  \"runId\": \"authoring-ab/run37\",\n  \"attempt\": 1,\n  \"episode\": 125,\n  \"selectedStories\": [\n    {\n      \"id\": \"49209539\",\n      \"title\": \"What happens if an entire class of workers loses faith in their careers\",\n      \"url\": \"https://www.noemamag.com/why-is-everyone-in-tech-so-sad/\",\n      \"hnUrl\": \"https://news.ycombinator.com/item?id=49209539\",\n      \"score\": 923,\n      \"matchedTopics\": [],\n      \"cocoindexReason\": [\n        \"matched trending topics: none\",\n        \"HN score: 923\",\n        \"not recently covered\"\n      ]\n    },\n    {\n      \"id\": \"49214008\",\n      \"title\": \"DeepSeek V4 Flash 0731\",\n      \"url\": \"https://arcprize.org/results/deepseek-v4-flash-0731\",\n      \"hnUrl\": \"https://news.ycombinator.com/item?id=49214008\",\n      \"score\": 737,\n      \"matchedTopics\": [\n        \"deepseek\"\n      ],\n      \"cocoindexReason\": [\n        \"matched trending topics: deepseek\",\n        \"HN score: 737\",\n        \"not recently covered\"\n      ]\n    },\n    {\n      \"id\": \"49214098\",\n      \"title\": \"Assembly Hall of Shame\",\n      \"url\": \"https://github.com/xoreaxeaxeax/asm-hall-of-shame\",\n      \"hnUrl\": \"https://news.ycombinator.com/item?id=49214098\",\n      \"score\": 401,\n      \"matchedTopics\": [],\n      \"cocoindexReason\": [\n        \"matched trending topics: none\",\n        \"HN score: 401\",\n        \"not recently covered\"\n      ]\n    },\n    {\n      \"id\": \"49189457\",\n      \"title\": \"A physicist rigged his pet hamster\\u2019s wheel to upload to Strava\",\n      \"url\": \"https://www.runnersworld.com/news/a73355106/hamster-wheel-strava-running/\",\n      \"hnUrl\": \"https://news.ycombinator.com/item?id=49189457\",\n      \"score\": 382,\n      \"matchedTopics\": [],\n      \"cocoindexReason\": [\n        \"matched trending topics: none\",\n        \"HN score: 382\",\n        \"not recently covered\"\n      ]\n    }\n  ]\n}"
+      }
+    },
+    {
+      "id": "fixture",
+      "name": "Prepare Frozen A/B Fixture",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -260
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{\"runMode\":\"shadow\",\"date\":\"2026-08-08\",\"runId\":\"authoring-ab/run37\",\"attempt\":1,\"episode\":125,\"selectedStories\":[{\"id\":\"49209539\",\"title\":\"What happens if an entire class of workers loses faith in their careers\",\"url\":\"https://www.noemamag.com/why-is-everyone-in-tech-so-sad/\",\"hnUrl\":\"https://news.ycombinator.com/item?id=49209539\",\"score\":923,\"matchedTopics\":[],\"cocoindexReason\":[\"matched trending topics: none\",\"HN score: 923\",\"not recently covered\"]},{\"id\":\"49214008\",\"title\":\"DeepSeek V4 Flash 0731\",\"url\":\"https://arcprize.org/results/deepseek-v4-flash-0731\",\"hnUrl\":\"https://news.ycombinator.com/item?id=49214008\",\"score\":737,\"matchedTopics\":[\"deepseek\"],\"cocoindexReason\":[\"matched trending topics: deepseek\",\"HN score: 737\",\"not recently covered\"]},{\"id\":\"49214098\",\"title\":\"Assembly Hall of Shame\",\"url\":\"https://github.com/xoreaxeaxeax/asm-hall-of-shame\",\"hnUrl\":\"https://news.ycombinator.com/item?id=49214098\",\"score\":401,\"matchedTopics\":[],\"cocoindexReason\":[\"matched trending topics: none\",\"HN score: 401\",\"not recently covered\"]},{\"id\":\"49189457\",\"title\":\"A physicist rigged his pet hamster\\u2019s wheel to upload to Strava\",\"url\":\"https://www.runnersworld.com/news/a73355106/hamster-wheel-strava-running/\",\"hnUrl\":\"https://news.ycombinator.com/item?id=49189457\",\"score\":382,\"matchedTopics\":[],\"cocoindexReason\":[\"matched trending topics: none\",\"HN score: 382\",\"not recently covered\"]}]}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "validate",
+      "name": "Validate A/B Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        -100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json;\nif(r.runMode!=='shadow'||!Array.isArray(r.selectedStories)||r.selectedStories.length!==4) throw new Error('A/B requires four shadow stories');\nreturn [{json:{...r,runId:`${r.runId}/${$execution.id}`}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "glm",
+      "name": "Run GLM-5.2 Authoring Candidate",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        760,
+        -220
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "pAuthorSubX8Q3M7",
+          "mode": "list",
+          "cachedResultName": "WF-podcast-sub-authoring-v1"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "runMode": "={{ $('Validate A/B Request').first().json.runMode }}",
+            "date": "={{ $('Validate A/B Request').first().json.date }}",
+            "runId": "={{ $('Validate A/B Request').first().json.runId }}",
+            "attempt": "={{ $('Validate A/B Request').first().json.attempt }}",
+            "episode": "={{ $('Validate A/B Request').first().json.episode }}",
+            "selectedStories": "={{ $('Validate A/B Request').first().json.selectedStories }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "runMode",
+              "displayName": "runMode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "runId",
+              "displayName": "runId",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "attempt",
+              "displayName": "attempt",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "episode",
+              "displayName": "episode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "selectedStories",
+              "displayName": "selectedStories",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "array"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "deepseek",
+      "name": "Run DeepSeek 0731 Authoring Candidate",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        760,
+        100
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "pAuthorDSX8Q3M7",
+          "mode": "list",
+          "cachedResultName": "WF-podcast-sub-authoring-deepseek-v1"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "runMode": "={{ $('Validate A/B Request').first().json.runMode }}",
+            "date": "={{ $('Validate A/B Request').first().json.date }}",
+            "runId": "={{ $('Validate A/B Request').first().json.runId }}",
+            "attempt": "={{ $('Validate A/B Request').first().json.attempt }}",
+            "episode": "={{ $('Validate A/B Request').first().json.episode }}",
+            "selectedStories": "={{ $('Validate A/B Request').first().json.selectedStories }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "runMode",
+              "displayName": "runMode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "runId",
+              "displayName": "runId",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "attempt",
+              "displayName": "attempt",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "episode",
+              "displayName": "episode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "selectedStories",
+              "displayName": "selectedStories",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "array"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "label_glm",
+      "name": "Label GLM Candidate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        -220
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{candidate:'glm-5.2',result:$input.first().json}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "label_ds",
+      "name": "Label DeepSeek Candidate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{candidate:'deepseek-v4-flash:0731-cloud',result:$input.first().json}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "merge",
+      "name": "Merge Both Authoring Candidates",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1280,
+        -60
+      ],
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      }
+    },
+    {
+      "id": "compare",
+      "name": "Build Objective A/B Comparison",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        -60
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const rows=$input.all().map(i=>i.json);const by=Object.fromEntries(rows.map(r=>[r.candidate,r.result]));\nconst glm=by['glm-5.2'],deepseek=by['deepseek-v4-flash:0731-cloud'];if(!glm||!deepseek)throw new Error('both A/B candidates are required');\nconst summary=r=>({model:r.scriptModel,validated:r.authoringValidated,attempt:r.authoringAttempt,wordCount:r.wordCount,paragraphCount:r.paragraphCount,scriptSha256:r.script_sha256,scriptText:r.scriptText});\nreturn [{json:{runId:glm.runId,date:glm.date,episode:glm.episode,selectedStories:glm.selectedStories,glm:summary(glm),deepseek:summary(deepseek),objectiveComplete:true,humanPreference:'pending'}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "ledger",
+      "name": "Ledger - Authoring A/B Complete",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1760,
+        -60
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "podcast_run_ledger"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $json.runId }}",
+            "execution_id": "={{ $execution.id }}",
+            "run_mode": "authoring-ab",
+            "episode": "={{ $json.episode }}",
+            "episode_date": "={{ $json.date }}",
+            "stage": "authoring-ab-complete",
+            "status": "passed",
+            "attempt": 1,
+            "selected_stories_json": "={{ JSON.stringify($json.selectedStories) }}",
+            "script_sha256": "",
+            "audio_sha256": "",
+            "srt_sha256": "",
+            "qa_json": "={{ JSON.stringify({glm:$json.glm,deepseek:$json.deepseek,humanPreference:$json.humanPreference}) }}",
+            "artifact_urls_json": "",
+            "error": "",
+            "started_at": "={{ $now.toISO() }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "return",
+      "name": "Return Authoring A/B Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        -60
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:$('Build Objective A/B Comparison').first().json}];"
+      },
+      "notes": ""
+    }
+  ],
+  "connections": {
+    "Manual Authoring A/B Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Frozen A/B Fixture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Frozen A/B Fixture": {
+      "main": [
+        [
+          {
+            "node": "Validate A/B Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Called with Four Stories": {
+      "main": [
+        [
+          {
+            "node": "Validate A/B Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate A/B Request": {
+      "main": [
+        [
+          {
+            "node": "Run GLM-5.2 Authoring Candidate",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Run DeepSeek 0731 Authoring Candidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run GLM-5.2 Authoring Candidate": {
+      "main": [
+        [
+          {
+            "node": "Label GLM Candidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run DeepSeek 0731 Authoring Candidate": {
+      "main": [
+        [
+          {
+            "node": "Label DeepSeek Candidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Label GLM Candidate": {
+      "main": [
+        [
+          {
+            "node": "Merge Both Authoring Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Label DeepSeek Candidate": {
+      "main": [
+        [
+          {
+            "node": "Merge Both Authoring Candidates",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Both Authoring Candidates": {
+      "main": [
+        [
+          {
+            "node": "Build Objective A/B Comparison",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Objective A/B Comparison": {
+      "main": [
+        [
+          {
+            "node": "Ledger - Authoring A/B Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger - Authoring A/B Complete": {
+      "main": [
+        [
+          {
+            "node": "Return Authoring A/B Contract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "tags": []
+}

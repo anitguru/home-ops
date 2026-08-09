@@ -167,7 +167,7 @@
         "resource": "all",
         "operation": "getAll",
         "returnAll": false,
-        "limit": 20,
+        "limit": 50,
         "additionalFields": {
           "tags": [
             "front_page"
@@ -220,9 +220,9 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const context = $input.first().json;\nconst topics=['ai','openai','llm','model','linux','security','database','postgres','supabase','cloud','developer','programming','python','javascript','hardware','chip','robot','network','privacy','browser','github'];\nconst stories=context.stories.map(story=>{\n  const haystack=`${story.title} ${story.url}`.toLowerCase();\n  const matchedTopics=topics.filter(topic=>haystack.includes(topic));\n  return {...story,matchedTopics,rankScore:story.score + matchedTopics.length*120};\n});\nreturn [{json:{...context,stories}}];"
+        "jsCode": "const context = $input.first().json;\nconst topics={ai:['ai','artificial intelligence','generative ai','machine learning'],openai:['openai'],llm:['llm','large language model','large language models'],model:['model','models'],linux:['linux'],security:['security','cybersecurity','infosec'],database:['database','databases'],postgres:['postgres','postgresql'],supabase:['supabase'],cloud:['cloud'],developer:['developer','developers'],programming:['programming'],python:['python'],javascript:['javascript','nodejs'],hardware:['hardware'],chip:['chip','chips','semiconductor','semiconductors'],robot:['robot','robots','robotic','robotics'],network:['network','networks','networking'],privacy:['privacy'],browser:['browser','browsers'],github:['github']};\nconst stories=context.stories.map(story=>{\n  const haystack=`${story.title} ${story.url}`.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();\n  const padded=` ${haystack} `;\n  const matchedTopics=Object.entries(topics).filter(([,aliases])=>aliases.some(alias=>padded.includes(` ${alias} `))).map(([topic])=>topic);\n  return {...story,matchedTopics,rankScore:story.score + matchedTopics.length*120};\n});\nreturn [{json:{...context,stories}}];"
       },
-      "notes": "Small reusable scoring transform. Weight and topic vocabulary are visible and versioned in this node."
+      "notes": "Token/phrase-aware scoring transform. Exact boundaries prevent false positives such as ai in Fastmail; weights and aliases are visible and versioned."
     },
     {
       "id": "sort",
@@ -252,7 +252,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const context=$input.first().json;\nconst selectedStories=context.stories.slice(0,4).map(({rankScore,domain,...story},index)=>({...story,rank:index+1,domain,rankScore}));\nif (selectedStories.length !== 4 || new Set(selectedStories.map(s=>s.domain)).size !== 4) throw new Error('four-story selection proof failed');\nreturn [{json:{runMode:context.runMode,date:context.date,runId:context.runId,attempt:context.attempt,episode:context.episode,episodeSource:context.episodeSource,selectedStories,candidateCount:context.stories.length,rankingProof:{algorithm:'visible-topic-score-v1',domainDiverse:true,selectedCount:4}}}];"
+        "jsCode": "const context=$input.first().json;\nconst selectedStories=context.stories.slice(0,4).map(({rankScore,domain,...story},index)=>({...story,rank:index+1,domain,rankScore}));\nif (selectedStories.length !== 4 || new Set(selectedStories.map(s=>s.domain)).size !== 4) throw new Error('four-story selection proof failed');\nreturn [{json:{runMode:context.runMode,date:context.date,runId:context.runId,attempt:context.attempt,episode:context.episode,episodeSource:context.episodeSource,selectedStories,candidateCount:context.stories.length,rankingProof:{algorithm:'visible-token-topic-score-v2',domainDiverse:true,selectedCount:4}}}];"
       },
       "notes": ""
     },
