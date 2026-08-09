@@ -269,3 +269,10 @@ readback showed 11 published workflows, exactly one Schedule Trigger in
 The reboot test restored both pi2 addresses, Docker, and the healthy n8n
 container. Hermes has no podcast job and pi4's three `gtb` timers remain
 disabled/inactive.
+
+pi2 is also enrolled in the tailnet as `n8n` at `100.119.90.15`. Persistent
+Tailscale Serve proxies private HTTPS
+`https://n8n.tail099001.ts.net/` to `http://127.0.0.1:5678`. A tailscaled
+restart restored the Serve configuration automatically; independent HTTPS
+readback returned a valid certificate, HTTP 200 for the UI, and
+`{"status":"ok"}` from `/healthz`.
