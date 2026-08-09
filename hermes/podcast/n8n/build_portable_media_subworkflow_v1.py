@@ -68,7 +68,7 @@ def build() -> dict:
             480,
             0,
             r"""const r=$input.first().json;
-if(r.runMode!=='shadow') throw new Error('media accepts shadow mode only');
+if(!['shadow','production'].includes(r.runMode)) throw new Error('media requires shadow or production mode');
 if(!/^[a-f0-9]{64}$/.test(String(r.script_sha256||''))) throw new Error('approved script hash missing');
 const segments=String(r.scriptText||'').split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);
 if(segments.length!==6||segments.some(x=>x.length<10)) throw new Error('media requires six non-empty paragraphs');

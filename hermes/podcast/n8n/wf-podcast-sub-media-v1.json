@@ -56,7 +56,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const r=$input.first().json;\nif(r.runMode!=='shadow') throw new Error('media accepts shadow mode only');\nif(!/^[a-f0-9]{64}$/.test(String(r.script_sha256||''))) throw new Error('approved script hash missing');\nconst segments=String(r.scriptText||'').split(/\\n\\s*\\n/).map(x=>x.trim()).filter(Boolean);\nif(segments.length!==6||segments.some(x=>x.length<10)) throw new Error('media requires six non-empty paragraphs');\nreturn [{json:{...r,segments,ttsProfile:'chatterbox-turbo-ct137-visible-v1'}}];"
+        "jsCode": "const r=$input.first().json;\nif(!['shadow','production'].includes(r.runMode)) throw new Error('media requires shadow or production mode');\nif(!/^[a-f0-9]{64}$/.test(String(r.script_sha256||''))) throw new Error('approved script hash missing');\nconst segments=String(r.scriptText||'').split(/\\n\\s*\\n/).map(x=>x.trim()).filter(Boolean);\nif(segments.length!==6||segments.some(x=>x.length<10)) throw new Error('media requires six non-empty paragraphs');\nreturn [{json:{...r,segments,ttsProfile:'chatterbox-turbo-ct137-visible-v1'}}];"
       },
       "notes": ""
     },

@@ -94,7 +94,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const i=$input.first();const r=i.json;const failures=[];\nif(r.runMode!=='shadow'||r.mediaValidated!==true) failures.push('mode/media proof');\nif(!/^[a-f0-9]{64}$/.test(String(r.script_sha256||''))||!/^[a-f0-9]{64}$/.test(String(r.audio_sha256||''))) failures.push('hashes');\nif(!i.binary?.audio) failures.push('audio binary');\nif(String(r.scriptText||'').split(/\\n\\s*\\n/).filter(Boolean).length!==6) failures.push('six paragraphs');\nif(failures.length) throw new Error(`transcription input: ${failures.join(', ')}`);\nreturn [{json:r,binary:{audio:i.binary.audio}}];"
+        "jsCode": "const i=$input.first();const r=i.json;const failures=[];\nif(!['shadow','production'].includes(r.runMode)||r.mediaValidated!==true) failures.push('mode/media proof');\nif(!/^[a-f0-9]{64}$/.test(String(r.script_sha256||''))||!/^[a-f0-9]{64}$/.test(String(r.audio_sha256||''))) failures.push('hashes');\nif(!i.binary?.audio) failures.push('audio binary');\nif(String(r.scriptText||'').split(/\\n\\s*\\n/).filter(Boolean).length!==6) failures.push('six paragraphs');\nif(failures.length) throw new Error(`transcription input: ${failures.join(', ')}`);\nreturn [{json:r,binary:{audio:i.binary.audio}}];"
       },
       "notes": ""
     },

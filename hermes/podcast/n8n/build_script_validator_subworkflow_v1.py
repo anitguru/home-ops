@@ -61,7 +61,7 @@ def build() -> dict:
             480,
             0,
             r"""const request=$input.first().json;
-if(!request.context||request.context.runMode!=='shadow') throw new Error('validator requires shadow context');
+if(!request.context||!['shadow','production'].includes(request.context.runMode)) throw new Error('validator requires shadow or production context');
 const attempt=Number(request.attempt);
 if(![1,2,3].includes(attempt)) throw new Error('validator attempt must be 1-3');
 let text=String(request.draft||'').trim();

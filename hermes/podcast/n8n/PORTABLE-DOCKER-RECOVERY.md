@@ -200,5 +200,28 @@ transcription 128, and production distribution 129. Acceptance values:
   contained episode 125 plus the new audio URL.
 
 The cleanup and partial-run recovery workflows were archived after this pass.
-The production parent and production distribution child remain unarchived but
-inactive/manual-only. Hermes remains paused; no n8n schedule exists.
+
+## Scheduler cutover completed
+
+At 21:39–21:44 EDT on 2026-08-08, the operator directly authorized production
+cutover. After backing up `/.n8n/database.sqlite` and all seven affected
+workflow exports under CT109
+`/root/n8n-backups/20260808-production-scheduler-cutover/`, the portable parent
+and reusable children were promoted to accept an explicit `production` run
+mode. Staging remains valid because the shared children accept exactly
+`shadow` or `production` and retain the same content, hash, audio, transcript,
+and distribution gates.
+
+`WF-podcast-portable-production-parent-v1` is now active with exactly one
+native Schedule Trigger at 06:00 and workflow timezone
+`America/New_York`. It retains its Manual Trigger, has a 3,600-second timeout,
+saves execution progress, and sends production execution failures to active
+`WF-error`. Live normalized hash
+`5abf77e661ee575b4c3351d69236181e009f94df423fd0f7228607c0f56f0ad9`
+matched the versioned export.
+
+SQLite readback found exactly one active workflow containing a Schedule
+Trigger: `pPortableProdParentX8`. Hermes job `a694c08ba15f` remained paused and
+all pi4 `gtb` timers remained inactive, so there is one scheduled producer. The
+next schedule implied by the verified rule/timezone after cutover is
+2026-08-09 06:00 EDT.

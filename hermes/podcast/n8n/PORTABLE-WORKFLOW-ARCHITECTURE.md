@@ -22,11 +22,15 @@ to be available; it has no schedule or other self-firing trigger.
 
 The production surface uses a separate thin parent,
 `WF-podcast-portable-production-parent-v1`, which calls the same first four
-children and then `WF-podcast-portable-production-v1`. Both are inactive and
-manual-only. The production child visibly performs the guarded Cloudinary,
+children and then `WF-podcast-portable-production-v1`. The production child visibly performs the guarded Cloudinary,
 GitHub, Supabase, and Telegram operations and their readbacks; it contains no
 schedule, SSH node, CT143 URL, or hidden worker call. Clean-slate parent
 execution 123 and production child execution 129 succeeded on 2026-08-08.
+
+After explicit cutover authorization, the parent is active with one visible
+native Schedule Trigger at 06:00 America/New_York plus its Manual Trigger. The
+called children are published so n8n can invoke them, but none contains a
+Schedule Trigger. `WF-error` is attached to scheduled production failures.
 
 CT143 is **only** the external n8n Task Runner. The implemented portable graph
 contains no SSH nodes, CT143 URL, or `podcast-worker` dependency. Voice and

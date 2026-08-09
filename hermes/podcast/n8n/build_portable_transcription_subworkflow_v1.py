@@ -52,7 +52,7 @@ def build() -> dict:
         code(
             "validate_input", "Validate Transcription Input", 720, 0,
             r"""const i=$input.first();const r=i.json;const failures=[];
-if(r.runMode!=='shadow'||r.mediaValidated!==true) failures.push('mode/media proof');
+if(!['shadow','production'].includes(r.runMode)||r.mediaValidated!==true) failures.push('mode/media proof');
 if(!/^[a-f0-9]{64}$/.test(String(r.script_sha256||''))||!/^[a-f0-9]{64}$/.test(String(r.audio_sha256||''))) failures.push('hashes');
 if(!i.binary?.audio) failures.push('audio binary');
 if(String(r.scriptText||'').split(/\n\s*\n/).filter(Boolean).length!==6) failures.push('six paragraphs');

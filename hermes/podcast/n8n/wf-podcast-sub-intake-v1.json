@@ -57,7 +57,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const request = $input.first().json;\nif (request.runMode !== 'shadow') throw new Error('intake sub-workflow accepts shadow mode only');\nif (!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(request.date || ''))) throw new Error('invalid ET date');\nif (!/^[A-Za-z0-9/_-]+$/.test(String(request.runId || ''))) throw new Error('invalid run ID');\nreturn [{json:{runMode:'shadow',date:request.date,runId:request.runId,attempt:Number(request.attempt || 1)}}];"
+        "jsCode": "const request = $input.first().json;\nif (!['shadow','production'].includes(request.runMode)) throw new Error('intake sub-workflow requires shadow or production mode');\nif (!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(request.date || ''))) throw new Error('invalid ET date');\nif (!/^[A-Za-z0-9/_-]+$/.test(String(request.runId || ''))) throw new Error('invalid run ID');\nreturn [{json:{runMode:request.runMode,date:request.date,runId:request.runId,attempt:Number(request.attempt || 1)}}];"
       },
       "notes": ""
     },

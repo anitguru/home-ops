@@ -49,7 +49,7 @@ def build() -> dict:
     nodes = [
         node(
             "sub_trigger", "When Called by Manual Production Parent", "n8n-nodes-base.executeWorkflowTrigger", 0,
-            {"inputSource": "jsonExample", "jsonExample": json.dumps({"runMode": "shadow", "publishMode": "production", "manualProductionApproved": True, "date": "2026-08-08", "runId": "portable-production/2026-08-08/example", "episode": 125, "selectedStories": [], "scriptText": "approved", "script_sha256": "0" * 64, "audio_sha256": "0" * 64, "audioQa": {"duration_seconds": 120}, "srt_sha256": "0" * 64, "alignment": {}, "transcriptionValidated": True}, indent=2)},
+            {"inputSource": "jsonExample", "jsonExample": json.dumps({"runMode": "production", "publishMode": "production", "manualProductionApproved": True, "date": "2026-08-08", "runId": "portable-production/2026-08-08/example", "episode": 125, "selectedStories": [], "scriptText": "approved", "script_sha256": "0" * 64, "audio_sha256": "0" * 64, "audioQa": {"duration_seconds": 120}, "srt_sha256": "0" * 64, "alignment": {}, "transcriptionValidated": True}, indent=2)},
             typeVersion=1.2,
         ),
         code_node(
@@ -62,7 +62,7 @@ return [{json:{...r,startedAt:$now.toISO(),audio:{sha256:r.audio_sha256,bytes:0,
         code_node(
             "gate", "Hard Manual Production Authorization Gate", 480,
             r"""const r=$input.first().json;const et=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
-const failures=[];if(r.runMode!=='shadow')failures.push('generation mode');if(r.publishMode!=='production')failures.push('publish mode');if(r.manualProductionApproved!==true)failures.push('operator approval');if(r.date!==et)failures.push('ET date');
+const failures=[];if(r.runMode!=='production')failures.push('generation mode');if(r.publishMode!=='production')failures.push('publish mode');if(r.manualProductionApproved!==true)failures.push('operator approval');if(r.date!==et)failures.push('ET date');
 if(!/^portable-production\/\d{4}-\d{2}-\d{2}\/[A-Za-z0-9_-]+$/.test(String(r.runId||'')))failures.push('run ID');if(r.transcriptionValidated!==true)failures.push('transcription proof');if(failures.length)throw new Error(`production gate: ${failures.join(', ')}`);return [{json:r}];""",
             "Explicit one-shot gate: current ET date, production publish mode, operator authorization, and completed transcription proof are all required.",
         ),

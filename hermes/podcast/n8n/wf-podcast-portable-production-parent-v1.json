@@ -1,11 +1,11 @@
 {
   "id": "pPortableProdParentX8",
   "name": "WF-podcast-portable-production-parent-v1",
-  "active": false,
+  "active": true,
   "nodes": [
     {
       "id": "manual",
-      "name": "Manual Production Replacement Trigger",
+      "name": "Manual Production Trigger",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
@@ -16,7 +16,7 @@
     },
     {
       "id": "context",
-      "name": "Prepare Manual Production Context",
+      "name": "Prepare Production Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -26,13 +26,13 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const now=new Date();\nconst date=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);\nreturn [{json:{runMode:'shadow',publishMode:'production',notifyMode:'production',manualProductionApproved:true,date,runId:`portable-production/${date}/${$execution.id}`,attempt:1}}];"
+        "jsCode": "const now=new Date();\nconst date=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);\nreturn [{json:{runMode:'production',publishMode:'production',notifyMode:'production',manualProductionApproved:true,date,runId:`portable-production/${date}/${$execution.id}`,attempt:1}}];"
       },
       "notes": ""
     },
     {
       "id": "gate",
-      "name": "Hard Manual Production Authorization Gate",
+      "name": "Hard Production Authorization Gate",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -42,13 +42,13 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const c=$input.first().json;const failures=[];\nif(c.runMode!=='shadow')failures.push('generation mode');if(c.publishMode!=='production')failures.push('publish mode');if(c.notifyMode!=='production')failures.push('notify mode');if(c.manualProductionApproved!==true)failures.push('operator approval');\nif(!/^portable-production\\/\\d{4}-\\d{2}-\\d{2}\\/[A-Za-z0-9_-]+$/.test(c.runId))failures.push('runId');if(failures.length)throw new Error(`manual production gate: ${failures.join(', ')}`);return [{json:c}];"
+        "jsCode": "const c=$input.first().json;const failures=[];\nif(c.runMode!=='production')failures.push('generation mode');if(c.publishMode!=='production')failures.push('publish mode');if(c.notifyMode!=='production')failures.push('notify mode');if(c.manualProductionApproved!==true)failures.push('cutover authorization');\nif(!/^portable-production\\/\\d{4}-\\d{2}-\\d{2}\\/[A-Za-z0-9_-]+$/.test(c.runId))failures.push('runId');if(failures.length)throw new Error(`production gate: ${failures.join(', ')}`);return [{json:c}];"
       },
       "notes": ""
     },
     {
       "id": "ledger_start",
-      "name": "Ledger - Manual Production Started",
+      "name": "Ledger - Production Started",
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
@@ -67,7 +67,7 @@
           "value": {
             "run_id": "={{ $json.runId }}",
             "execution_id": "={{ $execution.id }}",
-            "run_mode": "production-manual",
+            "run_mode": "production",
             "episode": 0,
             "episode_date": "={{ $json.date }}",
             "stage": "production-parent-start",
@@ -107,10 +107,10 @@
         "workflowInputs": {
           "mappingMode": "defineBelow",
           "value": {
-            "runMode": "={{ $('Hard Manual Production Authorization Gate').first().json.runMode }}",
-            "date": "={{ $('Hard Manual Production Authorization Gate').first().json.date }}",
-            "runId": "={{ $('Hard Manual Production Authorization Gate').first().json.runId }}",
-            "attempt": "={{ $('Hard Manual Production Authorization Gate').first().json.attempt }}"
+            "runMode": "={{ $('Hard Production Authorization Gate').first().json.runMode }}",
+            "date": "={{ $('Hard Production Authorization Gate').first().json.date }}",
+            "runId": "={{ $('Hard Production Authorization Gate').first().json.runId }}",
+            "attempt": "={{ $('Hard Production Authorization Gate').first().json.attempt }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -173,7 +173,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const r=$input.first().json;\nif(r.runMode!=='shadow'||!Number.isInteger(r.episode)||r.episode<1) throw new Error('invalid intake episode contract');\nif(!Array.isArray(r.selectedStories)||r.selectedStories.length!==4) throw new Error('intake did not return four stories');\nif(r.rankingProof?.domainDiverse!==true||r.rankingProof?.selectedCount!==4) throw new Error('ranking proof missing');\nreturn [{json:r}];"
+        "jsCode": "const r=$input.first().json;\nif(r.runMode!=='production'||!Number.isInteger(r.episode)||r.episode<1) throw new Error('invalid intake episode contract');\nif(!Array.isArray(r.selectedStories)||r.selectedStories.length!==4) throw new Error('intake did not return four stories');\nif(r.rankingProof?.domainDiverse!==true||r.rankingProof?.selectedCount!==4) throw new Error('ranking proof missing');\nreturn [{json:r}];"
       },
       "notes": ""
     },
@@ -581,7 +581,7 @@
           "mappingMode": "defineBelow",
           "value": {
             "runMode": "={{ $json.runMode }}",
-            "publishMode": "={{ $('Hard Manual Production Authorization Gate').first().json.publishMode }}",
+            "publishMode": "={{ $('Hard Production Authorization Gate').first().json.publishMode }}",
             "date": "={{ $json.date }}",
             "runId": "={{ $json.runId }}",
             "episode": "={{ Number($json.episode) }}",
@@ -593,7 +593,7 @@
             "srt_sha256": "={{ $json.srt_sha256 }}",
             "alignment": "={{ $json.alignment }}",
             "transcriptionValidated": "={{ $json.transcriptionValidated }}",
-            "manualProductionApproved": "={{ $('Hard Manual Production Authorization Gate').first().json.manualProductionApproved }}"
+            "manualProductionApproved": "={{ $('Hard Production Authorization Gate').first().json.manualProductionApproved }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -752,7 +752,7 @@
     },
     {
       "id": "stop",
-      "name": "Manual Production Run Complete",
+      "name": "Production Run Complete",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
@@ -760,7 +760,28 @@
         0
       ],
       "parameters": {},
-      "notes": "Manual production terminal node. No schedule exists in this workflow."
+      "notes": "Scheduled/manual production terminal node after all distribution readbacks pass."
+    },
+    {
+      "id": "production_schedule",
+      "name": "Daily Production Schedule \u2014 06:00 ET",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        180
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 6,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "notes": "Sole scheduled producer after cutover. Runs daily at 06:00 America/New_York."
     }
   ],
   "connections": {
@@ -852,40 +873,40 @@
         ]
       ]
     },
-    "Manual Production Replacement Trigger": {
+    "Manual Production Trigger": {
       "main": [
         [
           {
-            "node": "Prepare Manual Production Context",
+            "node": "Prepare Production Context",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare Manual Production Context": {
+    "Prepare Production Context": {
       "main": [
         [
           {
-            "node": "Hard Manual Production Authorization Gate",
+            "node": "Hard Production Authorization Gate",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Hard Manual Production Authorization Gate": {
+    "Hard Production Authorization Gate": {
       "main": [
         [
           {
-            "node": "Ledger - Manual Production Started",
+            "node": "Ledger - Production Started",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Ledger - Manual Production Started": {
+    "Ledger - Production Started": {
       "main": [
         [
           {
@@ -911,7 +932,18 @@
       "main": [
         [
           {
-            "node": "Manual Production Run Complete",
+            "node": "Production Run Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Production Schedule \u2014 06:00 ET": {
+      "main": [
+        [
+          {
+            "node": "Prepare Production Context",
             "type": "main",
             "index": 0
           }
@@ -921,7 +953,11 @@
   },
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": true
+    "availableInMCP": true,
+    "timezone": "America/New_York",
+    "errorWorkflow": "k5nmdOyJm5znKQzK",
+    "executionTimeout": 3600,
+    "saveExecutionProgress": true
   },
   "meta": {
     "templateCredsSetupCompleted": true

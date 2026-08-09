@@ -86,10 +86,10 @@ return [{json:{runMode:'shadow',date,runId:`intake-manual/${date}/${$execution.i
             480,
             0,
             r"""const request = $input.first().json;
-if (request.runMode !== 'shadow') throw new Error('intake sub-workflow accepts shadow mode only');
+if (!['shadow','production'].includes(request.runMode)) throw new Error('intake sub-workflow requires shadow or production mode');
 if (!/^\d{4}-\d{2}-\d{2}$/.test(String(request.date || ''))) throw new Error('invalid ET date');
 if (!/^[A-Za-z0-9/_-]+$/.test(String(request.runId || ''))) throw new Error('invalid run ID');
-return [{json:{runMode:'shadow',date:request.date,runId:request.runId,attempt:Number(request.attempt || 1)}}];""",
+return [{json:{runMode:request.runMode,date:request.date,runId:request.runId,attempt:Number(request.attempt || 1)}}];""",
         ),
         node(
             "supabase_date",

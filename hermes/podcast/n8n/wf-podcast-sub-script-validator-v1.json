@@ -56,7 +56,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const request=$input.first().json;\nif(!request.context||request.context.runMode!=='shadow') throw new Error('validator requires shadow context');\nconst attempt=Number(request.attempt);\nif(![1,2,3].includes(attempt)) throw new Error('validator attempt must be 1-3');\nlet text=String(request.draft||'').trim();\nif(!text) throw new Error('validator received empty draft');\nconst paragraphs=text.split(/\\n\\s*\\n/).map(p=>p.trim()).filter(Boolean);\nreturn [{json:{context:request.context,attempt,text,paragraphs,rawWordCount:text.split(/\\s+/).filter(Boolean).length}}];"
+        "jsCode": "const request=$input.first().json;\nif(!request.context||!['shadow','production'].includes(request.context.runMode)) throw new Error('validator requires shadow or production context');\nconst attempt=Number(request.attempt);\nif(![1,2,3].includes(attempt)) throw new Error('validator attempt must be 1-3');\nlet text=String(request.draft||'').trim();\nif(!text) throw new Error('validator received empty draft');\nconst paragraphs=text.split(/\\n\\s*\\n/).map(p=>p.trim()).filter(Boolean);\nreturn [{json:{context:request.context,attempt,text,paragraphs,rawWordCount:text.split(/\\s+/).filter(Boolean).length}}];"
       },
       "notes": ""
     },

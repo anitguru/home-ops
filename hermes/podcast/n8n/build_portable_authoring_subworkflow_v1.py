@@ -88,7 +88,7 @@ def build() -> dict:
             480,
             -160,
             r"""const r=$input.first().json;
-if(r.runMode!=='shadow') throw new Error('authoring accepts shadow mode only');
+if(!['shadow','production'].includes(r.runMode)) throw new Error('authoring requires shadow or production mode');
 if(!/^\d{4}-\d{2}-\d{2}$/.test(String(r.date||''))) throw new Error('invalid date');
 if(!Number.isInteger(r.episode)||r.episode<1) throw new Error('invalid episode');
 if(!Array.isArray(r.selectedStories)||r.selectedStories.length!==4) throw new Error('authoring requires four selected stories');
