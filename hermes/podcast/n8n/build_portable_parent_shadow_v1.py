@@ -234,6 +234,7 @@ return [{json:r}];""",
             r"""const i=$input.first(),r=i.json,q=r.audioQa||{};
 if(r.mediaValidated!==true||!i.binary?.audio) throw new Error('media proof/audio missing');
 if(!/^[a-f0-9]{64}$/.test(String(r.audio_sha256||''))) throw new Error('audio hash missing');
+if(!['lxc-137-cpu','rgb-rtx4090'].includes(String(r.ttsProcessor||''))||!r.ttsProcessorLabel||!r.ttsEndpointHost||!r.ttsProfile) throw new Error('TTS processor provenance missing');
 if(q.duration_seconds<60||q.integrated_lufs<-18||q.integrated_lufs>-14||q.true_peak_dbtp>-1.5||q.clipped_samples!==0||q.long_silence_ratio>0.08) throw new Error('media QA contract invalid');
 return [i];""",
         ),
@@ -247,11 +248,11 @@ return [i];""",
                 "workflowId": {"__rl": True, "value": "pTransSubX8Q3M7", "mode": "list", "cachedResultName": "WF-podcast-sub-transcription-v1"},
                 "workflowInputs": {
                     "mappingMode": "defineBelow",
-                    "value": {field: "={{ Number($json.episode) }}" if field == "episode" else f"={{{{ $json.{field} }}}}" for field in ("runMode", "date", "runId", "episode", "selectedStories", "scriptText", "script_sha256", "audio_sha256", "audioQa", "mediaValidated")},
+                    "value": {field: "={{ Number($json.episode) }}" if field == "episode" else f"={{{{ $json.{field} }}}}" for field in ("runMode", "date", "runId", "episode", "selectedStories", "scriptText", "script_sha256", "audio_sha256", "audioQa", "mediaValidated", "ttsProcessor", "ttsProcessorLabel", "ttsEndpointHost", "ttsProfile")},
                     "matchingColumns": [],
                     "schema": [
                         {"id": field, "displayName": field, "required": True, "defaultMatch": False, "display": True, "canBeUsedToMatch": True, "type": "array" if field == "selectedStories" else "number" if field == "episode" else "boolean" if field == "mediaValidated" else "object" if field == "audioQa" else "string"}
-                        for field in ("runMode", "date", "runId", "episode", "selectedStories", "scriptText", "script_sha256", "audio_sha256", "audioQa", "mediaValidated")
+                        for field in ("runMode", "date", "runId", "episode", "selectedStories", "scriptText", "script_sha256", "audio_sha256", "audioQa", "mediaValidated", "ttsProcessor", "ttsProcessorLabel", "ttsEndpointHost", "ttsProfile")
                     ],
                     "attemptToConvertTypes": False,
                     "convertFieldsToString": False,
@@ -294,6 +295,10 @@ return [i];""",
                         "script_sha256": "={{ $json.script_sha256 }}",
                         "audio_sha256": "={{ $json.audio_sha256 }}",
                         "audioQa": "={{ $json.audioQa }}",
+                        "ttsProcessor": "={{ $json.ttsProcessor }}",
+                        "ttsProcessorLabel": "={{ $json.ttsProcessorLabel }}",
+                        "ttsEndpointHost": "={{ $json.ttsEndpointHost }}",
+                        "ttsProfile": "={{ $json.ttsProfile }}",
                         "srt_sha256": "={{ $json.srt_sha256 }}",
                         "alignment": "={{ $json.alignment }}",
                         "transcriptionValidated": "={{ $json.transcriptionValidated }}",
@@ -301,7 +306,7 @@ return [i];""",
                     "matchingColumns": [],
                     "schema": [
                         {"id": field, "displayName": field, "required": True, "defaultMatch": False, "display": True, "canBeUsedToMatch": True, "type": "number" if field == "episode" else "array" if field == "selectedStories" else "boolean" if field == "transcriptionValidated" else "object" if field in ("audioQa", "alignment") else "string"}
-                        for field in ("runMode", "publishMode", "date", "runId", "episode", "selectedStories", "scriptText", "script_sha256", "audio_sha256", "audioQa", "srt_sha256", "alignment", "transcriptionValidated")
+                        for field in ("runMode", "publishMode", "date", "runId", "episode", "selectedStories", "scriptText", "script_sha256", "audio_sha256", "audioQa", "ttsProcessor", "ttsProcessorLabel", "ttsEndpointHost", "ttsProfile", "srt_sha256", "alignment", "transcriptionValidated")
                     ],
                     "attemptToConvertTypes": False,
                     "convertFieldsToString": False,

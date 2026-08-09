@@ -1,0 +1,233 @@
+{
+  "id": "pTtsProvRegX8Q3M7",
+  "name": "WF-podcast-tts-provenance-regression-2026-08-09",
+  "active": false,
+  "nodes": [
+    {
+      "id": "webhook",
+      "name": "Published TTS Provenance Regression Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "podcast-tts-provenance-regression-20260809",
+        "responseMode": "onReceived",
+        "options": {}
+      }
+    },
+    {
+      "id": "context",
+      "name": "Frozen LXC TTS Provenance",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{runId:'tts-provenance-regression/2026-08-09/1',date:'2026-08-09',episode:126,ttsProcessor:'lxc-137-cpu',ttsProcessorLabel:'LXC 137 (CPU)',ttsEndpointHost:'chatterbox.transformers.lan',ttsProfile:'chatterbox-turbo-ct137-visible-v1'}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "notification",
+      "name": "Prepare Provenance Telegram Confirmation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const c=$input.first().json;\nreturn [{json:{...c,text:`\ud83e\uddea TTS provenance regression \u2014 EP #${c.episode}\\n\ud83d\udde3\ufe0f TTS processor: ${c.ttsProcessorLabel}\\nProfile: ${c.ttsProfile}`}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "telegram",
+      "name": "Telegram - Send Provenance Confirmation",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "8100669692",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "disable_notification": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "oOpvPw9TPukkiYK6",
+          "name": "Guru's Tech Bytes Bot (podcast)"
+        }
+      }
+    },
+    {
+      "id": "gate",
+      "name": "Validate Telegram + Provenance Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const sent=$input.first().json,c=$('Prepare Provenance Telegram Confirmation').first().json,id=sent.result?.message_id;\nif(!Number.isInteger(id)||id<1)throw new Error('Telegram provenance confirmation missing');\nif(c.ttsProcessor!=='lxc-137-cpu'||c.ttsProcessorLabel!=='LXC 137 (CPU)'||!c.text.includes('TTS processor: LXC 137 (CPU)')||!c.text.includes(c.ttsProfile))throw new Error('TTS provenance contract invalid');\nreturn [{json:{...c,telegramMessageId:id,validated:true}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "ledger",
+      "name": "Ledger - TTS Provenance Regression Passed",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "podcast_run_ledger"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $json.runId }}",
+            "execution_id": "={{ $execution.id }}",
+            "run_mode": "regression",
+            "episode": "={{ $json.episode }}",
+            "episode_date": "={{ $json.date }}",
+            "stage": "tts-provenance-regression",
+            "status": "passed",
+            "attempt": 1,
+            "selected_stories_json": "",
+            "script_sha256": "",
+            "audio_sha256": "",
+            "srt_sha256": "",
+            "tts_processor": "={{ $json.ttsProcessor }}",
+            "tts_endpoint_host": "={{ $json.ttsEndpointHost }}",
+            "tts_profile": "={{ $json.ttsProfile }}",
+            "qa_json": "={{ JSON.stringify({tts:{processor:$json.ttsProcessor,label:$json.ttsProcessorLabel,endpointHost:$json.ttsEndpointHost,profile:$json.ttsProfile},telegramMessageId:$json.telegramMessageId}) }}",
+            "artifact_urls_json": "",
+            "error": "",
+            "started_at": "={{ $now.toISO() }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "return",
+      "name": "Return TTS Provenance Regression Proof",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:$('Validate Telegram + Provenance Contract').first().json}];"
+      },
+      "notes": ""
+    }
+  ],
+  "connections": {
+    "Published TTS Provenance Regression Webhook": {
+      "main": [
+        [
+          {
+            "node": "Frozen LXC TTS Provenance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Frozen LXC TTS Provenance": {
+      "main": [
+        [
+          {
+            "node": "Prepare Provenance Telegram Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Provenance Telegram Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Send Provenance Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram - Send Provenance Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Validate Telegram + Provenance Contract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Telegram + Provenance Contract": {
+      "main": [
+        [
+          {
+            "node": "Ledger - TTS Provenance Regression Passed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger - TTS Provenance Regression Passed": {
+      "main": [
+        [
+          {
+            "node": "Return TTS Provenance Regression Proof",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "tags": []
+}

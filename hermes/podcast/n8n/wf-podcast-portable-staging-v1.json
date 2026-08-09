@@ -25,7 +25,7 @@
       ],
       "parameters": {
         "inputSource": "jsonExample",
-        "jsonExample": "{\n  \"runMode\": \"shadow\",\n  \"publishMode\": \"staging\",\n  \"date\": \"2026-08-08\",\n  \"runId\": \"portable-shadow/example\",\n  \"episode\": 125,\n  \"selectedStories\": [],\n  \"scriptText\": \"approved\",\n  \"script_sha256\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"audio_sha256\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"audioQa\": {\n    \"duration_seconds\": 120\n  },\n  \"srt_sha256\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"alignment\": {},\n  \"transcriptionValidated\": true\n}"
+        "jsonExample": "{\n  \"runMode\": \"shadow\",\n  \"publishMode\": \"staging\",\n  \"date\": \"2026-08-08\",\n  \"runId\": \"portable-shadow/example\",\n  \"episode\": 125,\n  \"selectedStories\": [],\n  \"scriptText\": \"approved\",\n  \"script_sha256\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"audio_sha256\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"audioQa\": {\n    \"duration_seconds\": 120\n  },\n  \"ttsProcessor\": \"lxc-137-cpu\",\n  \"ttsProcessorLabel\": \"LXC 137 (CPU)\",\n  \"ttsEndpointHost\": \"chatterbox.transformers.lan\",\n  \"ttsProfile\": \"chatterbox-turbo-ct137-visible-v1\",\n  \"srt_sha256\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"alignment\": {},\n  \"transcriptionValidated\": true\n}"
       }
     },
     {
@@ -75,6 +75,9 @@
             "script_sha256": "",
             "audio_sha256": "",
             "srt_sha256": "={{ $('Portable Staging Context').first().json.srt.sha256 }}",
+            "tts_processor": "={{ $('Portable Staging Context').first().json.ttsProcessor || '' }}",
+            "tts_endpoint_host": "={{ $('Portable Staging Context').first().json.ttsEndpointHost || '' }}",
+            "tts_profile": "={{ $('Portable Staging Context').first().json.ttsProfile || '' }}",
             "qa_json": "",
             "artifact_urls_json": "",
             "error": "",
@@ -322,6 +325,9 @@
             "script_sha256": "",
             "audio_sha256": "={{ $('Portable Staging Context').first().json.audio.sha256 }}",
             "srt_sha256": "={{ $('Portable Staging Context').first().json.srt.sha256 }}",
+            "tts_processor": "={{ $('Portable Staging Context').first().json.ttsProcessor || '' }}",
+            "tts_endpoint_host": "={{ $('Portable Staging Context').first().json.ttsEndpointHost || '' }}",
+            "tts_profile": "={{ $('Portable Staging Context').first().json.ttsProfile || '' }}",
             "qa_json": "={{ JSON.stringify($('Portable Staging Context').first().json.audio) }}",
             "artifact_urls_json": "={{ JSON.stringify({audio:$('Validate Cloudinary Upload').first().json.secure_url}) }}",
             "error": "",
@@ -562,6 +568,9 @@
             "script_sha256": "",
             "audio_sha256": "={{ $('Portable Staging Context').first().json.audio.sha256 }}",
             "srt_sha256": "={{ $('Portable Staging Context').first().json.srt.sha256 }}",
+            "tts_processor": "={{ $('Portable Staging Context').first().json.ttsProcessor || '' }}",
+            "tts_endpoint_host": "={{ $('Portable Staging Context').first().json.ttsEndpointHost || '' }}",
+            "tts_profile": "={{ $('Portable Staging Context').first().json.ttsProfile || '' }}",
             "qa_json": "",
             "artifact_urls_json": "={{ JSON.stringify({audio:$('Validate Cloudinary Upload').first().json.secure_url,branch:$('Validate GitHub Commit').first().json.branch,path:$('Validate GitHub Commit').first().json.path,commit:$('Validate GitHub Commit').first().json.commitSha}) }}",
             "error": "",
@@ -658,6 +667,9 @@
             "script_sha256": "",
             "audio_sha256": "={{ $('Portable Staging Context').first().json.audio.sha256 }}",
             "srt_sha256": "={{ $('Portable Staging Context').first().json.srt.sha256 }}",
+            "tts_processor": "={{ $('Portable Staging Context').first().json.ttsProcessor || '' }}",
+            "tts_endpoint_host": "={{ $('Portable Staging Context').first().json.ttsEndpointHost || '' }}",
+            "tts_profile": "={{ $('Portable Staging Context').first().json.ttsProfile || '' }}",
             "qa_json": "",
             "artifact_urls_json": "",
             "error": "",
@@ -680,7 +692,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const fixture = $('Portable Staging Context').first().json;\nconst git = $('Validate GitHub Commit').first().json;\nreturn [{json:{text:`\ud83e\uddea Portable n8n staging verified \u2014 ${fixture.portableRunId}; Cloudinary direct; GitHub ${git.commitSha.slice(0,12)}; DB rolled back.`}}];"
+        "jsCode": "const fixture = $('Portable Staging Context').first().json;\nconst git = $('Validate GitHub Commit').first().json;\nreturn [{json:{text:`\ud83e\uddea Portable n8n staging verified \u2014 ${fixture.portableRunId}; TTS ${fixture.ttsProcessorLabel||'fixture/unknown'}; Cloudinary direct; GitHub ${git.commitSha.slice(0,12)}; DB rolled back.`}}];"
       },
       "notes": ""
     },
@@ -756,7 +768,10 @@
             "script_sha256": "",
             "audio_sha256": "={{ $('Portable Staging Context').first().json.audio.sha256 }}",
             "srt_sha256": "={{ $('Portable Staging Context').first().json.srt.sha256 }}",
-            "qa_json": "={{ JSON.stringify({audio:$('Portable Staging Context').first().json.audio,srt:$('Portable Staging Context').first().json.srt.alignment}) }}",
+            "tts_processor": "={{ $('Portable Staging Context').first().json.ttsProcessor || '' }}",
+            "tts_endpoint_host": "={{ $('Portable Staging Context').first().json.ttsEndpointHost || '' }}",
+            "tts_profile": "={{ $('Portable Staging Context').first().json.ttsProfile || '' }}",
+            "qa_json": "={{ JSON.stringify({audio:$('Portable Staging Context').first().json.audio,srt:$('Portable Staging Context').first().json.srt.alignment,tts:{processor:$('Portable Staging Context').first().json.ttsProcessor,label:$('Portable Staging Context').first().json.ttsProcessorLabel,endpointHost:$('Portable Staging Context').first().json.ttsEndpointHost,profile:$('Portable Staging Context').first().json.ttsProfile}}) }}",
             "artifact_urls_json": "={{ JSON.stringify({audio:$('Validate Cloudinary Upload').first().json.secure_url,github:$('Validate GitHub Commit').first().json}) }}",
             "error": "",
             "started_at": "={{ $('Portable Staging Context').first().json.startedAt }}",
@@ -790,7 +805,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const c=$('Portable Staging Context').first().json,u=$('Validate Cloudinary Upload').first().json,g=$('Validate GitHub Commit').first().json,n=$('Validate Staging Notification').first().json;\nreturn [{json:{runMode:c.runMode,publishMode:'staging',date:c.date,runId:c.portableRunId,episode:c.episode,audio_sha256:c.audio.sha256,srt_sha256:c.srt.sha256,cloudinary:{publicId:u.public_id,secureUrl:u.secure_url,bytes:u.bytes},github:g,telegramMessageId:n.messageId,databaseRolledBack:true,distributionValidated:true}}];"
+        "jsCode": "const c=$('Portable Staging Context').first().json,u=$('Validate Cloudinary Upload').first().json,g=$('Validate GitHub Commit').first().json,n=$('Validate Staging Notification').first().json;\nreturn [{json:{runMode:c.runMode,publishMode:'staging',date:c.date,runId:c.portableRunId,episode:c.episode,audio_sha256:c.audio.sha256,srt_sha256:c.srt.sha256,ttsProcessor:c.ttsProcessor,ttsProcessorLabel:c.ttsProcessorLabel,ttsEndpointHost:c.ttsEndpointHost,ttsProfile:c.ttsProfile,cloudinary:{publicId:u.public_id,secureUrl:u.secure_url,bytes:u.bytes},github:g,telegramMessageId:n.messageId,databaseRolledBack:true,distributionValidated:true}}];"
       },
       "notes": ""
     }

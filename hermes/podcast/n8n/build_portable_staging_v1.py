@@ -80,6 +80,9 @@ def ledger_node(node_id: str, name: str, x: int, stage: str, status: str, **fiel
         "script_sha256": fields.get("script_sha256", ""),
         "audio_sha256": fields.get("audio_sha256", ""),
         "srt_sha256": "={{ $('Portable Staging Context').first().json.srt.sha256 }}",
+        "tts_processor": "={{ $('Portable Staging Context').first().json.ttsProcessor || '' }}",
+        "tts_endpoint_host": "={{ $('Portable Staging Context').first().json.ttsEndpointHost || '' }}",
+        "tts_profile": "={{ $('Portable Staging Context').first().json.ttsProfile || '' }}",
         "qa_json": fields.get("qa_json", ""),
         "artifact_urls_json": fields.get("artifact_urls_json", ""),
         "error": "",
@@ -119,7 +122,7 @@ return [{json:{...fixture,portableRunId:`portable-staging/${fixture.sourceExecut
 
     nodes: list[dict] = [
         node("manual", "Manual Portable Staging Trigger", "n8n-nodes-base.manualTrigger", 0, {}),
-        node("sub_trigger", "When Called by Parent Workflow", "n8n-nodes-base.executeWorkflowTrigger", 0, {"inputSource": "jsonExample", "jsonExample": json.dumps({"runMode": "shadow", "publishMode": "staging", "date": "2026-08-08", "runId": "portable-shadow/example", "episode": 125, "selectedStories": [], "scriptText": "approved", "script_sha256": "0" * 64, "audio_sha256": "0" * 64, "audioQa": {"duration_seconds": 120}, "srt_sha256": "0" * 64, "alignment": {}, "transcriptionValidated": True}, indent=2)}, typeVersion=1.2, position=[0, 180]),
+        node("sub_trigger", "When Called by Parent Workflow", "n8n-nodes-base.executeWorkflowTrigger", 0, {"inputSource": "jsonExample", "jsonExample": json.dumps({"runMode": "shadow", "publishMode": "staging", "date": "2026-08-08", "runId": "portable-shadow/example", "episode": 125, "selectedStories": [], "scriptText": "approved", "script_sha256": "0" * 64, "audio_sha256": "0" * 64, "audioQa": {"duration_seconds": 120}, "ttsProcessor": "lxc-137-cpu", "ttsProcessorLabel": "LXC 137 (CPU)", "ttsEndpointHost": "chatterbox.transformers.lan", "ttsProfile": "chatterbox-turbo-ct137-visible-v1", "srt_sha256": "0" * 64, "alignment": {}, "transcriptionValidated": True}, indent=2)}, typeVersion=1.2, position=[0, 180]),
         code_node("context", "Portable Staging Context", 240, fixture_code, "Frozen execution-37 fixture; no credential, path, or worker URL."),
         ledger_node("ledger_start", "Ledger - Staging Started", 480, "staging-start", "running"),
         node(
@@ -387,7 +390,7 @@ return [{json:row}];""",
             6000,
             r"""const fixture = $('Portable Staging Context').first().json;
 const git = $('Validate GitHub Commit').first().json;
-return [{json:{text:`🧪 Portable n8n staging verified — ${fixture.portableRunId}; Cloudinary direct; GitHub ${git.commitSha.slice(0,12)}; DB rolled back.`}}];""",
+return [{json:{text:`🧪 Portable n8n staging verified — ${fixture.portableRunId}; TTS ${fixture.ttsProcessorLabel||'fixture/unknown'}; Cloudinary direct; GitHub ${git.commitSha.slice(0,12)}; DB rolled back.`}}];""",
         ),
         node(
             "telegram",
@@ -414,14 +417,14 @@ return [{json:{messageId,verified:true}}];""",
             "staging-complete",
             "passed",
             audio_sha256="={{ $('Portable Staging Context').first().json.audio.sha256 }}",
-            qa_json="={{ JSON.stringify({audio:$('Portable Staging Context').first().json.audio,srt:$('Portable Staging Context').first().json.srt.alignment}) }}",
+            qa_json="={{ JSON.stringify({audio:$('Portable Staging Context').first().json.audio,srt:$('Portable Staging Context').first().json.srt.alignment,tts:{processor:$('Portable Staging Context').first().json.ttsProcessor,label:$('Portable Staging Context').first().json.ttsProcessorLabel,endpointHost:$('Portable Staging Context').first().json.ttsEndpointHost,profile:$('Portable Staging Context').first().json.ttsProfile}}) }}",
             artifact_urls_json="={{ JSON.stringify({audio:$('Validate Cloudinary Upload').first().json.secure_url,github:$('Validate GitHub Commit').first().json}) }}",
         ),
         node("stop", "Portable Staging Stop", "n8n-nodes-base.noOp", 6960, {}, notes="Hard stop. No production branch, production table, scheduler, or media notification exists."),
         code_node(
             "return_contract", "Return Staging Distribution Contract", 7200,
             r"""const c=$('Portable Staging Context').first().json,u=$('Validate Cloudinary Upload').first().json,g=$('Validate GitHub Commit').first().json,n=$('Validate Staging Notification').first().json;
-return [{json:{runMode:c.runMode,publishMode:'staging',date:c.date,runId:c.portableRunId,episode:c.episode,audio_sha256:c.audio.sha256,srt_sha256:c.srt.sha256,cloudinary:{publicId:u.public_id,secureUrl:u.secure_url,bytes:u.bytes},github:g,telegramMessageId:n.messageId,databaseRolledBack:true,distributionValidated:true}}];""",
+return [{json:{runMode:c.runMode,publishMode:'staging',date:c.date,runId:c.portableRunId,episode:c.episode,audio_sha256:c.audio.sha256,srt_sha256:c.srt.sha256,ttsProcessor:c.ttsProcessor,ttsProcessorLabel:c.ttsProcessorLabel,ttsEndpointHost:c.ttsEndpointHost,ttsProfile:c.ttsProfile,cloudinary:{publicId:u.public_id,secureUrl:u.secure_url,bytes:u.bytes},github:g,telegramMessageId:n.messageId,databaseRolledBack:true,distributionValidated:true}}];""",
         ),
     ]
 

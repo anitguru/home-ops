@@ -131,6 +131,9 @@ Restore or create `podcast_run_ledger` with the schema encoded in
 `bootstrap-podcast-run-ledger.json`. The proven run wrote distinct rows for
 start, intake, authoring, media QA, transcription QA, staging actions, and
 cleanup evidence. Treat this table as operational history, not secret storage.
+The recovery schema includes `tts_processor`, `tts_endpoint_host`, and
+`tts_profile`; do not omit them, because production now hard-gates and reports
+the processor provenance for every accepted episode.
 
 ## Acceptance test after restore
 

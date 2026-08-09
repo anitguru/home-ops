@@ -72,7 +72,7 @@ if(!['shadow','production'].includes(r.runMode)) throw new Error('media requires
 if(!/^[a-f0-9]{64}$/.test(String(r.script_sha256||''))) throw new Error('approved script hash missing');
 const segments=String(r.scriptText||'').split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);
 if(segments.length!==6||segments.some(x=>x.length<10)) throw new Error('media requires six non-empty paragraphs');
-return [{json:{...r,segments,ttsProfile:'chatterbox-turbo-ct137-visible-v1'}}];""",
+return [{json:{...r,segments,ttsProcessor:'lxc-137-cpu',ttsProcessorLabel:'LXC 137 (CPU)',ttsEndpointHost:'chatterbox.transformers.lan',ttsProfile:'chatterbox-turbo-ct137-visible-v1'}}];""",
         ),
         *[tts_node(index, 480 + index * 240) for index in range(1, 7)],
         http(
@@ -125,7 +125,7 @@ return [{json:{...context,audio_sha256:r.audio_sha256,audioQa:{duration_seconds:
             "n8n-nodes-base.dataTable",
             3120,
             0,
-            {"resource": "row", "operation": "insert", "dataTableId": {"mode": "name", "value": "podcast_run_ledger"}, "columns": {"mappingMode": "defineBelow", "value": {"run_id": "={{ $json.runId }}", "execution_id": "={{ $execution.id }}", "run_mode": "shadow", "episode": "={{ $json.episode }}", "episode_date": "={{ $json.date }}", "stage": "media-qa", "status": "passed", "attempt": 1, "selected_stories_json": "={{ JSON.stringify($json.selectedStories) }}", "script_sha256": "={{ $json.script_sha256 }}", "audio_sha256": "={{ $json.audio_sha256 }}", "srt_sha256": "", "qa_json": "={{ JSON.stringify($json.audioQa) }}", "artifact_urls_json": "", "error": "", "started_at": "={{ $now.toISO() }}", "updated_at": "={{ $now.toISO() }}"}}, "options": {}},
+            {"resource": "row", "operation": "insert", "dataTableId": {"mode": "name", "value": "podcast_run_ledger"}, "columns": {"mappingMode": "defineBelow", "value": {"run_id": "={{ $json.runId }}", "execution_id": "={{ $execution.id }}", "run_mode": "shadow", "episode": "={{ $json.episode }}", "episode_date": "={{ $json.date }}", "stage": "media-qa", "status": "passed", "attempt": 1, "selected_stories_json": "={{ JSON.stringify($json.selectedStories) }}", "script_sha256": "={{ $json.script_sha256 }}", "audio_sha256": "={{ $json.audio_sha256 }}", "srt_sha256": "", "tts_processor": "={{ $json.ttsProcessor }}", "tts_endpoint_host": "={{ $json.ttsEndpointHost }}", "tts_profile": "={{ $json.ttsProfile }}", "qa_json": "={{ JSON.stringify({audio:$json.audioQa,tts:{processor:$json.ttsProcessor,label:$json.ttsProcessorLabel,endpointHost:$json.ttsEndpointHost,profile:$json.ttsProfile}}) }}", "artifact_urls_json": "", "error": "", "started_at": "={{ $now.toISO() }}", "updated_at": "={{ $now.toISO() }}"}}, "options": {}},
             typeVersion=1.1,
         ),
         node("merge_contract", "Merge Audio Binary + Media Contract", "n8n-nodes-base.merge", 3360, 0, {"mode": "combine", "combineBy": "combineByPosition", "options": {}}, typeVersion=3.2),
@@ -136,7 +136,7 @@ return [{json:{...context,audio_sha256:r.audio_sha256,audioQa:{duration_seconds:
             0,
             r"""const r=$input.first();const qa=JSON.parse(r.json.qa_json||'{}');
 if(!r.binary?.audio) throw new Error('assembled audio binary missing at media boundary');
-return [{json:{runMode:r.json.runMode,date:r.json.date,runId:r.json.runId,episode:r.json.episode,selectedStories:r.json.selectedStories,scriptText:r.json.scriptText,script_sha256:r.json.script_sha256,audio_sha256:r.json.audio_sha256,audioQa:qa,mediaValidated:true,ttsProfile:r.json.ttsProfile},binary:{audio:r.binary.audio}}];""",
+return [{json:{runMode:r.json.runMode,date:r.json.date,runId:r.json.runId,episode:r.json.episode,selectedStories:r.json.selectedStories,scriptText:r.json.scriptText,script_sha256:r.json.script_sha256,audio_sha256:r.json.audio_sha256,audioQa:qa,mediaValidated:true,ttsProcessor:r.json.ttsProcessor,ttsProcessorLabel:r.json.ttsProcessorLabel,ttsEndpointHost:r.json.ttsEndpointHost,ttsProfile:r.json.ttsProfile},binary:{audio:r.binary.audio}}];""",
             notes="Reusable boundary returns one assembled audio binary and the explicit validated contract; temporary segment binaries do not leave this workflow.",
         ),
     ]

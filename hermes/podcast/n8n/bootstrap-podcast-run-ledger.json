@@ -78,6 +78,18 @@
               "type": "string"
             },
             {
+              "name": "tts_processor",
+              "type": "string"
+            },
+            {
+              "name": "tts_endpoint_host",
+              "type": "string"
+            },
+            {
+              "name": "tts_profile",
+              "type": "string"
+            },
+            {
               "name": "qa_json",
               "type": "string"
             },

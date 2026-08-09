@@ -49,7 +49,7 @@ def build() -> dict:
     nodes = [
         node(
             "sub_trigger", "When Called by Manual Production Parent", "n8n-nodes-base.executeWorkflowTrigger", 0,
-            {"inputSource": "jsonExample", "jsonExample": json.dumps({"runMode": "production", "publishMode": "production", "manualProductionApproved": True, "date": "2026-08-08", "runId": "portable-production/2026-08-08/example", "episode": 125, "selectedStories": [], "scriptText": "approved", "script_sha256": "0" * 64, "audio_sha256": "0" * 64, "audioQa": {"duration_seconds": 120}, "srt_sha256": "0" * 64, "alignment": {}, "transcriptionValidated": True}, indent=2)},
+            {"inputSource": "jsonExample", "jsonExample": json.dumps({"runMode": "production", "publishMode": "production", "manualProductionApproved": True, "date": "2026-08-08", "runId": "portable-production/2026-08-08/example", "episode": 125, "selectedStories": [], "scriptText": "approved", "script_sha256": "0" * 64, "audio_sha256": "0" * 64, "audioQa": {"duration_seconds": 120}, "ttsProcessor": "lxc-137-cpu", "ttsProcessorLabel": "LXC 137 (CPU)", "ttsEndpointHost": "chatterbox.transformers.lan", "ttsProfile": "chatterbox-turbo-ct137-visible-v1", "srt_sha256": "0" * 64, "alignment": {}, "transcriptionValidated": True}, indent=2)},
             typeVersion=1.2,
         ),
         code_node(
@@ -57,6 +57,7 @@ def build() -> dict:
             r"""const i=$input.first();const r=i.json;
 if(!i.binary?.audio||!i.binary?.srt) throw new Error('production audio/SRT binaries missing');
 const seconds=Number(r.audioQa?.duration_seconds);const duration=`${Math.floor(seconds/60)}:${String(Math.round(seconds%60)).padStart(2,'0')}`;
+if(!['lxc-137-cpu','rgb-rtx4090'].includes(String(r.ttsProcessor||''))||!r.ttsProcessorLabel||!r.ttsEndpointHost||!r.ttsProfile) throw new Error('production TTS processor provenance missing');
 return [{json:{...r,startedAt:$now.toISO(),audio:{sha256:r.audio_sha256,bytes:0,durationSeconds:seconds,duration},srt:{sha256:r.srt_sha256,alignment:r.alignment}},binary:{audio:i.binary.audio,srt:i.binary.srt}}];""",
         ),
         code_node(
@@ -163,7 +164,7 @@ if(f.path!==e.path||d!==e.markdown||!/^[a-f0-9]{40}$/.test(String(c.commit?.sha|
         ledger_node("ledger_db", "Ledger - Production Supabase Verified", 6240, "production-database", "passed", audio_sha256="={{ $('Prepare Production Distribution Context').first().json.audio.sha256 }}", artifact_urls_json="={{ JSON.stringify({audio:$('Validate Production Cloudinary Upload').first().json.secure_url}) }}"),
         code_node(
             "notification", "Prepare Production Notification", 6480,
-            r"""const c=$('Prepare Production Distribution Context').first().json,u=$('Validate Production Cloudinary Upload').first().json;return [{json:{text:`🎙️ Guru's Tech Bytes EP #${c.episode} is live — ${c.date}\n${u.secure_url}`}}];""",
+            r"""const c=$('Prepare Production Distribution Context').first().json,u=$('Validate Production Cloudinary Upload').first().json;return [{json:{text:`🎙️ Guru's Tech Bytes EP #${c.episode} is live — ${c.date}\n🗣️ TTS processor: ${c.ttsProcessorLabel}\nProfile: ${c.ttsProfile}\n${u.secure_url}`}}];""",
         ),
         node("telegram_text", "Telegram - Send Production Summary", "n8n-nodes-base.telegram", 6720, {"resource": "message", "operation": "sendMessage", "chatId": "8100669692", "text": "={{ $json.text }}", "additionalFields": {}}, typeVersion=1.2, credentials=TELEGRAM_CREDENTIAL),
         code_node("restore_notify_audio", "Restore Audio for Telegram", 6960, r"""const c=$('Prepare Production Distribution Context').first();return [{json:{},binary:{audio:c.binary.audio}}];"""),
@@ -174,10 +175,10 @@ if(f.path!==e.path||d!==e.markdown||!/^[a-f0-9]{40}$/.test(String(c.commit?.sha|
             "validate_notifications", "Validate Production Telegram Delivery", 7920,
             r"""const ids=[$('Telegram - Send Production Summary').first().json.result?.message_id,$('Telegram - Send Production MP3').first().json.result?.message_id,$input.first().json.result?.message_id];if(ids.some(x=>!Number.isInteger(x)||x<1))throw new Error('production Telegram delivery missing');return [{json:{messageIds:ids,verified:true}}];""",
         ),
-        ledger_node("ledger_complete", "Ledger - Manual Production Complete", 8160, "production-complete", "passed", audio_sha256="={{ $('Prepare Production Distribution Context').first().json.audio.sha256 }}", srt_sha256="={{ $('Prepare Production Distribution Context').first().json.srt.sha256 }}", qa_json="={{ JSON.stringify({audio:$('Prepare Production Distribution Context').first().json.audio,srt:$('Prepare Production Distribution Context').first().json.srt.alignment}) }}", artifact_urls_json="={{ JSON.stringify({audio:$('Validate Production Cloudinary Upload').first().json.secure_url,github:$('Validate Production GitHub Readback').first().json,telegram:$('Validate Production Telegram Delivery').first().json.messageIds}) }}"),
+        ledger_node("ledger_complete", "Ledger - Manual Production Complete", 8160, "production-complete", "passed", audio_sha256="={{ $('Prepare Production Distribution Context').first().json.audio.sha256 }}", srt_sha256="={{ $('Prepare Production Distribution Context').first().json.srt.sha256 }}", qa_json="={{ JSON.stringify({audio:$('Prepare Production Distribution Context').first().json.audio,srt:$('Prepare Production Distribution Context').first().json.srt.alignment,tts:{processor:$('Prepare Production Distribution Context').first().json.ttsProcessor,label:$('Prepare Production Distribution Context').first().json.ttsProcessorLabel,endpointHost:$('Prepare Production Distribution Context').first().json.ttsEndpointHost,profile:$('Prepare Production Distribution Context').first().json.ttsProfile}}) }}", artifact_urls_json="={{ JSON.stringify({audio:$('Validate Production Cloudinary Upload').first().json.secure_url,github:$('Validate Production GitHub Readback').first().json,telegram:$('Validate Production Telegram Delivery').first().json.messageIds}) }}"),
         code_node(
             "return_contract", "Return Production Distribution Contract", 8400,
-            r"""const c=$('Prepare Production Distribution Context').first().json,u=$('Validate Production Cloudinary Upload').first().json,g=$('Validate Production GitHub Readback').first().json,n=$('Validate Production Telegram Delivery').first().json;return [{json:{runMode:c.runMode,publishMode:'production',date:c.date,runId:c.runId,episode:c.episode,audio_sha256:c.audio.sha256,srt_sha256:c.srt.sha256,cloudinary:{publicId:u.public_id,secureUrl:u.secure_url,bytes:u.bytes},github:g,supabasePersisted:true,telegramMessageIds:n.messageIds,distributionValidated:true}}];""",
+            r"""const c=$('Prepare Production Distribution Context').first().json,u=$('Validate Production Cloudinary Upload').first().json,g=$('Validate Production GitHub Readback').first().json,n=$('Validate Production Telegram Delivery').first().json;return [{json:{runMode:c.runMode,publishMode:'production',date:c.date,runId:c.runId,episode:c.episode,audio_sha256:c.audio.sha256,srt_sha256:c.srt.sha256,ttsProcessor:c.ttsProcessor,ttsProcessorLabel:c.ttsProcessorLabel,ttsEndpointHost:c.ttsEndpointHost,ttsProfile:c.ttsProfile,cloudinary:{publicId:u.public_id,secureUrl:u.secure_url,bytes:u.bytes},github:g,supabasePersisted:true,telegramMessageIds:n.messageIds,distributionValidated:true}}];""",
         ),
     ]
 

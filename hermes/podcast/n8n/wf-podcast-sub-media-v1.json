@@ -56,7 +56,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const r=$input.first().json;\nif(!['shadow','production'].includes(r.runMode)) throw new Error('media requires shadow or production mode');\nif(!/^[a-f0-9]{64}$/.test(String(r.script_sha256||''))) throw new Error('approved script hash missing');\nconst segments=String(r.scriptText||'').split(/\\n\\s*\\n/).map(x=>x.trim()).filter(Boolean);\nif(segments.length!==6||segments.some(x=>x.length<10)) throw new Error('media requires six non-empty paragraphs');\nreturn [{json:{...r,segments,ttsProfile:'chatterbox-turbo-ct137-visible-v1'}}];"
+        "jsCode": "const r=$input.first().json;\nif(!['shadow','production'].includes(r.runMode)) throw new Error('media requires shadow or production mode');\nif(!/^[a-f0-9]{64}$/.test(String(r.script_sha256||''))) throw new Error('approved script hash missing');\nconst segments=String(r.scriptText||'').split(/\\n\\s*\\n/).map(x=>x.trim()).filter(Boolean);\nif(segments.length!==6||segments.some(x=>x.length<10)) throw new Error('media requires six non-empty paragraphs');\nreturn [{json:{...r,segments,ttsProcessor:'lxc-137-cpu',ttsProcessorLabel:'LXC 137 (CPU)',ttsEndpointHost:'chatterbox.transformers.lan',ttsProfile:'chatterbox-turbo-ct137-visible-v1'}}];"
       },
       "notes": ""
     },
@@ -405,7 +405,10 @@
             "script_sha256": "={{ $json.script_sha256 }}",
             "audio_sha256": "={{ $json.audio_sha256 }}",
             "srt_sha256": "",
-            "qa_json": "={{ JSON.stringify($json.audioQa) }}",
+            "tts_processor": "={{ $json.ttsProcessor }}",
+            "tts_endpoint_host": "={{ $json.ttsEndpointHost }}",
+            "tts_profile": "={{ $json.ttsProfile }}",
+            "qa_json": "={{ JSON.stringify({audio:$json.audioQa,tts:{processor:$json.ttsProcessor,label:$json.ttsProcessorLabel,endpointHost:$json.ttsEndpointHost,profile:$json.ttsProfile}}) }}",
             "artifact_urls_json": "",
             "error": "",
             "started_at": "={{ $now.toISO() }}",
@@ -442,7 +445,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const r=$input.first();const qa=JSON.parse(r.json.qa_json||'{}');\nif(!r.binary?.audio) throw new Error('assembled audio binary missing at media boundary');\nreturn [{json:{runMode:r.json.runMode,date:r.json.date,runId:r.json.runId,episode:r.json.episode,selectedStories:r.json.selectedStories,scriptText:r.json.scriptText,script_sha256:r.json.script_sha256,audio_sha256:r.json.audio_sha256,audioQa:qa,mediaValidated:true,ttsProfile:r.json.ttsProfile},binary:{audio:r.binary.audio}}];"
+        "jsCode": "const r=$input.first();const qa=JSON.parse(r.json.qa_json||'{}');\nif(!r.binary?.audio) throw new Error('assembled audio binary missing at media boundary');\nreturn [{json:{runMode:r.json.runMode,date:r.json.date,runId:r.json.runId,episode:r.json.episode,selectedStories:r.json.selectedStories,scriptText:r.json.scriptText,script_sha256:r.json.script_sha256,audio_sha256:r.json.audio_sha256,audioQa:qa,mediaValidated:true,ttsProcessor:r.json.ttsProcessor,ttsProcessorLabel:r.json.ttsProcessorLabel,ttsEndpointHost:r.json.ttsEndpointHost,ttsProfile:r.json.ttsProfile},binary:{audio:r.binary.audio}}];"
       },
       "notes": "Reusable boundary returns one assembled audio binary and the explicit validated contract; temporary segment binaries do not leave this workflow."
     }

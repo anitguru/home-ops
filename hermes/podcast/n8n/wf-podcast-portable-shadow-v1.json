@@ -406,7 +406,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const i=$input.first(),r=i.json,q=r.audioQa||{};\nif(r.mediaValidated!==true||!i.binary?.audio) throw new Error('media proof/audio missing');\nif(!/^[a-f0-9]{64}$/.test(String(r.audio_sha256||''))) throw new Error('audio hash missing');\nif(q.duration_seconds<60||q.integrated_lufs<-18||q.integrated_lufs>-14||q.true_peak_dbtp>-1.5||q.clipped_samples!==0||q.long_silence_ratio>0.08) throw new Error('media QA contract invalid');\nreturn [i];"
+        "jsCode": "const i=$input.first(),r=i.json,q=r.audioQa||{};\nif(r.mediaValidated!==true||!i.binary?.audio) throw new Error('media proof/audio missing');\nif(!/^[a-f0-9]{64}$/.test(String(r.audio_sha256||''))) throw new Error('audio hash missing');\nif(!['lxc-137-cpu','rgb-rtx4090'].includes(String(r.ttsProcessor||''))||!r.ttsProcessorLabel||!r.ttsEndpointHost||!r.ttsProfile) throw new Error('TTS processor provenance missing');\nif(q.duration_seconds<60||q.integrated_lufs<-18||q.integrated_lufs>-14||q.true_peak_dbtp>-1.5||q.clipped_samples!==0||q.long_silence_ratio>0.08) throw new Error('media QA contract invalid');\nreturn [i];"
       },
       "notes": ""
     },
@@ -439,7 +439,11 @@
             "script_sha256": "={{ $json.script_sha256 }}",
             "audio_sha256": "={{ $json.audio_sha256 }}",
             "audioQa": "={{ $json.audioQa }}",
-            "mediaValidated": "={{ $json.mediaValidated }}"
+            "mediaValidated": "={{ $json.mediaValidated }}",
+            "ttsProcessor": "={{ $json.ttsProcessor }}",
+            "ttsProcessorLabel": "={{ $json.ttsProcessorLabel }}",
+            "ttsEndpointHost": "={{ $json.ttsEndpointHost }}",
+            "ttsProfile": "={{ $json.ttsProfile }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -532,6 +536,42 @@
               "display": true,
               "canBeUsedToMatch": true,
               "type": "boolean"
+            },
+            {
+              "id": "ttsProcessor",
+              "displayName": "ttsProcessor",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "ttsProcessorLabel",
+              "displayName": "ttsProcessorLabel",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "ttsEndpointHost",
+              "displayName": "ttsEndpointHost",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "ttsProfile",
+              "displayName": "ttsProfile",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
             }
           ],
           "attemptToConvertTypes": false,
@@ -590,6 +630,10 @@
             "script_sha256": "={{ $json.script_sha256 }}",
             "audio_sha256": "={{ $json.audio_sha256 }}",
             "audioQa": "={{ $json.audioQa }}",
+            "ttsProcessor": "={{ $json.ttsProcessor }}",
+            "ttsProcessorLabel": "={{ $json.ttsProcessorLabel }}",
+            "ttsEndpointHost": "={{ $json.ttsEndpointHost }}",
+            "ttsProfile": "={{ $json.ttsProfile }}",
             "srt_sha256": "={{ $json.srt_sha256 }}",
             "alignment": "={{ $json.alignment }}",
             "transcriptionValidated": "={{ $json.transcriptionValidated }}"
@@ -685,6 +729,42 @@
               "display": true,
               "canBeUsedToMatch": true,
               "type": "object"
+            },
+            {
+              "id": "ttsProcessor",
+              "displayName": "ttsProcessor",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "ttsProcessorLabel",
+              "displayName": "ttsProcessorLabel",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "ttsEndpointHost",
+              "displayName": "ttsEndpointHost",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "ttsProfile",
+              "displayName": "ttsProfile",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
             },
             {
               "id": "srt_sha256",

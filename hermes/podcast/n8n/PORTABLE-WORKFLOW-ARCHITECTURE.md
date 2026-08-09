@@ -119,6 +119,28 @@ write the final Data Table ledger. They contain no SSH or schedule nodes. After
 successful production execution and independent readback, the live one-shots
 are archived while their builders and JSON exports remain versioned here.
 
+## TTS processor provenance
+
+The media child emits four explicit fields with every accepted render:
+`ttsProcessor`, `ttsProcessorLabel`, `ttsEndpointHost`, and `ttsProfile`.
+They travel unchanged through transcription and the parent/distribution
+contracts. The current route is recorded as `lxc-137-cpu`, displayed as
+`LXC 137 (CPU)`, through `chatterbox.transformers.lan`, with profile
+`chatterbox-turbo-ct137-visible-v1`. A future RGB route must emit
+`rgb-rtx4090` and its own endpoint/profile rather than reusing the LXC label.
+
+The `podcast_run_ledger` Data Table has dedicated string columns
+`tts_processor`, `tts_endpoint_host`, and `tts_profile`; full labeled evidence
+also remains in `qa_json`. Production Telegram summaries include the readable
+processor label and profile. The parent hard-fails missing or unknown processor
+provenance before distribution, preventing an episode from being published
+with an ambiguous TTS origin.
+
+Text-only visible regression executions 235 and 236 sent Telegram messages 441
+and 442 without invoking TTS. Execution 236 wrote Data Table row 146 with all
+three dedicated provenance columns and the matching QA JSON. Both temporary
+regression workflows were archived afterward.
+
 ## Model evaluation economics
 
 `MODEL-EVALUATION-PLAN.md` defines the graph-visible A/B/N evidence contract.

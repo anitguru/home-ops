@@ -14,7 +14,7 @@
       ],
       "parameters": {
         "inputSource": "jsonExample",
-        "jsonExample": "{\n  \"runMode\": \"production\",\n  \"publishMode\": \"production\",\n  \"manualProductionApproved\": true,\n  \"date\": \"2026-08-08\",\n  \"runId\": \"portable-production/2026-08-08/example\",\n  \"episode\": 125,\n  \"selectedStories\": [],\n  \"scriptText\": \"approved\",\n  \"script_sha256\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"audio_sha256\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"audioQa\": {\n    \"duration_seconds\": 120\n  },\n  \"srt_sha256\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"alignment\": {},\n  \"transcriptionValidated\": true\n}"
+        "jsonExample": "{\n  \"runMode\": \"production\",\n  \"publishMode\": \"production\",\n  \"manualProductionApproved\": true,\n  \"date\": \"2026-08-08\",\n  \"runId\": \"portable-production/2026-08-08/example\",\n  \"episode\": 125,\n  \"selectedStories\": [],\n  \"scriptText\": \"approved\",\n  \"script_sha256\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"audio_sha256\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"audioQa\": {\n    \"duration_seconds\": 120\n  },\n  \"ttsProcessor\": \"lxc-137-cpu\",\n  \"ttsProcessorLabel\": \"LXC 137 (CPU)\",\n  \"ttsEndpointHost\": \"chatterbox.transformers.lan\",\n  \"ttsProfile\": \"chatterbox-turbo-ct137-visible-v1\",\n  \"srt_sha256\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"alignment\": {},\n  \"transcriptionValidated\": true\n}"
       }
     },
     {
@@ -29,7 +29,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const i=$input.first();const r=i.json;\nif(!i.binary?.audio||!i.binary?.srt) throw new Error('production audio/SRT binaries missing');\nconst seconds=Number(r.audioQa?.duration_seconds);const duration=`${Math.floor(seconds/60)}:${String(Math.round(seconds%60)).padStart(2,'0')}`;\nreturn [{json:{...r,startedAt:$now.toISO(),audio:{sha256:r.audio_sha256,bytes:0,durationSeconds:seconds,duration},srt:{sha256:r.srt_sha256,alignment:r.alignment}},binary:{audio:i.binary.audio,srt:i.binary.srt}}];"
+        "jsCode": "const i=$input.first();const r=i.json;\nif(!i.binary?.audio||!i.binary?.srt) throw new Error('production audio/SRT binaries missing');\nconst seconds=Number(r.audioQa?.duration_seconds);const duration=`${Math.floor(seconds/60)}:${String(Math.round(seconds%60)).padStart(2,'0')}`;\nif(!['lxc-137-cpu','rgb-rtx4090'].includes(String(r.ttsProcessor||''))||!r.ttsProcessorLabel||!r.ttsEndpointHost||!r.ttsProfile) throw new Error('production TTS processor provenance missing');\nreturn [{json:{...r,startedAt:$now.toISO(),audio:{sha256:r.audio_sha256,bytes:0,durationSeconds:seconds,duration},srt:{sha256:r.srt_sha256,alignment:r.alignment}},binary:{audio:i.binary.audio,srt:i.binary.srt}}];"
       },
       "notes": ""
     },
@@ -80,6 +80,9 @@
             "script_sha256": "",
             "audio_sha256": "",
             "srt_sha256": "={{ $('Prepare Production Distribution Context').first().json.srt.sha256 }}",
+            "tts_processor": "={{ $('Prepare Production Distribution Context').first().json.ttsProcessor || '' }}",
+            "tts_endpoint_host": "={{ $('Prepare Production Distribution Context').first().json.ttsEndpointHost || '' }}",
+            "tts_profile": "={{ $('Prepare Production Distribution Context').first().json.ttsProfile || '' }}",
             "qa_json": "",
             "artifact_urls_json": "",
             "error": "",
@@ -383,6 +386,9 @@
             "script_sha256": "",
             "audio_sha256": "={{ $('Prepare Production Distribution Context').first().json.audio.sha256 }}",
             "srt_sha256": "={{ $('Prepare Production Distribution Context').first().json.srt.sha256 }}",
+            "tts_processor": "={{ $('Prepare Production Distribution Context').first().json.ttsProcessor || '' }}",
+            "tts_endpoint_host": "={{ $('Prepare Production Distribution Context').first().json.ttsEndpointHost || '' }}",
+            "tts_profile": "={{ $('Prepare Production Distribution Context').first().json.ttsProfile || '' }}",
             "qa_json": "",
             "artifact_urls_json": "={{ JSON.stringify({audio:$('Validate Production Cloudinary Upload').first().json.secure_url}) }}",
             "error": "",
@@ -529,6 +535,9 @@
             "script_sha256": "",
             "audio_sha256": "={{ $('Prepare Production Distribution Context').first().json.audio.sha256 }}",
             "srt_sha256": "={{ $('Prepare Production Distribution Context').first().json.srt.sha256 }}",
+            "tts_processor": "={{ $('Prepare Production Distribution Context').first().json.ttsProcessor || '' }}",
+            "tts_endpoint_host": "={{ $('Prepare Production Distribution Context').first().json.ttsEndpointHost || '' }}",
+            "tts_profile": "={{ $('Prepare Production Distribution Context').first().json.ttsProfile || '' }}",
             "qa_json": "",
             "artifact_urls_json": "={{ JSON.stringify({audio:$('Validate Production Cloudinary Upload').first().json.secure_url,github:$('Validate Production GitHub Readback').first().json}) }}",
             "error": "",
@@ -660,6 +669,9 @@
             "script_sha256": "",
             "audio_sha256": "={{ $('Prepare Production Distribution Context').first().json.audio.sha256 }}",
             "srt_sha256": "={{ $('Prepare Production Distribution Context').first().json.srt.sha256 }}",
+            "tts_processor": "={{ $('Prepare Production Distribution Context').first().json.ttsProcessor || '' }}",
+            "tts_endpoint_host": "={{ $('Prepare Production Distribution Context').first().json.ttsEndpointHost || '' }}",
+            "tts_profile": "={{ $('Prepare Production Distribution Context').first().json.ttsProfile || '' }}",
             "qa_json": "",
             "artifact_urls_json": "={{ JSON.stringify({audio:$('Validate Production Cloudinary Upload').first().json.secure_url}) }}",
             "error": "",
@@ -682,7 +694,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const c=$('Prepare Production Distribution Context').first().json,u=$('Validate Production Cloudinary Upload').first().json;return [{json:{text:`\ud83c\udf99\ufe0f Guru's Tech Bytes EP #${c.episode} is live \u2014 ${c.date}\\n${u.secure_url}`}}];"
+        "jsCode": "const c=$('Prepare Production Distribution Context').first().json,u=$('Validate Production Cloudinary Upload').first().json;return [{json:{text:`\ud83c\udf99\ufe0f Guru's Tech Bytes EP #${c.episode} is live \u2014 ${c.date}\\n\ud83d\udde3\ufe0f TTS processor: ${c.ttsProcessorLabel}\\nProfile: ${c.ttsProfile}\\n${u.secure_url}`}}];"
       },
       "notes": ""
     },
@@ -836,7 +848,10 @@
             "script_sha256": "",
             "audio_sha256": "={{ $('Prepare Production Distribution Context').first().json.audio.sha256 }}",
             "srt_sha256": "={{ $('Prepare Production Distribution Context').first().json.srt.sha256 }}",
-            "qa_json": "={{ JSON.stringify({audio:$('Prepare Production Distribution Context').first().json.audio,srt:$('Prepare Production Distribution Context').first().json.srt.alignment}) }}",
+            "tts_processor": "={{ $('Prepare Production Distribution Context').first().json.ttsProcessor || '' }}",
+            "tts_endpoint_host": "={{ $('Prepare Production Distribution Context').first().json.ttsEndpointHost || '' }}",
+            "tts_profile": "={{ $('Prepare Production Distribution Context').first().json.ttsProfile || '' }}",
+            "qa_json": "={{ JSON.stringify({audio:$('Prepare Production Distribution Context').first().json.audio,srt:$('Prepare Production Distribution Context').first().json.srt.alignment,tts:{processor:$('Prepare Production Distribution Context').first().json.ttsProcessor,label:$('Prepare Production Distribution Context').first().json.ttsProcessorLabel,endpointHost:$('Prepare Production Distribution Context').first().json.ttsEndpointHost,profile:$('Prepare Production Distribution Context').first().json.ttsProfile}}) }}",
             "artifact_urls_json": "={{ JSON.stringify({audio:$('Validate Production Cloudinary Upload').first().json.secure_url,github:$('Validate Production GitHub Readback').first().json,telegram:$('Validate Production Telegram Delivery').first().json.messageIds}) }}",
             "error": "",
             "started_at": "={{ $('Prepare Production Distribution Context').first().json.startedAt }}",
@@ -858,7 +873,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const c=$('Prepare Production Distribution Context').first().json,u=$('Validate Production Cloudinary Upload').first().json,g=$('Validate Production GitHub Readback').first().json,n=$('Validate Production Telegram Delivery').first().json;return [{json:{runMode:c.runMode,publishMode:'production',date:c.date,runId:c.runId,episode:c.episode,audio_sha256:c.audio.sha256,srt_sha256:c.srt.sha256,cloudinary:{publicId:u.public_id,secureUrl:u.secure_url,bytes:u.bytes},github:g,supabasePersisted:true,telegramMessageIds:n.messageIds,distributionValidated:true}}];"
+        "jsCode": "const c=$('Prepare Production Distribution Context').first().json,u=$('Validate Production Cloudinary Upload').first().json,g=$('Validate Production GitHub Readback').first().json,n=$('Validate Production Telegram Delivery').first().json;return [{json:{runMode:c.runMode,publishMode:'production',date:c.date,runId:c.runId,episode:c.episode,audio_sha256:c.audio.sha256,srt_sha256:c.srt.sha256,ttsProcessor:c.ttsProcessor,ttsProcessorLabel:c.ttsProcessorLabel,ttsEndpointHost:c.ttsEndpointHost,ttsProfile:c.ttsProfile,cloudinary:{publicId:u.public_id,secureUrl:u.secure_url,bytes:u.bytes},github:g,supabasePersisted:true,telegramMessageIds:n.messageIds,distributionValidated:true}}];"
       },
       "notes": ""
     }

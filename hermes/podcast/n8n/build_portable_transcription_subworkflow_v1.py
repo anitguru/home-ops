@@ -38,10 +38,11 @@ def build() -> dict:
         "selectedStories": fixture["selectedStories"], "scriptText": fixture["scriptText"],
         "script_sha256": hashlib.sha256(fixture["scriptText"].encode()).hexdigest(),
         "audio_sha256": fixture["audio"]["sha256"], "audioQa": {"duration_seconds": fixture["audio"]["durationSeconds"]}, "mediaValidated": True,
+        "ttsProcessor": "lxc-137-cpu", "ttsProcessorLabel": "LXC 137 (CPU)", "ttsEndpointHost": "chatterbox.transformers.lan", "ttsProfile": "chatterbox-turbo-ct137-visible-v1",
     }
     nodes = [
         node("manual", "Manual Transcription Test Trigger", "n8n-nodes-base.manualTrigger", 0, -180, {}),
-        node("sub_trigger", "When Called by Parent Workflow", "n8n-nodes-base.executeWorkflowTrigger", 0, 80, {"inputSource": "jsonExample", "jsonExample": json.dumps({"runMode": "shadow", "date": "2026-08-08", "runId": "portable-shadow/example", "episode": 125, "selectedStories": [], "scriptText": "approved authored text", "script_sha256": "0" * 64, "audio_sha256": "0" * 64, "audioQa": {"duration_seconds": 120}, "mediaValidated": True}, indent=2)}, typeVersion=1.2),
+        node("sub_trigger", "When Called by Parent Workflow", "n8n-nodes-base.executeWorkflowTrigger", 0, 80, {"inputSource": "jsonExample", "jsonExample": json.dumps({"runMode": "shadow", "date": "2026-08-08", "runId": "portable-shadow/example", "episode": 125, "selectedStories": [], "scriptText": "approved authored text", "script_sha256": "0" * 64, "audio_sha256": "0" * 64, "audioQa": {"duration_seconds": 120}, "mediaValidated": True, "ttsProcessor": "lxc-137-cpu", "ttsProcessorLabel": "LXC 137 (CPU)", "ttsEndpointHost": "chatterbox.transformers.lan", "ttsProfile": "chatterbox-turbo-ct137-visible-v1"}, indent=2)}, typeVersion=1.2),
         code("fixture", "Prepare Transcription Fixture Context", 240, -260, "return [{json:" + json.dumps(manual, separators=(",", ":")) + "}];"),
         node(
             "fixture_audio", "Download Verified Fixture Audio", "n8n-nodes-base.httpRequest", 240, -100,
@@ -115,7 +116,7 @@ const thirds=['beginning','middle','end'].map((name,k)=>{const lo=Math.floor(a.l
 let maxGap=0,last=-1;for(const x of r.anchors){maxGap=Math.max(maxGap,x.r-last-1);last=x.r;}maxGap=Math.max(maxGap,a.length-last-1);
 const alignment={durationSeconds:r.whisperDuration,referenceWords:a.length,transcriptWords:b.length,wordErrorRate:Number((prev[b.length]/a.length).toFixed(6)),exactAnchors:r.anchors.length,exactAnchorRatio:Number(r.exactAnchorRatio.toFixed(6)),cueCount:r.cueCount,maximumLineCharacters:r.maximumLineCharacters,maximumLinesPerCue:r.maximumLinesPerCue,thirds,maximumUnanchoredRunWords:maxGap};
 const srt=$('Convert SRT Text to File').first().binary?.srt;if(!srt) throw new Error('native SRT file binary missing');
-return [{json:{runMode:r.runMode,date:r.date,runId:r.runId,episode:r.episode,selectedStories:r.selectedStories,scriptText:r.scriptText,script_sha256:r.script_sha256,audio_sha256:r.audio_sha256,audioQa:r.audioQa,srt_sha256:r.srt_sha256,alignment,transcriptionValidated:true},binary:{srt}}];""",
+return [{json:{runMode:r.runMode,date:r.date,runId:r.runId,episode:r.episode,selectedStories:r.selectedStories,scriptText:r.scriptText,script_sha256:r.script_sha256,audio_sha256:r.audio_sha256,audioQa:r.audioQa,ttsProcessor:r.ttsProcessor,ttsProcessorLabel:r.ttsProcessorLabel,ttsEndpointHost:r.ttsEndpointHost,ttsProfile:r.ttsProfile,srt_sha256:r.srt_sha256,alignment,transcriptionValidated:true},binary:{srt}}];""",
         ),
         code(
             "gate", "Hard Transcript + SRT Quality Gate", 2880, 0,
@@ -130,7 +131,7 @@ return [i];""",
         ),
         node(
             "ledger", "Ledger - Transcription QA Passed", "n8n-nodes-base.dataTable", 3120, 0,
-            {"resource": "row", "operation": "insert", "dataTableId": {"mode": "name", "value": "podcast_run_ledger"}, "columns": {"mappingMode": "defineBelow", "value": {"run_id": "={{ $json.runId }}", "execution_id": "={{ $execution.id }}", "run_mode": "shadow", "episode": "={{ $json.episode }}", "episode_date": "={{ $json.date }}", "stage": "transcription-qa", "status": "passed", "attempt": 1, "selected_stories_json": "={{ JSON.stringify($json.selectedStories) }}", "script_sha256": "={{ $json.script_sha256 }}", "audio_sha256": "={{ $json.audio_sha256 }}", "srt_sha256": "={{ $json.srt_sha256 }}", "qa_json": "={{ JSON.stringify({audio:$json.audioQa,alignment:$json.alignment}) }}", "artifact_urls_json": "", "error": "", "started_at": "={{ $now.toISO() }}", "updated_at": "={{ $now.toISO() }}"}}, "options": {}}, typeVersion=1.1,
+            {"resource": "row", "operation": "insert", "dataTableId": {"mode": "name", "value": "podcast_run_ledger"}, "columns": {"mappingMode": "defineBelow", "value": {"run_id": "={{ $json.runId }}", "execution_id": "={{ $execution.id }}", "run_mode": "shadow", "episode": "={{ $json.episode }}", "episode_date": "={{ $json.date }}", "stage": "transcription-qa", "status": "passed", "attempt": 1, "selected_stories_json": "={{ JSON.stringify($json.selectedStories) }}", "script_sha256": "={{ $json.script_sha256 }}", "audio_sha256": "={{ $json.audio_sha256 }}", "srt_sha256": "={{ $json.srt_sha256 }}", "tts_processor": "={{ $json.ttsProcessor }}", "tts_endpoint_host": "={{ $json.ttsEndpointHost }}", "tts_profile": "={{ $json.ttsProfile }}", "qa_json": "={{ JSON.stringify({audio:$json.audioQa,alignment:$json.alignment,tts:{processor:$json.ttsProcessor,label:$json.ttsProcessorLabel,endpointHost:$json.ttsEndpointHost,profile:$json.ttsProfile}}) }}", "artifact_urls_json": "", "error": "", "started_at": "={{ $now.toISO() }}", "updated_at": "={{ $now.toISO() }}"}}, "options": {}}, typeVersion=1.1,
         ),
         node("merge_binary", "Merge Audio + SRT Binaries", "n8n-nodes-base.merge", 3120, 180, {"mode": "combine", "combineBy": "combineByPosition", "options": {}}, typeVersion=3.2),
         node("merge_final", "Merge Binaries + Transcription Ledger", "n8n-nodes-base.merge", 3360, 0, {"mode": "combine", "combineBy": "combineByPosition", "options": {}}, typeVersion=3.2),
@@ -138,7 +139,7 @@ return [i];""",
             "return_contract", "Return Clean Transcription Contract", 3600, 0,
             r"""const i=$input.first();
 if(!i.binary?.audio||!i.binary?.srt) throw new Error('audio/SRT binaries missing at transcription boundary');
-return [{json:{runMode:i.json.runMode,date:i.json.date||i.json.episode_date,runId:i.json.runId||i.json.run_id,episode:i.json.episode,selectedStories:i.json.selectedStories,scriptText:i.json.scriptText,script_sha256:i.json.script_sha256,audio_sha256:i.json.audio_sha256,audioQa:i.json.audioQa,srt_sha256:i.json.srt_sha256,alignment:i.json.alignment,transcriptionValidated:true},binary:{audio:i.binary.audio,srt:i.binary.srt}}];""",
+return [{json:{runMode:i.json.runMode,date:i.json.date||i.json.episode_date,runId:i.json.runId||i.json.run_id,episode:i.json.episode,selectedStories:i.json.selectedStories,scriptText:i.json.scriptText,script_sha256:i.json.script_sha256,audio_sha256:i.json.audio_sha256,audioQa:i.json.audioQa,ttsProcessor:i.json.ttsProcessor,ttsProcessorLabel:i.json.ttsProcessorLabel,ttsEndpointHost:i.json.ttsEndpointHost,ttsProfile:i.json.ttsProfile,srt_sha256:i.json.srt_sha256,alignment:i.json.alignment,transcriptionValidated:true},binary:{audio:i.binary.audio,srt:i.binary.srt}}];""",
             notes="Reusable boundary returns only the assembled audio and authored SRT binaries plus their verified hashes/QA contract.",
         ),
     ]

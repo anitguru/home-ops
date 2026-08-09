@@ -94,6 +94,7 @@ if(!/^portable-production\/\d{4}-\d{2}-\d{2}\/[A-Za-z0-9_-]+$/.test(c.runId))fai
 
     by_id["validate_distribution"]["parameters"]["jsCode"] = r"""const r=$input.first().json;
 if(r.distributionValidated!==true||r.publishMode!=='production'||r.supabasePersisted!==true)throw new Error('production distribution proof missing');
+if(!['lxc-137-cpu','rgb-rtx4090'].includes(String(r.ttsProcessor||''))||!r.ttsProcessorLabel||!r.ttsProfile)throw new Error('production TTS provenance proof missing');
 if(!String(r.cloudinary?.secureUrl||'').startsWith('https://res.cloudinary.com/')||!/^[a-f0-9]{40}$/.test(String(r.github?.commitSha||'')))throw new Error('production artifact readback missing');
 if(!Array.isArray(r.telegramMessageIds)||r.telegramMessageIds.length!==3)throw new Error('production notification proof missing');return [{json:r}];"""
     by_id["validate_intake"]["parameters"]["jsCode"] = by_id["validate_intake"]["parameters"]["jsCode"].replace("r.runMode!=='shadow'", "r.runMode!=='production'")
