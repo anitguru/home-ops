@@ -100,6 +100,35 @@ GitHub verification, Supabase persistence, three Telegram deliveries, and the
 final ledger. The production GitHub readback node is now published with a
 bounded four-attempt, two-second retry to absorb this consistency window.
 
+Episode-repair execution 228 later demonstrated a second consistency behavior:
+GitHub may return HTTP 200 with the old file contents immediately after a
+successful native Edit File operation. Because a successful stale response does
+not activate `retryOnFail`, the repair graphs now place a visible five-second
+Wait node before the native GitHub readback and then hard-check the expected
+content SHA, transcript, and Cloudinary URL.
+
+## Historical audio and timestamp repair surface
+
+The episode 123/124 repair workflows are purpose-built one-shots, not hidden
+host scripts. They recover the committed transcript through the native GitHub
+node, enforce the exact target episode/date and spoken-number greeting, call the
+published reusable media and transcription children, validate objective audio
+and alignment evidence, upload through the Cloudinary node, edit/read back the
+site through GitHub nodes, update/read back Supabase through native nodes, and
+write the final Data Table ledger. They contain no SSH or schedule nodes. After
+successful production execution and independent readback, the live one-shots
+are archived while their builders and JSON exports remain versioned here.
+
+## Model evaluation economics
+
+`MODEL-EVALUATION-PLAN.md` defines the graph-visible A/B/N evidence contract.
+The key decision metric is total cost per human-accepted episode, including all
+failed/retried attempts. It pairs per-attempt latency, token/cost, validator and
+leakage evidence with a blinded listening review. GLM is the quality control;
+DeepSeek is the current production candidate; Qwen joins only after its exact
+available model tag is verified. Scheduled candidates must use durable API-key
+or local credentials rather than interactive subscription sessions.
+
 The same audit found that scheduled intake execution 161 had used its older
 published lexical scorer: the CocoIndex child existed only as an unpublished
 draft dependency. The CocoIndex child and intake were published in dependency

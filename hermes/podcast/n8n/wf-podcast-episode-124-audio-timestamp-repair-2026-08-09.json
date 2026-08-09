@@ -1,0 +1,1147 @@
+{
+  "id": "pEpisode124RepairX8",
+  "name": "WF-podcast-episode-124-audio-timestamp-repair-2026-08-09",
+  "active": false,
+  "nodes": [
+    {
+      "id": "webhook",
+      "name": "Published Episode 124 Repair Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "podcast-episode-124-124-audio-repair-20260809",
+        "responseMode": "onReceived",
+        "options": {}
+      }
+    },
+    {
+      "id": "context",
+      "name": "Episode 124 Repair Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{\"approved\":true,\"date\":\"2026-08-07\",\"episode\":124,\"runMode\":\"production\",\"runId\":\"audio-timestamp-repair/2026-08-07/124\",\"githubPath\":\"content/podcast/2026-08-07.md\",\"oldAudioUrl\":\"https://res.cloudinary.com/ddicetqs5/video/upload/v1786286197/anitguru/gurus-tech-bytes-2026-08-07-rerender.mp3\",\"newCloudinaryPublicId\":\"anitguru/gurus-tech-bytes-2026-08-07-rerender-v2\"}}];"
+      },
+      "notes": "Exact operator-approved episode-124 audio-only repair. The old asset remains as the recovery copy."
+    },
+    {
+      "id": "gate",
+      "name": "Hard Episode 124 Exact-Target Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const c=$input.first().json;\nif(c.approved!==true||c.date!=='2026-08-07'||c.episode!==124||c.runMode!=='production')throw new Error('Episode 124 repair target mismatch');\nif(c.githubPath!=='content/podcast/2026-08-07.md'||c.newCloudinaryPublicId!=='anitguru/gurus-tech-bytes-2026-08-07-rerender-v2')throw new Error('Episode 124 artifact target mismatch');return [{json:c}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "github_get",
+      "name": "GitHub - Read Episode 124 Episode File",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "owner": {
+          "mode": "name",
+          "value": "anitguru"
+        },
+        "repository": {
+          "mode": "name",
+          "value": "anit.guru"
+        },
+        "filePath": "={{ $('Episode 124 Repair Context').first().json.githubPath }}",
+        "asBinaryProperty": false,
+        "additionalParameters": {
+          "reference": "main"
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "pGithubNodeX8Q3M7Z",
+          "name": "GitHub Node (podcast)"
+        }
+      }
+    },
+    {
+      "id": "parse",
+      "name": "Recover Episode 124 Transcript + Steer Episode Number",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const f=$input.first().json,c=$('Episode 124 Repair Context').first().json;\nconst raw=Buffer.from(String(f.content||'').replace(/\\n/g,''),'base64').toString('utf8');const parts=raw.split(/^---\\s*$/m);const body=(parts.slice(2).join('---')).trim();\nif(f.path!==c.githubPath||!raw.includes('episode: 124')||!raw.includes(c.oldAudioUrl)||!body.startsWith(\"Good morning, it's Friday.\"))throw new Error('Episode 124 GitHub source mismatch');\nconst scriptText=body;\nif(!scriptText.includes(\"This is Guru's Tech Bytes, episode one hundred twenty four.\")||scriptText.split(/\\n\\s*\\n/).length!==6||/\\d/.test(scriptText.split(/\\n\\s*\\n/)[0]))throw new Error('Episode 124 spoken-number steering failed');return [{json:{...c,rawMarkdown:raw,scriptText,githubSourceSha:f.sha}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "supabase_get",
+      "name": "Supabase - Read Exact Episode 124 Row",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "podcast_episodes",
+        "returnAll": false,
+        "limit": 1,
+        "orderBy": "episode.desc",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "date",
+              "condition": "eq",
+              "keyValue": "={{ $('Episode 124 Repair Context').first().json.date }}"
+            },
+            {
+              "keyName": "episode",
+              "condition": "eq",
+              "keyValue": "={{ $('Episode 124 Repair Context').first().json.episode }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "duPN6Njb1go7DN8w",
+          "name": "Supabase (podcast)"
+        }
+      }
+    },
+    {
+      "id": "validate_row",
+      "name": "Validate Episode 124 Source Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json,c=$('Recover Episode 124 Transcript + Steer Episode Number').first().json;\nif(r.date!==c.date||Number(r.episode)!==c.episode||r.audio_url!==c.oldAudioUrl||!Array.isArray(r.stories)||r.stories.length!==4)throw new Error('Episode 124 Supabase source mismatch');return [{json:{...c,selectedStories:r.stories}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "script_hash",
+      "name": "SHA256 Episode 124 Corrected Script",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        0
+      ],
+      "parameters": {
+        "action": "hash",
+        "binaryData": false,
+        "type": "SHA256",
+        "value": "={{ $json.scriptText }}",
+        "dataPropertyName": "script_sha256",
+        "encoding": "hex"
+      }
+    },
+    {
+      "id": "media",
+      "name": "Run Published Chatterbox Media Workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1920,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "pMediaSubX8Q3M7",
+          "mode": "list",
+          "cachedResultName": "WF-podcast-sub-media-v1"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "runMode": "={{ $json.runMode }}",
+            "date": "={{ $json.date }}",
+            "runId": "={{ $json.runId }}",
+            "episode": "={{ $json.episode }}",
+            "selectedStories": "={{ $json.selectedStories }}",
+            "scriptText": "={{ $json.scriptText }}",
+            "script_sha256": "={{ $json.script_sha256 }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "runMode",
+              "displayName": "runMode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "runId",
+              "displayName": "runId",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "episode",
+              "displayName": "episode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "selectedStories",
+              "displayName": "selectedStories",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "array"
+            },
+            {
+              "id": "scriptText",
+              "displayName": "scriptText",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "script_sha256",
+              "displayName": "script_sha256",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "validate_media",
+      "name": "Validate Episode 124 Audio QA + Binary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const i=$input.first(),r=i.json,q=r.audioQa||{};\nif(r.mediaValidated!==true||!i.binary?.audio||q.duration_seconds<60||q.true_peak_dbtp>-1.5||q.clipped_samples!==0||q.long_silence_ratio>0.08)throw new Error('Episode 124 media QA failed');return [i];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "upload",
+      "name": "Cloudinary - Upload Episode 124 Corrected Audio",
+      "type": "n8n-nodes-cloudinary.cloudinary",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        0
+      ],
+      "parameters": {
+        "resource": "upload",
+        "operation": "uploadFile",
+        "file": "audio",
+        "resource_type_file": "video",
+        "additionalFieldsFile": {
+          "folder": "anitguru",
+          "public_id": "gurus-tech-bytes-2026-08-07-rerender-v2",
+          "tags": "podcast-production,episode-124-corrected"
+        }
+      },
+      "credentials": {
+        "cloudinaryApi": {
+          "id": "pCloudinaryX8Q3M7",
+          "name": "Cloudinary (podcast)"
+        }
+      }
+    },
+    {
+      "id": "validate_upload",
+      "name": "Validate Episode 124 Cloudinary Replacement",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json,c=$('Episode 124 Repair Context').first().json;\nif(r.public_id!==c.newCloudinaryPublicId||Number(r.bytes)<100000||!String(r.secure_url||'').startsWith('https://res.cloudinary.com/'))throw new Error('Episode 124 Cloudinary replacement invalid');return [{json:r}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "download",
+      "name": "Download Episode 124 Replacement for Hash Proof",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2880,
+        0
+      ],
+      "parameters": {
+        "url": "={{ $('Validate Episode 124 Cloudinary Replacement').first().json.secure_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "downloaded"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "notes": "HTTP exception: the Cloudinary community node has no delivery-URL binary download operation."
+    },
+    {
+      "id": "download_hash",
+      "name": "SHA256 Downloaded Episode 124 Replacement",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        0
+      ],
+      "parameters": {
+        "action": "hash",
+        "binaryData": true,
+        "binaryPropertyName": "downloaded",
+        "type": "SHA256",
+        "dataPropertyName": "downloaded_sha256",
+        "encoding": "hex"
+      }
+    },
+    {
+      "id": "validate_hash",
+      "name": "Validate Episode 124 Download Hash",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3360,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json,e=$('Validate Episode 124 Audio QA + Binary').first().json.audio_sha256;\nif(r.downloaded_sha256!==e)throw new Error('Episode 124 downloaded audio hash mismatch');return [{json:{audio_sha256:e,verified:true}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "markdown",
+      "name": "Build Episode 124 Markdown with Replacement Link",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3600,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const c=$('Recover Episode 124 Transcript + Steer Episode Number').first().json,u=$('Validate Episode 124 Cloudinary Replacement').first().json,m=$('Validate Episode 124 Audio QA + Binary').first().json;\nconst duration=`${Math.floor(m.audioQa.duration_seconds/60)}:${String(Math.round(m.audioQa.duration_seconds%60)).padStart(2,'0')}`;let raw=c.rawMarkdown;\nraw=raw.replace(/^audioUrl:.*$/m,`audioUrl: ${JSON.stringify(u.secure_url)}`).replace(/^audioLength:.*$/m,`audioLength: ${u.bytes}`).replace(/^duration:.*$/m,`duration: ${JSON.stringify(duration)}`);\nconst parts=raw.split(/^---\\s*$/m);const markdown=`---${parts[1]}---\\n\\n${c.scriptText}\\n`;return [{json:{markdown,duration,path:c.githubPath}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "github_edit",
+      "name": "GitHub - Edit Episode 124 Episode on Main",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        3840,
+        0
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "edit",
+        "owner": {
+          "mode": "name",
+          "value": "anitguru"
+        },
+        "repository": {
+          "mode": "name",
+          "value": "anit.guru"
+        },
+        "filePath": "={{ $('Build Episode 124 Markdown with Replacement Link').first().json.path }}",
+        "binaryData": false,
+        "fileContent": "={{ $('Build Episode 124 Markdown with Replacement Link').first().json.markdown }}",
+        "commitMessage": "podcast: repair episode 124 spoken greeting, audio, and timestamps",
+        "additionalParameters": {
+          "branch": {
+            "branch": "main"
+          }
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "pGithubNodeX8Q3M7Z",
+          "name": "GitHub Node (podcast)"
+        }
+      }
+    },
+    {
+      "id": "github_readback",
+      "name": "GitHub - Read Back Episode 124 Repair",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        4080,
+        0
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "owner": {
+          "mode": "name",
+          "value": "anitguru"
+        },
+        "repository": {
+          "mode": "name",
+          "value": "anit.guru"
+        },
+        "filePath": "={{ $('Episode 124 Repair Context').first().json.githubPath }}",
+        "asBinaryProperty": false,
+        "additionalParameters": {
+          "reference": "main"
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "pGithubNodeX8Q3M7Z",
+          "name": "GitHub Node (podcast)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 4,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "validate_github",
+      "name": "Validate Episode 124 GitHub Readback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4320,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const f=$input.first().json,e=$('Build Episode 124 Markdown with Replacement Link').first().json,u=$('Validate Episode 124 Cloudinary Replacement').first().json,g=$('GitHub - Edit Episode 124 Episode on Main').first().json;\nconst raw=Buffer.from(String(f.content||'').replace(/\\n/g,''),'base64').toString('utf8');if(raw!==e.markdown||!raw.includes(u.secure_url)||!raw.includes('episode one hundred twenty four.')||!/^[a-f0-9]{40}$/.test(String(g.commit?.sha||'')))throw new Error('Episode 124 GitHub readback invalid');return [{json:{commitSha:g.commit.sha,contentSha:f.sha,verified:true}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "prepare_update",
+      "name": "Prepare Episode 124 Supabase Replacement",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4560,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$('Validate Episode 124 Source Row').first().json,u=$('Validate Episode 124 Cloudinary Replacement').first().json,m=$('Validate Episode 124 Audio QA + Binary').first().json;return [{json:{date:r.date,episode:r.episode,stories:r.selectedStories,audio_url:u.secure_url,duration_secs:Math.round(m.audioQa.duration_seconds)}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "supabase_update",
+      "name": "Supabase - Update Episode 124 Episode Row",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        4800,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "tableId": "podcast_episodes",
+        "dataToSend": "autoMapInputData",
+        "inputsToIgnore": "",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "date",
+              "condition": "eq",
+              "keyValue": "={{ $('Episode 124 Repair Context').first().json.date }}"
+            },
+            {
+              "keyName": "episode",
+              "condition": "eq",
+              "keyValue": "={{ $('Episode 124 Repair Context').first().json.episode }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "duPN6Njb1go7DN8w",
+          "name": "Supabase (podcast)"
+        }
+      }
+    },
+    {
+      "id": "supabase_readback",
+      "name": "Supabase - Read Back Episode 124 Replacement",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        5040,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "podcast_episodes",
+        "returnAll": false,
+        "limit": 1,
+        "orderBy": "episode.desc",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "date",
+              "condition": "eq",
+              "keyValue": "={{ $('Episode 124 Repair Context').first().json.date }}"
+            },
+            {
+              "keyName": "episode",
+              "condition": "eq",
+              "keyValue": "={{ $('Episode 124 Repair Context').first().json.episode }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "duPN6Njb1go7DN8w",
+          "name": "Supabase (podcast)"
+        }
+      }
+    },
+    {
+      "id": "hard_gate",
+      "name": "Hard Episode 124 Three-System Repair Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5280,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const r=$input.first().json,c=$('Episode 124 Repair Context').first().json,u=$('Validate Episode 124 Cloudinary Replacement').first().json,g=$('Validate Episode 124 GitHub Readback').first().json,h=$('Validate Episode 124 Download Hash').first().json,m=$('Validate Episode 124 Audio QA + Binary').first().json,t=$('Validate Episode 124 Timestamp QA + Binaries').first().json;\nif(r.date!==c.date||Number(r.episode)!==c.episode||r.audio_url!==u.secure_url||Number(r.duration_secs)!==Math.round(m.audioQa.duration_seconds)||g.verified!==true||h.verified!==true||t.transcriptionValidated!==true)throw new Error('Episode 124 three-system/timestamp repair proof failed');return [{json:{repairValidated:true,date:c.date,episode:c.episode,oldAudioUrl:c.oldAudioUrl,newAudioUrl:u.secure_url,bytes:u.bytes,durationSeconds:m.audioQa.duration_seconds,audioQa:m.audioQa,audio_sha256:h.audio_sha256,srt_sha256:t.srt_sha256,alignment:t.alignment,github:g,supabase:r}}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "ledger",
+      "name": "Ledger - Episode 124 Audio Repair Complete",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        5520,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "podcast_run_ledger"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "audio-timestamp-repair/2026-08-07/124",
+            "execution_id": "={{ $execution.id }}",
+            "run_mode": "production-repair",
+            "episode": 124,
+            "episode_date": "2026-08-07",
+            "stage": "audio-timestamp-link-replaced",
+            "status": "passed",
+            "attempt": 1,
+            "selected_stories_json": "={{ JSON.stringify($json.supabase.stories) }}",
+            "script_sha256": "={{ $('SHA256 Episode 124 Corrected Script').first().json.script_sha256 }}",
+            "audio_sha256": "={{ $json.audio_sha256 }}",
+            "srt_sha256": "={{ $json.srt_sha256 }}",
+            "qa_json": "={{ JSON.stringify({audioQa:$json.audioQa,alignment:$json.alignment}) }}",
+            "artifact_urls_json": "={{ JSON.stringify({old:$json.oldAudioUrl,new:$json.newAudioUrl,github:$json.github}) }}",
+            "error": "",
+            "started_at": "={{ $now.toISO() }}",
+            "updated_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "return",
+      "name": "Return Episode 124 Repair Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5760,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:$('Hard Episode 124 Three-System Repair Gate').first().json}];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "transcription",
+      "name": "Run Published Transcription + SRT for Episode 124",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2280,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "pTransSubX8Q3M7",
+          "mode": "list",
+          "cachedResultName": "WF-podcast-sub-transcription-v1"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "runMode": "={{ $json.runMode }}",
+            "date": "={{ $json.date }}",
+            "runId": "={{ $json.runId }}",
+            "episode": "={{ Number($json.episode) }}",
+            "selectedStories": "={{ $json.selectedStories }}",
+            "scriptText": "={{ $json.scriptText }}",
+            "script_sha256": "={{ $json.script_sha256 }}",
+            "audio_sha256": "={{ $json.audio_sha256 }}",
+            "audioQa": "={{ $json.audioQa }}",
+            "mediaValidated": "={{ $json.mediaValidated }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "runMode",
+              "displayName": "runMode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "runId",
+              "displayName": "runId",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "episode",
+              "displayName": "episode",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "selectedStories",
+              "displayName": "selectedStories",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "array"
+            },
+            {
+              "id": "scriptText",
+              "displayName": "scriptText",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "script_sha256",
+              "displayName": "script_sha256",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "audio_sha256",
+              "displayName": "audio_sha256",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "audioQa",
+              "displayName": "audioQa",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            },
+            {
+              "id": "mediaValidated",
+              "displayName": "mediaValidated",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "boolean"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "Visible reusable timestamp path: direct Whisper, authored-word alignment, SRT file/hash, and hard QA gate."
+    },
+    {
+      "id": "validate_transcription",
+      "name": "Validate Episode 124 Timestamp QA + Binaries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2340,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const i=$input.first(),r=i.json,a=r.alignment||{};\nif(r.transcriptionValidated!==true||!i.binary?.audio||!i.binary?.srt)throw new Error('repair transcription binaries/proof missing');\nif(!/^[a-f0-9]{64}$/.test(String(r.srt_sha256||''))||a.wordErrorRate>0.20||a.exactAnchorRatio<0.60||a.maximumLineCharacters>47||a.maximumLinesPerCue>2)throw new Error('repair timestamp QA invalid');return [i];"
+      },
+      "notes": ""
+    },
+    {
+      "id": "github_wait",
+      "name": "Wait for Episode 124 GitHub Consistency",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3960,
+        0
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "notes": "Visible consistency delay before native GitHub readback; avoids accepting stale pre-commit contents."
+    }
+  ],
+  "connections": {
+    "Published Episode 124 Repair Webhook": {
+      "main": [
+        [
+          {
+            "node": "Episode 124 Repair Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Episode 124 Repair Context": {
+      "main": [
+        [
+          {
+            "node": "Hard Episode 124 Exact-Target Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hard Episode 124 Exact-Target Gate": {
+      "main": [
+        [
+          {
+            "node": "GitHub - Read Episode 124 Episode File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub - Read Episode 124 Episode File": {
+      "main": [
+        [
+          {
+            "node": "Recover Episode 124 Transcript + Steer Episode Number",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recover Episode 124 Transcript + Steer Episode Number": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Read Exact Episode 124 Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Read Exact Episode 124 Row": {
+      "main": [
+        [
+          {
+            "node": "Validate Episode 124 Source Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Episode 124 Source Row": {
+      "main": [
+        [
+          {
+            "node": "SHA256 Episode 124 Corrected Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SHA256 Episode 124 Corrected Script": {
+      "main": [
+        [
+          {
+            "node": "Run Published Chatterbox Media Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Published Chatterbox Media Workflow": {
+      "main": [
+        [
+          {
+            "node": "Validate Episode 124 Audio QA + Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Episode 124 Audio QA + Binary": {
+      "main": [
+        [
+          {
+            "node": "Run Published Transcription + SRT for Episode 124",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cloudinary - Upload Episode 124 Corrected Audio": {
+      "main": [
+        [
+          {
+            "node": "Validate Episode 124 Cloudinary Replacement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Episode 124 Cloudinary Replacement": {
+      "main": [
+        [
+          {
+            "node": "Download Episode 124 Replacement for Hash Proof",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Episode 124 Replacement for Hash Proof": {
+      "main": [
+        [
+          {
+            "node": "SHA256 Downloaded Episode 124 Replacement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SHA256 Downloaded Episode 124 Replacement": {
+      "main": [
+        [
+          {
+            "node": "Validate Episode 124 Download Hash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Episode 124 Download Hash": {
+      "main": [
+        [
+          {
+            "node": "Build Episode 124 Markdown with Replacement Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Episode 124 Markdown with Replacement Link": {
+      "main": [
+        [
+          {
+            "node": "GitHub - Edit Episode 124 Episode on Main",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub - Edit Episode 124 Episode on Main": {
+      "main": [
+        [
+          {
+            "node": "Wait for Episode 124 GitHub Consistency",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub - Read Back Episode 124 Repair": {
+      "main": [
+        [
+          {
+            "node": "Validate Episode 124 GitHub Readback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Episode 124 GitHub Readback": {
+      "main": [
+        [
+          {
+            "node": "Prepare Episode 124 Supabase Replacement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Episode 124 Supabase Replacement": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Update Episode 124 Episode Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Update Episode 124 Episode Row": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Read Back Episode 124 Replacement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Read Back Episode 124 Replacement": {
+      "main": [
+        [
+          {
+            "node": "Hard Episode 124 Three-System Repair Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hard Episode 124 Three-System Repair Gate": {
+      "main": [
+        [
+          {
+            "node": "Ledger - Episode 124 Audio Repair Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ledger - Episode 124 Audio Repair Complete": {
+      "main": [
+        [
+          {
+            "node": "Return Episode 124 Repair Contract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Published Transcription + SRT for Episode 124": {
+      "main": [
+        [
+          {
+            "node": "Validate Episode 124 Timestamp QA + Binaries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Episode 124 Timestamp QA + Binaries": {
+      "main": [
+        [
+          {
+            "node": "Cloudinary - Upload Episode 124 Corrected Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Episode 124 GitHub Consistency": {
+      "main": [
+        [
+          {
+            "node": "GitHub - Read Back Episode 124 Repair",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "tags": []
+}
