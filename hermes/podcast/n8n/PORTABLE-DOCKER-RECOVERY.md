@@ -247,3 +247,25 @@ Trigger: `pPortableProdParentX8`. Hermes job `a694c08ba15f` remained paused and
 all pi4 `gtb` timers remained inactive, so there is one scheduled producer. The
 next schedule implied by the verified rule/timezone after cutover is
 2026-08-09 06:00 EDT.
+
+## Docker control-plane migration to pi2 (2026-08-09)
+
+The live n8n 2.30.7 control plane now runs from
+`/app/stacks/n8n/compose.yaml` on Raspberry Pi 5 `pi2`, dual-homed at
+`10.0.0.12` and `10.0.70.12`. Persistent state is bind-mounted from
+`/app/data/n8n`; runtime env files remain outside Git under `/etc/n8n/`.
+The container is health-checked and uses `restart: unless-stopped`.
+
+The ARM64 CocoIndex runner remains on `pi1`, but its broker URI is now
+`http://10.0.70.12:5679`. The former CT143 runner is stopped with `onboot=0`,
+and CT109's native n8n service is stopped/disabled. Their disks remain intact
+for rollback. CT109's final stopped-source backup is
+`/root/n8n-backups/20260809-pi2-cutover/`; the matching pi2 copy is
+`/app/backups/n8n-ct109-cutover-20260809/`.
+
+The migration restored 4,478 files and all 46 workflows/13 credentials. Live
+readback showed 11 published workflows, exactly one Schedule Trigger in
+`WF-podcast-portable-production-parent-v1`, and zero in-flight executions.
+The reboot test restored both pi2 addresses, Docker, and the healthy n8n
+container. Hermes has no podcast job and pi4's three `gtb` timers remain
+disabled/inactive.
