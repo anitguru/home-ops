@@ -45,6 +45,12 @@ by the recovery test; none has a Schedule Trigger. Publish the production parent
 only when restoring the authorized scheduler cutover after proving exactly one
 scheduled producer.
 
+After every update to an already published workflow, publish/activate the new
+version and verify `versionId == activeVersionId`. A manual execution exercises
+the current draft and is not proof that scheduled or integrated production will
+use it. The acceptance run must record child `workflowVersionId` values and
+compare each with the workflow's `activeVersionId`.
+
 The approved cleanup and Cloudinary verifier exports are historical recovery
 evidence. They import MCP-disabled and must not be part of normal recovery:
 
@@ -136,6 +142,8 @@ cleanup evidence. Treat this table as operational history, not secret storage.
 5. Require terminal success for parent plus all five child executions.
    Authoring acceptance also requires `promptLeakageDetected=false`, an empty
    `promptLeakagePhrases` array, and no validation errors.
+   Confirm each execution's `workflowVersionId` equals that child's live
+   `activeVersionId`.
 6. Read back the final contract: one Cloudinary staging URL, one GitHub
    `podcast-shadow/` branch/file, database rollback true, Telegram message ID,
    audio/SRT hashes, objective audio QA, WER/anchor/layout QA, and ledger rows.

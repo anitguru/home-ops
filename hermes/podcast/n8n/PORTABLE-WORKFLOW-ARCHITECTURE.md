@@ -72,6 +72,25 @@ with explicit leakage proof. Fresh A/B execution 154 then passed: GLM on
 attempt 1 at 387 words and DeepSeek on attempt 2 at 390 words, both with six
 paragraphs, empty validation errors, and `promptLeakageDetected=false`.
 
+The 2026-08-09 scheduled execution 160 exposed n8n's draft/published boundary:
+manual A/B execution 154 had exercised the corrected drafts, while scheduled
+authoring execution 162 and validator execution 163 used older active versions
+and allowed the prior prompt sentence through. The four changed workflows were
+then explicitly published and read back with `versionId == activeVersionId`.
+Published-version regression execution 167 called A/B, GLM, DeepSeek, and
+validator executions 168–173; every execution version matched its active
+version. GLM passed at 380 words and DeepSeek at 397 words, both with empty
+validation errors and no leakage. Future workflow updates require this active
+version equality plus an integrated published-version test.
+
+The same audit found that scheduled intake execution 161 had used its older
+published lexical scorer: the CocoIndex child existed only as an unpublished
+draft dependency. The CocoIndex child and intake were published in dependency
+order. Published webhook regression execution 177 then called intake 178 and
+CocoIndex 179 on their exact active version IDs. It passed with 46 candidates,
+four unique non-duplicates, 50 indexed topics, CocoIndex 0.3.9, and ARM64
+runtime proof. The temporary caller was archived afterward.
+
 CT143 is **only** the external n8n Task Runner. The implemented portable graph
 contains no SSH nodes, CT143 URL, or `podcast-worker` dependency. Voice and
 Whisper are direct service calls from visible nodes. Cloudinary, GitHub,
